@@ -49,6 +49,12 @@ MAIN					PROC
 						POP		ES
 
 
+						LEA		DI,[TOC_BUFFER]
+						MOV		CX,512
+						MOV		AL,255
+						REP		STOSB
+
+
 						MOV		AH,054H
 						MOV		AL,0C0H
 						LEA		DI,[TOC_BUFFER]
@@ -74,7 +80,7 @@ MAIN					PROC
 						CALL	PRINT_CRLF
 						MOV		CL,BYTE PTR [TOC_BUFFER+2]
 						SUB		CL,BYTE PTR [TOC_BUFFER+1]
-						ADD		CL,2
+						ADD		CL,4  ; Must see FFFFFF in the end.
 						LEA		DI,[TOC_BUFFER]
 PRINT_LOOP:
 						MOV		AL,[DI]
