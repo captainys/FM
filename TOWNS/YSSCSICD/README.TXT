@@ -27,9 +27,17 @@ I have tested with:
 I've been able to:
   - Start and play Afterburner II
   - Start and play Splatter House
+  - Start and play Viewpoint
+  - Start and play Bubble Bobble
+  - Start and play Kyukyoku Tiger (Twin Cobra)
+  - Start and play Wing Commander, but no BGM.
+  - Start and play Rainbow Island, but no BGM.
   - Start and play CD_PLAY.EXP (TownsOS standard CD player)
+  - Boot into Towns OS V2.1 L20 using a boot floppy disk. (GUI works perfectly)
+  - Boot into Towns OS V2.1 L31 using a boot floppy disk. (GUI works perfectly)
 
-
+Tested but not worked are:
+  - Rayxanber
 
 
 
