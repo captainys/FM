@@ -41,16 +41,32 @@ Tested but not worked are:
 
 
 
-[Options]
-DEVICE=\YSSCSICD.SYS /R
-With /R option, the driver will send debugging information to RS232C.  19200bps, No parity, 1 stop bit.
-You can see what commands are sent to the CD-ROM BIOS.
+[Revision]
+V0.6 2019/12/02
+  Disabled CONFIG.SYS options.  Use ECHO command to enable/disable debug output.
 
-DEVICE=\YSSCSICD.SYS /V
-With /V option, the driver will print debugging information to Console.
+V0.5 2019/11/27
+  First success and first release!
 
-You can specify both.
 
+
+
+[Debugging Output]
+In V0.5 you could specify options in DEVICE=YSSCSICD.SYS for enabling debug output.
+
+But, I realized it is not safe when you don't have an RS232C connected to another computer because /R option will freeze the driver just waiting for TX Rdy. Therefore I disabled command options.
+
+Instead, you can do:
+  ECHO R > CPTYS_CD
+for enabling RS232C debugging,
+  ECHO V > CPTYS_CD
+for enabling Console debugging,
+  ECHO r > CPTYS_CD
+for disabling RS232C debugging, and
+  ECHO v > CPTYS_CD
+for disabling Console debugging.
+
+Don't do it in AUTOEXEC.BAT.  Enabling RS232C debugging without a computer receiving messages will freeze this driver.
 
 
 

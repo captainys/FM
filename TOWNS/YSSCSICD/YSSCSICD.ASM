@@ -31,11 +31,12 @@
 ; Standard Usage:
 ; DEVICE=YSSCSICD.SYS
 ;
-; Debug Message to Console:
-; DEVICE=YSSCSICD.SYS /V
-;
-; Debug Message to RS232C (19200bps, No Parity, 1 stop bit)
-; DEVICE=YSSCSICD.SYS /R
+; Options are disabled now.
+; DISABLED: Debug Message to Console:
+; DISABLED: DEVICE=YSSCSICD.SYS /V
+; DISABLED: 
+; DISABLED: Debug Message to RS232C (19200bps, No Parity, 1 stop bit)
+; DISABLED: DEVICE=YSSCSICD.SYS /R
 
 						.186
 
@@ -87,7 +88,7 @@ INITIALIZE				PROC	FAR
 						LEA		DI,[MSG_INTRO]
 						CALL	PRINT_CSTR
 
-						CALL	RECOGNIZE_COMMAND_PARAMETER
+						; CALL	RECOGNIZE_COMMAND_PARAMETER
 
 						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
 						JE		@f
@@ -140,7 +141,79 @@ INITIALIZE				ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 INTERRUPT				PROC	FAR
+						PUSH	ES
+						PUSH	DS
+						PUSHA
+						PUSHF
+
+						LES		DI,CS:[PACKET]
+
+						MOV		AL,ES:[DI+2]
+						MOV		WORD PTR ES:[DI+3],0100H  ; Stat=DONE
+
+						CMP		AL,13
+						JNE		@f
+						JMP		CMD_OPEN
+@@:
+						CMP		AL,14
+						JNE		@f
+						JMP		CMD_CLOSE
+@@:
+						CMP		AL,8
+						JNE		@f
+						JMP		CMD_WRITE
+@@:
+						CMP		AL,9
+						JNE		@f
+						JMP		CMD_WRITE
+@@:
+CMD_EXIT:
+
+						POPF
+						POPA
+						POP		DS
+						POP		ES
 						RET
+
+CMD_OPEN:
+						JMP		CMD_EXIT
+CMD_CLOSE:
+						JMP		CMD_EXIT
+
+CMD_WRITE:
+						; Source https://www.drdobbs.com/writing-ms-dos-device-drivers/184402277?pgno=2
+						LES		SI,ES:[DI+14]	; Data Pointer
+						CMP		CX,ES:[DI+18]	; Transfer Size
+
+CMD_WRITE_LOOP:
+						MOV		AL,ES:[SI]  ; Was there an 8086 instruction that does these four lines?
+						LEA		SI,[SI+1]
+						CMP		AL,'V'
+						JNE		@f
+						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
+						JMP		CMD_WRITE_LOOP_NEXT
+@@:
+						CMP		AL,'v'
+						JNE		@f
+						AND		BYTE PTR CS:[YSSCSICD_FLAGS],NOT YSSCSICD_FLAGS_DEBUG_CONSOLE
+						JMP		CMD_WRITE_LOOP_NEXT
+
+@@:
+						CMP		AL,'R'
+						JNE		@f
+						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
+						JMP		CMD_WRITE_LOOP_NEXT
+
+@@:
+						CMP		AL,'r'
+						JNE		@f
+						AND		BYTE PTR CS:[YSSCSICD_FLAGS],NOT YSSCSICD_FLAGS_DEBUG_RS232C
+@@:
+CMD_WRITE_LOOP_NEXT:
+						LOOP	CMD_WRITE_LOOP
+
+						JMP		CMD_EXIT
+
 INTERRUPT				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -169,88 +242,100 @@ DEVICE_END				DB		'DEVICE END',0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-RECOGNIZE_COMMAND_PARAMETER	PROC
-						PUSH	ES
-						PUSHA
+; I realized that if you set /R option in the CONFIG.SYS and if you don't have an RS232C connected to a computer,
+; The driver freezes just waiting for the TX Ready, which is dangerous.
+; I disabled command parameter.  Instead you can use:
+;   ECHO R > CPTYS_CD
+; for enabling RS232C debugging,
+;   ECHO V > CPTYS_CD
+; for enabling Console debugging,
+;   ECHO r > CPTYS_CD
+; for disabling RS232C debugging, and
+;   ECHO v > CPTYS_CD
+; for disabling Console debugging.
 
-						LES		SI,CS:[PACKET]	; ES:SI=Pointer to Command Struct
-						LES		SI,ES:[SI+18]	; ES:SI=Command String
-
-						; Debugging of CDSD.SYS told that the line may terminate by 00H, 0DH, or 0AH
-						; Probably MS-DOS V5 and newer 0DH.  V3 (like TownsOS) 00.
-
-						MOV		DH,0	; State 0:In Param   1:Out Param
-CMD_PARAM_LOOP:
-						MOV		AL,ES:[SI]
-						CALL	IS_ZERO_0DH_OR_0AH
-						JNC		@f
-						JMP		CMD_PARAM_EXIT
-@@:
-						CMP		DH,0
-						JE		CMD_PARAM_OUT_PARAM
-
-CMD_PARAM_IN_PARAM:
-						CMP		AL,'V'
-						JNE		@f
-						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
-						XOR		DH,DH
-						JMP		CMD_PARAM_NEXT
-@@:
-						CMP		AL,'R'
-						JNE		@f
-						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
-						XOR		DH,DH
-						JMP		CMD_PARAM_NEXT
-@@:
-						PUSH	ES
-						PUSH	DX
-						PUSH	SI
-						LEA		DI,[MSG_ERR_PARAM]
-						CALL	PRINT_CSTR
-						CALL	PUTC
-						CALL	PRINT_CRLF
-						POP		SI
-						POP		DX
-						POP		ES
-						XOR		DH,DH
-
-						JMP		CMD_PARAM_NEXT
-
-
-CMD_PARAM_OUT_PARAM:
-						CMP		AL,'/'
-						JNE		CMD_PARAM_NEXT
-						MOV		DH,1
-
-CMD_PARAM_NEXT:
-						LEA		SI,[SI+1]
-						JMP		CMD_PARAM_LOOP
-CMD_PARAM_EXIT:
-
-
-						POPA
-						POP		ES
-						RET
-
-IS_ZERO_0DH_OR_0AH:
-						CMP		AL,0
-						JE		@f
-						CMP		AL,0DH
-						JE		@f
-						CMP		AL,0AH
-						JE		@f
-						CLC
-						RET
-@@:
-						STC
-						RET
-
-RECOGNIZE_COMMAND_PARAMETER	ENDP
+;RECOGNIZE_COMMAND_PARAMETER	PROC
+;						PUSH	ES
+;						PUSHA
+;
+;						LES		SI,CS:[PACKET]	; ES:SI=Pointer to Command Struct
+;						LES		SI,ES:[SI+18]	; ES:SI=Command String
+;
+;						; Debugging of CDSD.SYS told that the line may terminate by 00H, 0DH, or 0AH
+;						; Probably MS-DOS V5 and newer 0DH.  V3 (like TownsOS) 00.
+;
+;						MOV		DH,0	; State 0:In Param   1:Out Param
+;CMD_PARAM_LOOP:
+;						MOV		AL,ES:[SI]
+;						CALL	IS_ZERO_0DH_OR_0AH
+;						JNC		@f
+;						JMP		CMD_PARAM_EXIT
+;@@:
+;						CMP		DH,0
+;						JE		CMD_PARAM_OUT_PARAM
+;
+;CMD_PARAM_IN_PARAM:
+;						CMP		AL,'V'
+;						JNE		@f
+;						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
+;						XOR		DH,DH
+;						JMP		CMD_PARAM_NEXT
+;@@:
+;						CMP		AL,'R'
+;						JNE		@f
+;						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
+;						XOR		DH,DH
+;						JMP		CMD_PARAM_NEXT
+;@@:
+;						PUSH	ES
+;						PUSH	DX
+;						PUSH	SI
+;						LEA		DI,[MSG_ERR_PARAM]
+;						CALL	PRINT_CSTR
+;						CALL	PUTC
+;						CALL	PRINT_CRLF
+;						POP		SI
+;						POP		DX
+;						POP		ES
+;						XOR		DH,DH
+;
+;						JMP		CMD_PARAM_NEXT
+;
+;
+;CMD_PARAM_OUT_PARAM:
+;						CMP		AL,'/'
+;						JNE		CMD_PARAM_NEXT
+;						MOV		DH,1
+;
+;CMD_PARAM_NEXT:
+;						LEA		SI,[SI+1]
+;						JMP		CMD_PARAM_LOOP
+;CMD_PARAM_EXIT:
+;
+;
+;						POPA
+;						POP		ES
+;						RET
+;
+;IS_ZERO_0DH_OR_0AH:
+;						CMP		AL,0
+;						JE		@f
+;						CMP		AL,0DH
+;						JE		@f
+;						CMP		AL,0AH
+;						JE		@f
+;						CLC
+;						RET
+;@@:
+;						STC
+;						RET
+;
+;RECOGNIZE_COMMAND_PARAMETER	ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 MSG_INTRO				DB		"YS SCSI BIOS REDIRECTOR",0DH,0AH
-						DB		"Ver 0.5 2019/11/27",0DH,0AH
+						DB		"Ver 0.6 2019/12/02",0DH,0AH
 						DB		"By CaptainYS (http://www.ysflight.com)",0DH,0AH,0
 MSG_ERR_PARAM			DB		"UNRECOGNIZED COMMAND OPTION:",0
 MSG_DEBUG_OUT_CON		DB		"DEBUG MESSAGE TO CONSOLE",0DH,0AH,0
