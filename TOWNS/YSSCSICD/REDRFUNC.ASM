@@ -186,6 +186,18 @@ REDIRECT_CDROM_BIOSCALL	PROC
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
+						CMP		AH,057H
+						JNE		@f
+						CALL	CDROM_BIOS_057H_SET_ELEVOL
+						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
+@@:
+
+						CMP		AH,058H
+						JNE		@f
+						CALL	CDROM_BIOS_058H_GET_ELEVOL
+						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
+@@:
+
 						CMP		AH,060H
 						JNE		@f
 						CALL	CDROM_BIOS_PRETEND_NO_ERROR
@@ -930,3 +942,82 @@ CDROM_BIOS_056H_UNPAUSE	PROC
 
 						RET
 CDROM_BIOS_056H_UNPAUSE	ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Unpublished function 57H Set Electric Volume
+;   AH=057H
+;   AL=0C0H
+;   DL=0
+;   DS:[DI]    Don't care
+;   DS:[DI+1]  Left Volume (Unsigned char)
+;   DS:[DI+2]  Don't care
+;   DS:[DI+3]  Right Volume (Unsigned char)
+;   DS:[DI+4]  Don't care
+;   DS:[DI+5]  Don't care
+;   DS:[DI+6]  Don't care
+;   DS:[DI+7]  Don't care
+; Just cache it so that when volume is requested, it can answer what's set.
+CDROM_BIOS_057H_SET_ELEVOL	PROC
+						PUSH	ES
+						MOV		ES,[BP+INCOMING_DS]
+						MOV		DI,[BP+INCOMING_DI]
+
+						MOV		AL,ES:[DI+1]
+						MOV		CS:[YSSCSICD_ELEVOL_LEFT],AL
+						MOV		AL,ES:[DI+3]
+						MOV		CS:[YSSCSICD_ELEVOL_RIGHT],AL
+
+						POP		ES
+						MOV		AH,0
+
+						RET
+CDROM_BIOS_057H_SET_ELEVOL	ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Unpublished function 57H Get Electric Volume
+;   AH=057H
+;   AL=0C0H
+;   DL=0
+; Return
+;   DS:[DI]    0
+;   DS:[DI+1]  Left Volume (Unsigned char)
+;   DS:[DI+2]  1
+;   DS:[DI+3]  Right Volume (Unsigned char)
+;   DS:[DI+4]  2
+;   DS:[DI+5]  Microphone Volume
+;   DS:[DI+6]  3
+;   DS:[DI+7]  Modem Volume
+;
+; Here's a problem.  I can return left and right volumes cached in the buffer.
+; What about microphone and modem?  Those are set outside of the CD-ROM BIOS.
+; If I return 0, subsequently this function may end up muting microphone and modem.
+;
+; On the other hand, if I end up maximizing the microphone volume, it could explode 
+; the speaker by microphone feedback.
+;
+; .... I just make them zeros.
+
+CDROM_BIOS_058H_GET_ELEVOL	PROC
+						PUSH	ES
+
+						MOV		ES,[BP+INCOMING_DS]
+						MOV		DI,[BP+INCOMING_DI]
+
+						MOV		BYTE PTR ES:[DI],0
+						MOV		CS:[YSSCSICD_ELEVOL_LEFT],AL
+						MOV		AL,ES:[DI+1]
+
+						MOV		BYTE PTR ES:[DI+2],1
+						MOV		CS:[YSSCSICD_ELEVOL_RIGHT],AL
+						MOV		AL,ES:[DI+3]
+
+						MOV		BYTE PTR ES:[DI+4],02H
+						MOV		BYTE PTR ES:[DI+5],00H
+						MOV		BYTE PTR ES:[DI+6],03H
+						MOV		BYTE PTR ES:[DI+7],00H
+
+						POP		ES
+						MOV		AH,0
+
+						RET
+CDROM_BIOS_058H_GET_ELEVOL	ENDP

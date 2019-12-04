@@ -4,6 +4,19 @@ http://www.ysflight.com
 
 
 
+[Revision]
+V0.7 2019/12/04
+  Better (probably) emulation of unpublished functions 57H an 58H.
+
+V0.6 2019/12/02
+  Disabled CONFIG.SYS options.  Use ECHO command to enable/disable debug output.
+
+V0.5 2019/11/27
+  First success and first release!
+
+
+
+
 This device driver is for extending life of FM TOWNS unit with a broken internal CD-ROM drive.
 
 You need a boot floppy disk or boot hard drive, but you have a good chance of running a CD-ROM game title from an external SCSI CD-ROM drive.
@@ -38,16 +51,6 @@ I've been able to:
 
 Tested but not worked are:
   - Rayxanber
-
-
-
-[Revision]
-V0.6 2019/12/02
-  Disabled CONFIG.SYS options.  Use ECHO command to enable/disable debug output.
-
-V0.5 2019/11/27
-  First success and first release!
-
 
 
 
