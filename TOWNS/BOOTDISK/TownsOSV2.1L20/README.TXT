@@ -8,7 +8,8 @@ Steps:
 1. Create a Towns OS V2.1 L20 command-mode bootable floppy disk from TownsMENU.  Make sure to select 1.2MB and check "Copy System" option.
 2. Copy two files in here, AUTOEXEC.BAT and CONFIG.SYS to the floppy disk.  Majority of the USB floppy disk drives should be able to write to 1.2MB-format floppy from Windows.
 3. Copy YSSCSICD.SYS to the floppy disk.
-
+4. Copy SYSDRV.EXE to the floppy disk.
+5. Copy SYSINIW.EXE to the floppy disk.
 
 
 Booting:
