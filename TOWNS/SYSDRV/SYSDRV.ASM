@@ -59,11 +59,12 @@ CMD_ARG_EXIT:
 
 						; Small letter?
 						MOV		AL,CS:[SYSDRV_LETTER]
-						SUB		AL,'a'
+						CMP		AL,'a'
+						JB		@f
 						CMP		AL,'z'
 						JA		@f
 						; Need capitalize
-						ADD		AL,'A'
+						ADD		AL,'A'-'a'
 						MOV		CS:[SYSDRV_LETTER],AL
 @@:
 

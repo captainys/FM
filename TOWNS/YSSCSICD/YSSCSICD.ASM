@@ -31,6 +31,12 @@
 ; Standard Usage:
 ; DEVICE=YSSCSICD.SYS
 ;
+; DEVICE=YSSCSICD.SYS /M
+;   Enable messages from SYSINIT.EXE
+;
+; DEVICE=YSSCSICD.SYS /D:Q
+;   Change system drive to Q
+;
 ; Options are disabled now.
 ; DISABLED: Debug Message to Console:
 ; DISABLED: DEVICE=YSSCSICD.SYS /V
@@ -88,7 +94,7 @@ INITIALIZE				PROC	FAR
 						LEA		DI,[MSG_INTRO]
 						CALL	PRINT_CSTR
 
-;						CALL	RECOGNIZE_COMMAND_PARAMETER
+						CALL	RECOGNIZE_COMMAND_PARAMETER
 ;
 ;						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
 ;						JE		@f
@@ -254,92 +260,176 @@ DEVICE_END				DB		'DEVICE END',0
 ;   ECHO v > CPTYS_CD
 ; for disabling Console debugging.
 
-;RECOGNIZE_COMMAND_PARAMETER	PROC
-;						PUSH	ES
-;						PUSHA
-;
-;						LES		SI,CS:[PACKET]	; ES:SI=Pointer to Command Struct
-;						LES		SI,ES:[SI+18]	; ES:SI=Command String
-;
-;						; Debugging of CDSD.SYS told that the line may terminate by 00H, 0DH, or 0AH
-;						; Probably MS-DOS V5 and newer 0DH.  V3 (like TownsOS) 00.
-;
-;						MOV		DH,0	; State 0:In Param   1:Out Param
-;CMD_PARAM_LOOP:
-;						MOV		AL,ES:[SI]
-;						CALL	IS_ZERO_0DH_OR_0AH
-;						JNC		@f
-;						JMP		CMD_PARAM_EXIT
-;@@:
-;						CMP		DH,0
-;						JE		CMD_PARAM_OUT_PARAM
-;
-;CMD_PARAM_IN_PARAM:
-;						CMP		AL,'V'
-;						JNE		@f
-;						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
-;						XOR		DH,DH
-;						JMP		CMD_PARAM_NEXT
-;@@:
-;						CMP		AL,'R'
-;						JNE		@f
-;						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
-;						XOR		DH,DH
-;						JMP		CMD_PARAM_NEXT
-;@@:
-;						PUSH	ES
-;						PUSH	DX
-;						PUSH	SI
-;						LEA		DI,[MSG_ERR_PARAM]
-;						CALL	PRINT_CSTR
-;						CALL	PUTC
-;						CALL	PRINT_CRLF
-;						POP		SI
-;						POP		DX
-;						POP		ES
-;						XOR		DH,DH
-;
-;						JMP		CMD_PARAM_NEXT
-;
-;
-;CMD_PARAM_OUT_PARAM:
-;						CMP		AL,'/'
-;						JNE		CMD_PARAM_NEXT
-;						MOV		DH,1
-;
-;CMD_PARAM_NEXT:
-;						LEA		SI,[SI+1]
-;						JMP		CMD_PARAM_LOOP
-;CMD_PARAM_EXIT:
-;
-;
-;						POPA
-;						POP		ES
-;						RET
-;
-;IS_ZERO_0DH_OR_0AH:
-;						CMP		AL,0
-;						JE		@f
-;						CMP		AL,0DH
-;						JE		@f
-;						CMP		AL,0AH
-;						JE		@f
-;						CLC
-;						RET
-;@@:
-;						STC
-;						RET
-;
-;RECOGNIZE_COMMAND_PARAMETER	ENDP
+RECOGNIZE_COMMAND_PARAMETER	PROC
+						PUSH	ES
+						PUSHA
+
+						LES		SI,CS:[PACKET]	; ES:SI=Pointer to Command Struct
+						LES		SI,ES:[SI+18]	; ES:SI=Command String
+
+						; Debugging of CDSD.SYS told that the line may terminate by 00H, 0DH, or 0AH
+						; Probably MS-DOS V5 and newer 0DH.  V3 (like TownsOS) 00.
+
+						MOV		DH,0	; State 0:In Param   1:Out Param
+
+						; Don't break ES, SI and DH in this loop.
+CMD_PARAM_LOOP:
+						MOV		AL,ES:[SI]
+						CALL	IS_ZERO_0DH_OR_0AH
+						JNC		@f
+						JMP		CMD_PARAM_EXIT
+@@:
+						CMP		DH,0
+						JNE		CMD_PARAM_IN_PARAM
+						JMP		CMD_PARAM_OUT_PARAM
+
+CMD_PARAM_IN_PARAM:
+						; SYSINIT Message
+						CMP		AL,'M'
+						JNE		@f
+
+						CALL	CMD_ENABLE_SYSINIT_MESSAGE
+						XOR		DH,DH   ; State=Out Param
+						JMP		CMD_PARAM_NEXT
+
+@@:
+						CMP		AL,'D'
+						JNE		@f
+						CALL	CMD_SET_SYSTEM_DRIVE
+						XOR		DH,DH   ; State=Out Param
+						JMP		CMD_PARAM_NEXT
+
+@@:
+						PUSH	ES
+						PUSH	DX
+						PUSH	SI
+						LEA		DI,[MSG_ERR_PARAM]
+						CALL	PRINT_CSTR
+						CALL	PUTC
+						CALL	PRINT_CRLF
+						POP		SI
+						POP		DX
+						POP		ES
+						XOR		DH,DH
+
+						JMP		CMD_PARAM_NEXT
+
+
+CMD_PARAM_OUT_PARAM:
+						CMP		AL,'/'
+						JNE		CMD_PARAM_NEXT
+						MOV		DH,1
+
+CMD_PARAM_NEXT:
+						LEA		SI,[SI+1]
+						JMP		CMD_PARAM_LOOP
+CMD_PARAM_EXIT:
+
+
+						POPA
+						POP		ES
+						RET
+
+IS_ZERO_0DH_OR_0AH:
+						CMP		AL,0
+						JE		@f
+						CMP		AL,0DH
+						JE		@f
+						CMP		AL,0AH
+						JE		@f
+						CLC
+						RET
+@@:
+						STC
+						RET
+
+
+
+CMD_ENABLE_SYSINIT_MESSAGE:
+						MOV		AL,'R'
+						MOV		DX,3A34H
+						OUT		DX,AL
+
+						MOV		AL,'A'
+						MOV		DX,3A36H
+						OUT		DX,AL
+
+						LEA		DI,[MSG_ENABLE_SYSINIT_MSG]
+						CALL	PRINT_CSTR
+
+						RET
+
+
+CMD_SET_SYSTEM_DRIVE:
+						PUSH	SI
+						PUSH	DX
+
+						MOV		AL,BYTE PTR CS:[CMD_SYSDRV_LETTER]
+
+						CMP		BYTE PTR ES:[SI+1],':'
+						JNE		@f
+						MOV		AL,ES:[SI+2]
+@@:
+
+						; Small letter?
+						CMP		AL,'a'
+						JB		@f
+						CMP		AL,'z'
+						JA		@f
+						; Need capitalize
+						ADD		AL,'A'-'a'
+@@:
+
+						CMP		AL,'A'
+						JB		CMD_SYSDRV_BAD_DRIVE_LETTER
+						CMP		AL,'Z'
+						JA		CMD_SYSDRV_BAD_DRIVE_LETTER
+
+						MOV		BYTE PTR CS:[CMD_SYSDRV_LETTER],AL
+						LEA		DI,[MSG_SYSDRV]
+						CALL	PRINT_CSTR
+
+						MOV		BL,CS:[CMD_SYSDRV_LETTER]
+						SUB		BL,'A'
+						AND		BL,1FH
+						SHL		BL,2
+
+						MOV		DX,3C32H
+						IN		AL,DX
+
+						AND		AL,083H
+						OR		AL,BL
+
+						OUT		DX,AL
+
+CMD_SET_SYSTEM_DRIVE_EXIT:
+						POP		DX
+						POP		SI
+						RET
+
+CMD_SYSDRV_BAD_DRIVE_LETTER:
+						LEA		DI,[MSG_SYSDRV_BADDRV]
+						CALL	PRINT_CSTR
+						JMP		CMD_SET_SYSTEM_DRIVE_EXIT
+
+RECOGNIZE_COMMAND_PARAMETER	ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 MSG_INTRO				DB		"YS SCSI BIOS REDIRECTOR",0DH,0AH
-						DB		"Ver 0.6 2019/12/02",0DH,0AH
+						DB		"Ver 0.7 2019/12/05",0DH,0AH
 						DB		"By CaptainYS (http://www.ysflight.com)",0DH,0AH,0
-;MSG_ERR_PARAM			DB		"UNRECOGNIZED COMMAND OPTION:",0
+MSG_ERR_PARAM			DB		"UNRECOGNIZED COMMAND OPTION:",0
 ;MSG_DEBUG_OUT_CON		DB		"DEBUG MESSAGE TO CONSOLE",0DH,0AH,0
 ;MSG_DEBUG_OUT_RS232C	DB		"DEBUG MESSAGE TO RS232C",0DH,0AH,0
+
+MSG_SYSDRV				DB		"SET SYSTEM DRIVE TO ["
+CMD_SYSDRV_LETTER		DB		'Q'
+						DB		']',0DH,0AH,0
+
+MSG_SYSDRV_BADDRV		DB		"BAD DRIVE LETTER",0DH,0AH,0
+
+MSG_ENABLE_SYSINIT_MSG	DB		"ENABLED SYSINIT.EXE MESSAGES",0DH,0AH,0
 
 DATA_CODE				ENDS
 
