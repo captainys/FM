@@ -91,6 +91,14 @@ CMD_ARG_EXIT:
 
 						OUT		DX,AL
 
+
+						; Change DOS default drive.
+						MOV		DL,CS:[SYSDRV_LETTER]
+						SUB		DL,'A'
+						MOV		AH,0EH
+						INT		21H
+
+
 						JMP		@f
 
 ILLEGAL_DRIVE_LETTER:
