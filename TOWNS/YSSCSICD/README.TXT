@@ -5,6 +5,9 @@ http://www.ysflight.com
 
 
 [Revision]
+V0.8 2019/12/05
+  Integrated SYSINIW.EXE and SYSDRV.EXE with YSSCSICD.SYS
+
 V0.7 2019/12/04
   Better (probably) emulation of unpublished functions 57H an 58H.
 
