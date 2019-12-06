@@ -35,6 +35,9 @@ MSG_REG_CX				DB		" CX=",0
 MSG_REG_DX				DB		" DX=",0
 MSG_REG_SI				DB		" SI=",0
 MSG_REG_DI				DB		" DI=",0
+MSG_REG_CS				DB		" CS=",0
+MSG_REG_DS				DB		" DS=",0
+MSG_REG_ES				DB		" ES=",0
 
 
 PRINT_REGISTER			PROC

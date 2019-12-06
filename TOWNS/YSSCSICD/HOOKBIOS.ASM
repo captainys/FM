@@ -108,12 +108,31 @@ INT93H_IS_CDROM_CALL:
 						JE		@f	; Jump if redirect.
 						JMP		CS:[INT93_TOWNS]
 @@:
+						MOV		BYTE PTR CS:[YSSCSICD_DEBUG_CMD_CACHE],AH
 						CALL	REDIRECT_CDROM_BIOSCALL
 
 
 						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
-						JE		@f
+						JE		INT93H_NO_RS232C_POST
 						PUSHA
+
+						;;;;;;;;
+
+						PUSH	AX
+						PUSH	CX
+						CMP		BYTE PTR CS:[YSSCSICD_DEBUG_CMD_CACHE],050H
+						JNE		@f
+						CALL	INT93_DEBUG_RS232C_PLAY_INFO
+@@:
+						CMP		BYTE PTR CS:[YSSCSICD_DEBUG_CMD_CACHE],054H
+						JNE		@f
+						CALL	INT93_DEBUG_RS232C_TOC
+@@:
+						POP		CX
+						POP		AX
+
+						;;;;;;;;
+
 						PUSH	AX
 						MOV		AL,'R'
 						CALL	RS232C_PUTC
@@ -125,12 +144,65 @@ INT93H_IS_CDROM_CALL:
 						CALL	BUSY_WAIT_65536
 						CALL	RS232C_WAIT_TX_READY
 						POPA
-@@:
+INT93H_NO_RS232C_POST:
 
 						IRET
 
 INT93H_HOOKPROC			ENDP
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+INT93_DEBUG_RS232C_PLAY_INFO	PROC
+						PUSH	DI
+						PUSH	CX
+						PUSH	AX
+						MOV		CX,6
+@@:
+						MOV		AL,DS:[DI]
+						CALL	RS232C_AL
+						LEA		DI,[DI+1]
+						LOOP	@b
+
+						CALL	RS232C_CRLF
+						POP		AX
+						POP		CX
+						POP		DI
+						RET
+INT93_DEBUG_RS232C_PLAY_INFO	ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+INT93_DEBUG_RS232C_TOC	PROC
+						PUSH	DI
+						PUSH	CX
+						PUSH	AX
+
+						CMP		AH,0
+						JNE		INT93_DEBUG_RS232C_TOC_ERROR
+
+						MOV		CL,DS:[DI+2]
+						SUB		CL,DS:[DI+1]
+						ADD		CL,3			; CL+1=Num of music  Two more 3-byte pairs for additional info.
+						XOR		CH,CH
+@@:
+						MOV		AL,DS:[DI]
+						CALL	RS232C_AL
+						MOV		AL,DS:[DI+1]
+						CALL	RS232C_AL
+						MOV		AL,DS:[DI+2]
+						CALL	RS232C_AL
+						CALL	RS232C_CRLF
+						LEA		DI,[DI+3]
+						LOOP	@b
+
+INT93_DEBUG_RS232C_TOC_ERROR:
+						POP		AX
+						POP		CX
+						POP		DI
+						RET
+INT93_DEBUG_RS232C_TOC	ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 BUSY_WAIT_65536			PROC
 						PUSH	CX
