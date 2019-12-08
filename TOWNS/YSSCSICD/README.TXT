@@ -5,7 +5,11 @@ http://www.ysflight.com
 
 
 [Revision]
-V0.8 2019/12/07
+V0.87 2019/12/08
+  I was forgetting to return BX and DX in AH=02H.
+  Also since fix in V0.85, AL was not returned.  I think I fixed AL-not-returned problem all.
+
+V0.85 2019/12/07
   Preserve AL.  Only update AH.
   Preserve CX unless return_AH==0x80.
 
