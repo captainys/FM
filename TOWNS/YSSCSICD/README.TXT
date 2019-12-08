@@ -5,6 +5,10 @@ http://www.ysflight.com
 
 
 [Revision]
+V0.8 2019/12/07
+  Preserve AL.  Only update AH.
+  Preserve CX unless return_AH==0x80.
+
 V0.8 2019/12/05
   Integrated SYSINIW.EXE and SYSDRV.EXE with YSSCSICD.SYS
 

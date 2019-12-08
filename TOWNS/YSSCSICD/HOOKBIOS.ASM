@@ -40,8 +40,8 @@ INSTALL_HOOK			PROC
 						; AL=93H    for INT 93H
 						INT		21H
 
-						MOV		WORD PTR [INT93_TOWNS],BX
-						MOV		WORD PTR [INT93_TOWNS+2],ES
+						MOV		WORD PTR CS:[INT93_TOWNS],BX
+						MOV		WORD PTR CS:[INT93_TOWNS+2],ES
 
 						PUSH	CS
 						POP		ES
@@ -75,11 +75,6 @@ INT93H_IS_CDROM_CALL:
 						PUSH	ES
 						PUSH	DS
 
-						PUSH	DS
-						POP		ES
-
-						PUSH	CS
-						POP		DS
 
 						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
 						JE		@f
@@ -182,7 +177,7 @@ INT93_DEBUG_RS232C_TOC	PROC
 
 						MOV		CL,DS:[DI+2]
 						SUB		CL,DS:[DI+1]
-						ADD		CL,3			; CL+1=Num of music  Two more 3-byte pairs for additional info.
+						ADD		CL,4			; CL+1=Num of music  Two more 3-byte pairs for additional info.  Will print 3 extra bytes.
 						XOR		CH,CH
 @@:
 						MOV		AL,DS:[DI]

@@ -327,7 +327,7 @@ RS232C_CSTR				PROC
 						PUSH	AX
 
 @@:
-						MOV		AL,DS:[DI]
+						MOV		AL,CS:[DI]
 						CMP		AL,0
 						JE		RS232C_CSTR_EXIT
 						CALL	RS232C_PUTC

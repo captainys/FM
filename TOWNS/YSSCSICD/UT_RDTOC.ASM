@@ -59,19 +59,11 @@ MAIN					PROC
 						MOV		AL,0C0H
 						LEA		DI,[TOC_BUFFER]
 						XOR		CX,CX
+						CALL	PRINT_REGISTER
+						CALL	PRINT_CRLF
 						INT		93H
-
-						PUSH	AX
-						LEA		DI,[MSG_AH]
-						CALL	PRINT_CSTR
-						MOV		AL,AH
-						CALL	PRINT_AL
-
-						LEA		DI,[MSG_CX]
-						CALL	PRINT_CSTR
-						MOV		AX,CX
-						CALL	PRINT_AX
-						POP		AX
+						CALL	PRINT_REGISTER
+						CALL	PRINT_CRLF
 
 						CMP		AH,0
 						JNE		EXIT

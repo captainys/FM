@@ -76,6 +76,21 @@ PRINT_REGISTER			PROC
 						CALL	PRINT_CSTR
 						CALL	PRINT_AX
 
+						MOV		AX,CS
+						LEA		DI,[MSG_REG_CS]
+						CALL	PRINT_CSTR
+						CALL	PRINT_AX
+
+						MOV		AX,DS
+						LEA		DI,[MSG_REG_DS]
+						CALL	PRINT_CSTR
+						CALL	PRINT_AX
+
+						MOV		AX,ES
+						LEA		DI,[MSG_REG_ES]
+						CALL	PRINT_CSTR
+						CALL	PRINT_AX
+
 						MOV		AL,'$'
 						CALL	PUTC
 
@@ -195,7 +210,7 @@ PRINT_CSTR				PROC
 						PUSH	CX
 						PUSH	AX
 @@:
-						MOV		DL,DS:[DI]
+						MOV		DL,CS:[DI]
 						CMP		DL,0
 						JE		PRINT_CSTR_EXIT
 						MOV		AH,06H
