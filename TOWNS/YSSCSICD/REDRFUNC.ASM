@@ -560,6 +560,18 @@ CDROM_BIOS_050H_START_PLAY		PROC
 						MOV		CS:[DEBUG_REDIR_SUBSTEP],'a'
 						RET
 @@:
+						; Cache first, and use cache for SCSI command >>
+						; DOS Extender Call Back may overwrite the Protected-Mode shared buffer.
+						MOV		ES,[BP+INCOMING_DS]
+						MOV		DI,[BP+INCOMING_DI]
+
+						MOV		CX,ES:[DI]
+						MOV		WORD PTR CS:[CDPLAY_INFO_CACHE],CX   ; CS is supposed to be same as DS though.
+						MOV		CX,ES:[DI+2]
+						MOV		WORD PTR CS:[CDPLAY_INFO_CACHE+2],CX
+						MOV		CX,ES:[DI+4]
+						MOV		WORD PTR CS:[CDPLAY_INFO_CACHE+4],CX
+						; Cache first <<
 
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS
@@ -577,16 +589,10 @@ CDROM_BIOS_050H_START_PLAY		PROC
 						RET
 @@:
 
-						MOV		ES,[BP+INCOMING_DS]
-						MOV		DI,[BP+INCOMING_DI]
+						MOV		CX,CS
+						MOV		ES,CX
+						LEA		DI,[CDPLAY_INFO_CACHE]
 						MOV		AL,[YSSCSICD_SCSI_ID]
-
-						MOV		CX,ES:[DI]
-						MOV		WORD PTR [CDPLAY_INFO_CACHE],CX
-						MOV		CX,ES:[DI+2]
-						MOV		WORD PTR [CDPLAY_INFO_CACHE+2],CX
-						MOV		CX,ES:[DI+4]
-						MOV		WORD PTR [CDPLAY_INFO_CACHE+4],CX
 
 						CALL	SCSI_START_PLAY
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
