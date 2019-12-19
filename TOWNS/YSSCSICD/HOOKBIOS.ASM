@@ -60,6 +60,15 @@ INSTALL_HOOK			ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 INT93H_HOOKPROC			PROC
+						CMP		AX,71C0H
+						JNE		@f
+						JMP		YS_EXT_PLAY_CDDA
+@@:
+						CMP		AX,72C0H
+						JNE		@f
+						JMP		YS_EXT_PLAY_CDDA_BCD
+@@:
+
 						CMP		AL,0C0H
 						JE		INT93H_IS_CDROM_CALL
 
