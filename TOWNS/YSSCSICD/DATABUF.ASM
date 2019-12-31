@@ -27,7 +27,10 @@
 ;
 ;//////////////////////////////////////////////////////////// */
 
-SCSI_DATA_BUF_LENGTH 	EQU 	2560
+SECTOR_BUFFER_COUNT		EQU		12
+MAX_SECTOR_SIZE			EQU		2340
+
+SCSI_DATA_BUF_LENGTH 	EQU 	(128+SECTOR_BUFFER_COUNT*MAX_SECTOR_SIZE)
 
 YSSCSICD_SCSI_ID		DB		0	; 0FFH:No SCSI CD  0 to 7:SCSI CD Found
 
@@ -43,4 +46,4 @@ DEBUG_REDIR_SUBSTEP		DB		' '
 
 SCSI_DATABUF_PTR		DB		4 dup(0)
 SCSI_CMD				DB		12 dup(0)  ; SCSI_HDR and SCSI_CMD must be contiguous, probably.
-SCSI_DATA_BUF			DB		SCSI_DATA_BUF_LENGTH dup(0) ; I don't know what I get from FDH.
+SCSI_DATA_BUF			DB		SCSI_DATA_BUF_LENGTH dup(?) ; I don't know what I get from FDH.

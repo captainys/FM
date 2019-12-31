@@ -238,9 +238,15 @@ INTERRUPT				ENDP
 
 MSG_FOUND_CDROM_AT		DB		"Found CD-ROM Drive SCSI-ID:",0
 MSG_CDROM_NOT_FOUND		DB		"SCSI CD-ROM Drive not found.",0DH,0AH,0
+DATA_CODE				ENDS
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+						INCLUDE	WRHIGH.ASM
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+DATA_CODE				SEGMENT
 						INCLUDE	DATABUF.ASM
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

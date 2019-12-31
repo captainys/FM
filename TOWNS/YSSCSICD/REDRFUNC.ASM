@@ -336,32 +336,15 @@ CDROM_BIOS_02H_GET_DRIVE_STATUS	ENDP
 ;   ES   Destination segment (if CH==0)
 ;   DI   Destination address or destination physical address low word
 CDROM_BIOS_05H_READ_SECTOR_HSG	PROC
+						CMP		CH,0FFH
+						JNE		@f
+						JMP		CDROM_BIOS_READ_SECTOR_EX
+@@:
+
 						PUSH	ES
 
 						MOV		ES,[BP+INCOMING_DS]
 						MOV		DI,[BP+INCOMING_DI]
-
-						CMP		CH,0FFH
-						JNE		@f
-
-						XCHG	CH,CL
-						MOV		AX,SI
-						AND		AX,0FH
-						MOV		CL,12
-						SHL		AX,CL
-						MOV		ES,AX
-						XCHG	CH,CL
-
-						XOR		CH,CH
-						CMP		SI,10H
-						JC		@f
-
-						; Physical Address>0FFFFFH  Inaccessible from real mode.
-						POP		ES
-						MOV		AH,BIOSERR_HARDERROR
-						MOV		CX,BIOSERR_DETAIL_PARAMETER
-						RET
-@@:
 
 						CMP		CH,0
 						JE		@f
@@ -519,6 +502,11 @@ CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG		ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CDROM_BIOS_15H_READ_SECTOR_MSF	PROC
+						CMP		CH,0FFH
+						JNE		@f
+						JMP		CDROM_BIOS_READ_SECTOR_EX
+@@:
+
 						PUSH	AX
 
 						MOV		AX,DX
@@ -1034,3 +1022,126 @@ CDROM_BIOS_058H_GET_ELEVOL	PROC
 
 						RET
 CDROM_BIOS_058H_GET_ELEVOL	ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CDROM_BIOS_READ_SECTOR_EX	PROC
+
+						MOV		CS:[PHYS_ADDR_HIGH],SI
+						MOV		CS:[PHYS_ADDR_LOW],DI
+
+						CMP		AH,15H
+						JNE		@f		; Jump if it is not Read Sector MSF
+
+						; Convert MSF to HSG
+						; BX is carrying number of sectors.  Don't break BX
+
+						; Done with AL and AH
+						; Input:
+						;  CL=Min
+						;  DH=Sec
+						;  DL=Frm
+						MOV		AX,DX
+						MOV		DL,CL
+						;	DL		MIN
+						;	AH		SEC
+						;	AL		FRM
+						CALL	MSF2HSG
+						; Looks like I need to subtract 150 (2 seconds)
+						SUB		AX,150
+						SBB		DX,0
+						;	DH		0
+						;	DL		High-byte of HSG
+						;	AH		Mid-byte of HSG
+						;	AL		Low-byte of HSG
+
+						MOV		CX,DX	; Make it CX=High word, and DX=Low word
+						MOV		DX,AX
+
+						; Now all HSG,
+@@:
+						MOV		AX,CS
+						MOV		DS,AX
+						MOV		ES,AX		; DS=ES=CS
+
+						MOV		CS:[HSG_ADDRESS_HIGH],CX
+						MOV		CS:[HSG_ADDRESS_LOW],DX
+						MOV		CS:[NUM_SECT_LEFT],BX
+
+						; Debug Output
+						;PUSHA
+						;CALL	PRINT_AL
+						;CALL	PRINT_CRLF
+						;POPA
+						; Debug Output
+
+						; while(0<NUM_SECT_LEFT)
+						; {
+READ_SECTOR_EX_LOOP:
+						MOV		AH,0		; Tentatively No Error
+
+						MOV		BX,CS:[NUM_SECT_LEFT]
+						CMP		BX,0
+						JE		READ_SECTOR_EX_LOOP_END
+
+						CMP		BX,SECTOR_BUFFER_COUNT
+						JL		@f
+						MOV		BX,SECTOR_BUFFER_COUNT
+@@:
+						SUB		CS:[NUM_SECT_LEFT],BX
+
+						; BX=Num Sector to Read
+						PUSH	BX
+						MOV		CL,BYTE PTR CS:[HSG_ADDRESS_HIGH]
+						MOV		DX,CS:[HSG_ADDRESS_LOW]
+						LEA		DI,[SCSI_DATA_BUF]
+						MOV		AL,CS:[YSSCSICD_SCSI_ID]
+						; At this line
+						; AL     SCSI ID
+						; ES:DI  Destination
+						; BX     Read sector count
+						; CL|DX  HSG address
+						CALL	SCSI_READ_SECTOR_HSG
+						CALL	CDROM_BIOS_IS_SCSI_ERROR
+						POP		BX
+						JC		READ_SECTOR_EX_LOOP_END
+
+
+
+						;   DX:AX    Physical Address  DX=High_16_bit  AX=Low_16_bit
+						;   DS:SI    Source
+						;   CX       Transfer size/4
+						PUSH	BX
+						MOV		DX,CS:[PHYS_ADDR_HIGH]
+						MOV		AX,CS:[PHYS_ADDR_LOW]
+						MOV		CX,BX
+						SHL		CX,(11-2) ; 2048 bytes per sector (Left Shift by 11), CX should be #bytes/4 (Right Shift by 2)
+						LEA		SI,[SCSI_DATA_BUF]
+						CALL	WRITE_HIGH
+						POP		BX
+
+						ADD		WORD PTR CS:[HSG_ADDRESS_LOW],BX
+						ADC		WORD PTR CS:[HSG_ADDRESS_HIGH],0
+
+						SHL		BX,11 ; 2048 bytes per sector
+						ADD		WORD PTR CS:[PHYS_ADDR_LOW],BX
+						ADC		WORD PTR CS:[PHYS_ADDR_HIGH],0
+
+						JMP		READ_SECTOR_EX_LOOP
+						; }
+
+READ_SECTOR_EX_LOOP_END:
+						MOV		BX,CS:[NUM_SECT_LEFT]
+						MOV		[BP+INCOMING_BX],BX
+
+						RET
+
+
+NUM_SECT_LEFT			DW		0
+HSG_ADDRESS_LOW			DW		0
+HSG_ADDRESS_HIGH		DW		0
+PHYS_ADDR_LOW			DW		0
+PHYS_ADDR_HIGH			DW		0
+
+CDROM_BIOS_READ_SECTOR_EX	ENDP
+
