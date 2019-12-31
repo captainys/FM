@@ -5,6 +5,10 @@ http://www.ysflight.com
 
 
 [Revision]
+V0.90 2019/12/31
+  Supported INT 93H, AH=05H/15H, CH=0FFH, read sector to physical memory location.
+  With this addition RAYXANBER can start from a boot floppy disk.
+
 V0.87 2019/12/08
   I was forgetting to return BX and DX in AH=02H.
   Also since fix in V0.85, AL was not returned.  I think I fixed AL-not-returned problem all.
