@@ -9,6 +9,18 @@ V0.90 2019/12/31
   Supported INT 93H, AH=05H/15H, CH=0FFH, read sector to physical memory location.
   With this addition RAYXANBER can start from a boot floppy disk.
 
+  Added original function AX=71C0H (Play CDDA) and AX=72C0H (Play CDDA BCD).  The usage is:
+    INT 93H
+    AX=71C0H or 72C0H
+    BL Starting time M (In BCD if AH=72H)
+    BH Starting time S (In BCD if AH=72H)
+    CL Starting time F (In BCD if AH=72H)
+    CH Ending time M (In BCD if AH=72H)
+    DL Ending time S (In BCD if AH=72H)
+    DH Ending time F (In BCD if AH=72H)
+
+  This addition was needed for patching Puyo Puyo to enable CDDA BGM, and may be used for other titles in the future.
+
 V0.87 2019/12/08
   I was forgetting to return BX and DX in AH=02H.
   Also since fix in V0.85, AL was not returned.  I think I fixed AL-not-returned problem all.
