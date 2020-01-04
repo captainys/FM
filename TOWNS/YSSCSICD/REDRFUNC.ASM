@@ -769,17 +769,19 @@ CDROM_BIOS_054H_GET_DISC_INFO_TOC	PROC
 						; RedTOC issues SCSI call READ TOC with Track=0AAH.
 						; BL(Min), DH(Sec), DL(Frm) are taken from data buffer+9, 10, 11
 						; Min, Sec, Frm are then converted to HSG and returned.
-						; For unknown reason, CDSD.SYS subtracts 150 frames (2 seconds) from volume size.
-						; I just follow it
 
 						MOV		DL,BYTE PTR [SCSI_DATA_BUF+9]
 						MOV		AH,BYTE PTR [SCSI_DATA_BUF+10]
 						MOV		AL,BYTE PTR [SCSI_DATA_BUF+11]
-						SUB		AH,2	; 2 seconds
-						JNC		@f
-						ADD		AH,60
-						DEC		DL
-@@:
+
+						; For unknown reason, CDSD.SYS seems to subtract 150 frames (2 seconds) from volume size.
+						; Uncomment the following if it is correct.
+						; But, to make it compatible with FM TOWNS CD-ROM BIOS, it shouldn't subtract 2 seconds apparently.
+;						SUB		AH,2	; 2 seconds
+;						JNC		@f
+;						ADD		AH,60
+;						DEC		DL
+;@@:
 						MOV		ES:[SI+3],DL
 						MOV		ES:[SI+4],AH
 						MOV		ES:[SI+5],AL

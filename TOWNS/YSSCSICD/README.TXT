@@ -5,6 +5,18 @@ http://www.ysflight.com
 
 
 [Revision]
+V0.91 2020/01/04
+  Now supports Operation Wolf.
+
+  Fixed AH=54H (Read TOC).  When I was reading CDSD.SYS source, I understood that the total length returned
+  must be the length returned from SCSI CD-ROM minus 2 seconds (150 frames).  I may have gotten it wrong,
+  or CDSD.SYS was wrong, or it was for MSCDEX not for FM TOWNS CD-ROM BIOS after all.
+
+  To make it compatible with FM TOWNS CD-ROM BIOS, I apparently shouldn't subtract 2 seconds.  Operation Wolf
+  was checking the total length of the CD to make sure the original disc was in the drive, and this 2-second
+  discrepancy was preventing it from starting.
+
+
 V0.90 2019/12/31
   Supported INT 93H, AH=05H/15H, CH=0FFH, read sector to physical memory location.
   With this addition RAYXANBER can start from a boot floppy disk.

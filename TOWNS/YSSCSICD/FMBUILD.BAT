@@ -96,6 +96,6 @@ DEL YSSCSICD.LST
 
 
 COPY YSSCSICD.SYS A:\
-
+COPY copy2hdd.bat A:\
 
 :EXIT

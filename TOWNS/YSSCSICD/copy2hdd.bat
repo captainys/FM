@@ -1,0 +1,6 @@
+copy YSSCSICD.SYS D:\
+copy YSSCSICD.SYS E:\
+copy YSSCSICD.SYS F:\
+copy YSSCSICD.SYS G:\
+copy YSSCSICD.SYS H:\
+copy YSSCSICD.SYS I:\
