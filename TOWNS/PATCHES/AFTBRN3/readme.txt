@@ -8,6 +8,8 @@ patch.exe AB3.EXP AB3PATCH.EXP
 
 Or, if you run PATCH.EXP you can apply patch on FM TOWNS (real hardware or emulator).  AB3.EXP is the executable in the CD-ROM of Afterburner 3 for FM TOWNS.
 
+This patch also redirects its CDDA-Play function to YSSCSICD.SYS's expanded function (AX=71C0H).  You need to have YSSCSICD.SYS installed to play CDDA.
+
 The patched executable can run from Towns OS V1.1.  It most likely crash if you start from V2.1.
 
 To run the patched executable, do the following:
@@ -27,6 +29,8 @@ patch.cをコンパイル後、
 patch.exe AB3.EXP AB3PATCH.EXP
 
 としてパッチを当てる。あるいは、PATCH.EXPを使うとFM TOWNS上(実機でもエミュレータでも)でパッチを当てることができる。AB3.EXPはFM TOWNS用Afterburner 3のCD-ROM上の実行ファイル。
+
+なお、CDDA関数をYSSCSICD.SYSの拡張機能(AX=71C0H)にリダイレクトするのでYSSCSICD.SYSがインストールされていない状態ではBGMが鳴らない。
 
 この実行ファイルはTowns OS V1.1から起動が可能。V2.1だと途中でクラッシュする可能性が高い。
 
