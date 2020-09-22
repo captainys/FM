@@ -1,3 +1,19 @@
+INITGRAPHICS			PROC
+
+						MOV		DX,IO_FMR_GVRAMDISPMODE
+						MOV		AL,27H  ; Show all planes, write to Page 0 (Page 0 is upper half of VRAM Layer 0)
+						OUT		DX,AL
+
+						MOV		DX,IO_FMR_GVRAMMASK
+						MOV		AL,0FH  ; Write to all planes
+						OUT		DX,AL
+
+						RET
+
+INITGRAPHICS			ENDP
+
+
+
 CLS						PROC
 						PUSH	ES
 						PUSH	DI
@@ -18,6 +34,16 @@ CLS						PROC
 						RET
 CLS						ENDP
 
+
+; Input
+;   AL Color (0-15)
+; DX will be destroyed.
+COLOR					PROC
+						AND		AL,0FH
+						MOV		DX,IO_FMR_GVRAMMASK
+						OUT		DX,AL
+						RET
+COLOR					ENDP
 
 
 ; Input
