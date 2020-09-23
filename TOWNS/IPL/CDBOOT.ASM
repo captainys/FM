@@ -12,11 +12,62 @@ BOOT_FROM_SCSI_CD		PROC
 						PUSH	CX
 						CALL	FIND_FBIOS_SECTOR
 						POP		CX
+						JB		@f
+
+						; CL=SCSI ID
+						; EAX=Sector where FBIOS is written
+						MOV		EDX,EAX
+						MOV		BX,64
+						MOV		EDI,0400H
+						CALL	SCSI_READ_SECTOR
+						JB		@f
+
+						MOV		AX,0050H
+						MOV		FS,AX
+						MOV		AX,FS:[0]
+						MOV		FS,AX
+						CALL	FIND_JUMP_INSTRUCTION
+						JB		@f
+
+						PUSH	FS
+						PUSH	SI
+
+						MOV		BP,SP
+						MOV		AL,[BP+2]  ; Low Byte FS
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [BOOT_SCSICD_FOUND_MSG+16],AX
+
+						MOV		AL,[BP+3]  ; High Byte FS
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [BOOT_SCSICD_FOUND_MSG+14],AX
+
+						MOV		AL,[BP]  ; Low Byte SI
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [BOOT_SCSICD_FOUND_MSG+21],AX
+
+						MOV		AL,[BP+1]  ; High Byte SI
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [BOOT_SCSICD_FOUND_MSG+19],AX
+
+						MOV		AX,0106H
+						CALL	LOCATE
+						MOV		SI,OFFSET BOOT_SCSICD_FOUND_MSG
+						CALL	PRINT_TALL
+
+						POP		FS
+						POP		SI
 
 @@:
+						
 						RET
 BOOT_FROM_SCSI_CD		ENDP
 
+BOOT_SCSICD_ERROR_MSG	DB		"BOOT SEQUENCE FAILED",0
+BOOT_SCSICD_FOUND_MSG	DB		"JMPF FOUND AT xxxx:xxxx",0
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -191,4 +242,62 @@ FIND_FBIOS_SECTOR		ENDP
 
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+; Input
+;   FS    IO.SYS Start Segment
+; Output
+;   SI    Offset to the JMPF xxxx:0000
+;   CF    Set if not found
+FIND_JUMP_INSTRUCTION	PROC
+						MOV		SI,0
+
+FIND_JUMP_INSTRUCTION_LOOP:
+						MOV		AL,FS:[SI]
+						CALL	E8_OR_BE
+						JNE		FIND_JUMP_INSTRUCTION_NEXT
+
+						MOV		CX,10
+						PUSH	SI
+@@:
+						ADD		SI,3
+						MOV		AL,FS:[SI]
+						CALL	E8_OR_BE
+						JNE		@f
+						LOOP	@b
+
+						ADD		SI,3
+						MOV		AL,FS:[SI]
+						CMP		AL,0EAH		; JMPF
+						JNE		@f
+
+						; Found it!
+						ADD		SP,2
+						JMP		FIND_JUMP_INSTRUCTION_FOUND
+
+@@:
+						POP		SI
+
+FIND_JUMP_INSTRUCTION_NEXT:
+						INC		SI
+						CMP		SI,0FF00H	; Must not be that late in the segment
+						JNE		FIND_JUMP_INSTRUCTION_LOOP
+						STC
+						RET
+
+FIND_JUMP_INSTRUCTION_FOUND:
+						CLC
+						RET
+
+; Return ZF=1 if AL==E8 or BE
+E8_OR_BE:
+						CMP		AL,0E8H	; CALL
+						JE		@f
+						CMP		AL,0BEH ; MOV SI,
+@@:						RET
+
+
+FIND_JUMP_INSTRUCTION	ENDP
 
