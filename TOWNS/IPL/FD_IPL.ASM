@@ -33,6 +33,7 @@ MAIN					PROC
 						CALL		PRINT_TALL
 
 						POP			BX
+						PUSH		BX
 
 						MOV			AL,BH	; Unit number
 						OR			AL,20H	; Floppy Disk
@@ -66,9 +67,11 @@ MAIN					PROC
 						JNC			@b
 
 @@:
+						POP			BX		; Keep Incoming AX
+
 						DB			9AH		; CALLF 8000:0000
 						DW			0000H
-						DW			8000H
+						DW			BOOTLOADER_SEGMENT
 
 
 READ_ERROR:

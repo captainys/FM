@@ -34,13 +34,13 @@
 ; PAUSED   12H
 ; However, I have a suspicion that it is 11H even when it is paused.
 
-						.186
+						.386p
 
 						ORG		0
 						ASSUME	CS:DATA_CODE,DS:DATA_CODE,SS:STACK
 
 
-DATA_CODE				SEGMENT
+DATA_CODE				SEGMENT	USE16
 
 MAIN					PROC
 

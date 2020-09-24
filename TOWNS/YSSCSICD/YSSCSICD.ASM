@@ -44,13 +44,13 @@
 ; DISABLED: Debug Message to RS232C (19200bps, No Parity, 1 stop bit)
 ; DISABLED: DEVICE=YSSCSICD.SYS /R
 
-						.186
+						.386p
 
 						ORG		0
 						ASSUME	CS:DATA_CODE,DS:DATA_CODE
 
 
-DATA_CODE				SEGMENT
+DATA_CODE				SEGMENT	USE16
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -72,6 +72,11 @@ PACKET					DD		0
 NOT_USED_AT_THIS_TIME	DD		0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+						ORG		0020H
+DIRECT_INSTALL			PROC	FAR
+						JMP		INSTALL_HOOK_DIRECT
+DIRECT_INSTALL			ENDP
 
 STRATEGY				PROC	FAR
 						MOV		WORD PTR CS:[PACKET],BX
@@ -424,7 +429,7 @@ RECOGNIZE_COMMAND_PARAMETER	ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 MSG_INTRO				DB		"YS SCSI BIOS REDIRECTOR",0DH,0AH
-						DB		"Ver 0.91 2020/01/04",0DH,0AH
+						DB		"Ver 0.92 2020/09/24",0DH,0AH
 						DB		"By CaptainYS (http://www.ysflight.com)",0DH,0AH,0
 MSG_ERR_PARAM			DB		"UNRECOGNIZED COMMAND OPTION:",0
 ;MSG_DEBUG_OUT_CON		DB		"DEBUG MESSAGE TO CONSOLE",0DH,0AH,0
