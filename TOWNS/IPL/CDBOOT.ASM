@@ -337,7 +337,7 @@ IOSYS_INTERCEPT			PROC
 						POP		DS
 
 						; Turned out MSDOS.SYS is copied to the conventional memory, but not installed yet.
-			CALL	TSUGARU_DEBUG_BREAK
+			; CALL	TSUGARU_DEBUG_BREAK
 
 						PUSH	AX
 						MOV		AL,CS:[SCSI_ID_CDROM]
@@ -347,7 +347,7 @@ IOSYS_INTERCEPT			PROC
 						DW		YSSCSICD_SEGMENT
 						POP		AX
 
-			CALL	TSUGARU_DEBUG_BREAK
+			; CALL	TSUGARU_DEBUG_BREAK
 
 						DB		0EAH ; JMPF
 IOSYS_RESUME_IP			DW		0
