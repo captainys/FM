@@ -58,8 +58,28 @@ BOOT_FROM_SCSI_CD		PROC
 						MOV		SI,OFFSET BOOT_SCSICD_FOUND_MSG
 						CALL	PRINT_TALL
 
-						POP		FS
 						POP		SI
+						POP		FS
+
+						MOV		AX,FS:[SI+1]
+						MOV		CS:[IOSYS_RESUME_IP],AX
+						MOV		AX,FS:[SI+3]
+						MOV		CS:[IOSYS_RESUME_CS],AX
+
+						MOV		WORD PTR FS:[SI+1],OFFSET IOSYS_INTERCEPT
+						MOV		FS:[SI+3],CS
+
+						MOV		CS:[IOSYS_ENTRY_CS],FS
+
+						; MOV		BX,0002H
+						MOV		AX,0F7FFH	; This will make IO.SYS think B0000H to BFFFFH block is inaccessible.
+						MOV		DI,0
+						MOV		DX,0
+						MOV		CX,0280H  ; Pretend CD-ROM Drive
+						DB		0EAH   ; JMPF
+IOSYS_ENTRY_IP			DW		0000H ; Fixed
+IOSYS_ENTRY_CS			DW		0000H
+
 
 @@:
 						
@@ -301,3 +321,29 @@ E8_OR_BE:
 
 FIND_JUMP_INSTRUCTION	ENDP
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+; Intercept IO.SYS jump to MSDOS.SYS
+IOSYS_INTERCEPT			PROC
+
+						PUSH	CS
+						POP		DS
+
+						; Turned out MSDOS.SYS is copied to the conventional memory, but not installed yet.
+
+@@:
+						JMP		@b
+
+						DB		0EAH ; JMPF
+IOSYS_RESUME_IP			DW		0
+IOSYS_RESUME_CS			DW		0
+
+IOSYS_INTERCEPT_MESSAGE	DB		"INTERCEPTED IO.SYS$",0
+
+
+
+IOSYS_INTERCEPT			ENDP
