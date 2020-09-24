@@ -134,6 +134,10 @@ ISSUE_SCSI_CMD_OWN_BUFFER:
 						CALL	FIRE_INT_93H
 
 						; Observation suggests that CH=2, AH=0 also needs sense.
+						; With more understanding of FM-R BIOS, AH=0 means the command was successful.
+						; In this case, Disk BIOS successfully communicated with the SCSI device.
+						; CH must be the status code returned from the SCSI device.
+						; 2 means CHECK_CONDITION.
 						CMP		CH,2
 						JNE		@f
 						CMP		AH,0
@@ -146,7 +150,7 @@ ISSUE_SCSI_CMD_OWN_BUFFER:
 						JE		ISSUE_SCSI_CMD_EXIT	; Jump if no error.
 
 						; FM TOWNS BIOS disassembly strongly suggests that CH is the error code.
-						; The meaning of CH is still unknown, but 0 means no error.
+						; The meaning of CH is still unknown, but 0 means no error.  -> See above.  CH must be the STATUS code from the SCSI device.
 
 ISSUE_SCSI_CMD_NEED_SENSE:
 						PUSH	CX
