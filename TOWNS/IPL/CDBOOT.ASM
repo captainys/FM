@@ -74,11 +74,11 @@ BOOT_FROM_SCSI_CD		PROC
 
 						MOV		CS:[IOSYS_ENTRY_CS],FS
 
-						; MOV		BX,0002H
-						MOV		AX,0F7FFH	; This will make IO.SYS think B0000H to BFFFFH block is inaccessible.
+						MOV		AX,0F7FFH	; Make IO.SYS think B0000H to BFFFFH block is inaccessible
+						MOV		BX,0008H	; Pretend Booting from CD-ROM Drive
+						MOV		CX,0280H
 						MOV		DI,0
 						MOV		DX,0
-						MOV		CX,0280H  ; Pretend CD-ROM Drive
 						DB		0EAH   ; JMPF
 IOSYS_ENTRY_IP			DW		0000H ; Fixed
 IOSYS_ENTRY_CS			DW		0000H
