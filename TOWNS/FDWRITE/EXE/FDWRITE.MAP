@@ -1,0 +1,348 @@
+386|LINK: 4.1 -- Copyright (C) 1986-91 Phar Lap Software, Inc.
+Target CPU is 80386
+
+
+Command line switches:
+
+BUILD\FDWRITE.OBJ @LIBS.LN -EXE EXE\FDWRITE.EXP
+-LIB
+C:\hc386\TOWNSLIB\LIB\TBIOS.lib
+C:\hc386\TOWNSLIB\LIB\FMCFRB.lib
+C:\hc386\small\hce.lib
+C:\hc386\small\na.lib
+
+
+Input module(s):
+
+"FDWRITE" from file "BUILD\FDWRITE.OBJ".
+"f9300" from file "C:\hc386\TOWNSLIB\LIB\FMCFRB.lib".
+"f9330" from file "C:\hc386\TOWNSLIB\LIB\FMCFRB.lib".
+"f9350" from file "C:\hc386\TOWNSLIB\LIB\FMCFRB.lib".
+"f9360" from file "C:\hc386\TOWNSLIB\LIB\FMCFRB.lib".
+"c9300-0" from file "C:\hc386\TOWNSLIB\LIB\FMCFRB.lib".
+"c9301-0" from file "C:\hc386\TOWNSLIB\LIB\FMCFRB.lib".
+"fclose" from file "C:\hc386\small\hce.lib".
+"printf" from file "C:\hc386\small\hce.lib".
+"ctop1" from file "C:\hc386\small\hce.lib".
+"fopen" from file "C:\hc386\small\hce.lib".
+"init" from file "C:\hc386\small\hce.lib".
+"fread" from file "C:\hc386\small\hce.lib".
+"cvars" from file "C:\hc386\small\hce.lib".
+"fwrite" from file "C:\hc386\small\hce.lib".
+"init_buf" from file "C:\hc386\small\hce.lib".
+"aprintf" from file "C:\hc386\small\hce.lib".
+"cfinit" from file "C:\hc386\small\hce.lib".
+"arg" from file "C:\hc386\small\hce.lib".
+"dummypio" from file "C:\hc386\small\hce.lib".
+"errno" from file "C:\hc386\small\hce.lib".
+"system1" from file "C:\hc386\small\hce.lib".
+"system3" from file "C:\hc386\small\hce.lib".
+"_fmode" from file "C:\hc386\small\hce.lib".
+"heap" from file "C:\hc386\small\hce.lib".
+"term" from file "C:\hc386\small\hce.lib".
+"system4" from file "C:\hc386\small\hce.lib".
+"system5" from file "C:\hc386\small\hce.lib".
+"osmajor" from file "C:\hc386\small\hce.lib".
+"printr" from file "C:\hc386\small\hce.lib".
+"atexit" from file "C:\hc386\small\hce.lib".
+"c_heap1" from file "C:\hc386\small\hce.lib".
+"dos" from file "C:\hc386\small\hce.lib".
+"floa3" from file "C:\hc386\small\hce.lib".
+"floa4" from file "C:\hc386\small\hce.lib".
+"fsim1" from file "C:\hc386\small\hce.lib".
+"fsim0b" from file "C:\hc386\small\hce.lib".
+"fsim0d" from file "C:\hc386\small\hce.lib".
+"fsim0f" from file "C:\hc386\small\hce.lib".
+"fsim1a" from file "C:\hc386\small\hce.lib".
+"fsim1b" from file "C:\hc386\small\hce.lib".
+"fsim1c" from file "C:\hc386\small\hce.lib".
+"fsim1d" from file "C:\hc386\small\hce.lib".
+"c_stkdmp" from file "C:\hc386\small\hce.lib".
+"kb2" from file "C:\hc386\small\hce.lib".
+"eflsupp" from file "C:\hc386\small\hce.lib".
+"ltox" from file "C:\hc386\small\hce.lib".
+"rtox" from file "C:\hc386\small\hce.lib".
+"fsima" from file "C:\hc386\small\hce.lib".
+"fsim0" from file "C:\hc386\small\hce.lib".
+"fsim4" from file "C:\hc386\small\hce.lib".
+"fsim6" from file "C:\hc386\small\hce.lib".
+"fsimaa" from file "C:\hc386\small\hce.lib".
+"fsimab" from file "C:\hc386\small\hce.lib".
+"term2" from file "C:\hc386\small\hce.lib".
+
+
+Segment map
+
+     Name         Group         Class     Type   Offset     Size
+------------  ------------  ------------  ----  --------  --------
+CODE          CGROUP        CODE          PUB   00000000  00000000
+FDWRITE       CGROUP        CODE          PVT   00000000  0000039C
+FMC_CSEG      CGROUP        CODE          PUB   0000039C  000000B4
+_MWFCLOSE     CGROUP        CODE          PVT   00000450  000001DD
+_MWPRINTF     CGROUP        CODE          PVT   00000630  000000E7
+_MWCTOP1      CGROUP        CODE          PVT   00000718  00000039
+_MWFOPEN      CGROUP        CODE          PVT   00000754  0000049C
+?init         CGROUP        CODE          PVT   00000BF0  00000647
+_MWFREAD      CGROUP        CODE          PVT   00001238  0000054C
+_MWFWRITE     CGROUP        CODE          PVT   00001784  0000039E
+_MWINIT_BUF   CGROUP        CODE          PVT   00001B24  000000E6
+_MWAPRINTF    CGROUP        CODE          PVT   00001C0C  00000AD0
+_MWFINIT      CGROUP        CODE          PVT   000026DC  0000008F
+_MWARG        CGROUP        CODE          PVT   0000276C  0000010F
+_mwdummypio   CGROUP        CODE          PVT   0000287C  00000001
+_MWDOS_INTE-  CGROUP        CODE          PVT   00002880  000000E8
+_MWDOS_INTE-  CGROUP        CODE          PVT   00002968  000000A9
+HEAPCODE      CGROUP        CODE          PUB   00002A14  00000694
+_MWTERM1      CGROUP        CODE          PVT   000030A8  00000089
+_MWDOS_INTE-  CGROUP        CODE          PVT   00003134  000000D4
+_MWDOS_INTE-  CGROUP        CODE          PVT   00003208  00000043
+_MWPRINTR     CGROUP        CODE          PVT   0000324C  00000CD5
+ATEXIT        CGROUP        CODE          PVT   00003F24  00000050
+_MWHEAP1      CGROUP        CODE          PVT   00003F74  00000076
+_mwcalldos_   CGROUP        CODE          PVT   00003FEC  0000007F
+_MWFLOA3      CGROUP        CODE          PVT   0000406C  00000080
+_MWFLOA4      CGROUP        CODE          PVT   000040EC  00000113
+_MWFSIM1      CGROUP        CODE          PVT   00004200  00000117
+_MWFSIM0B     CGROUP        CODE          PVT   00004318  00000039
+_MWFSIM0D     CGROUP        CODE          PVT   00004354  0000003C
+_MWFSIM0F     CGROUP        CODE          PVT   00004390  000000A0
+_MWFSIM1A     CGROUP        CODE          PVT   00004430  000000CE
+_MWFSIM1B     CGROUP        CODE          PVT   00004500  00000138
+_MWFSIM1C     CGROUP        CODE          PVT   00004638  0000015A
+_MWFSIM1D     CGROUP        CODE          PVT   00004794  000000D3
+_MWSTACKDUMP  CGROUP        CODE          PVT   00004868  0000002E
+_MWCONSOLE2   CGROUP        CODE          PVT   00004898  00000031
+_mwfloat      CGROUP        CODE          PUB   000048CC  00000144
+_mwltox_      CGROUP        CODE          PVT   00004A10  000000F8
+_mwrtox_      CGROUP        CODE          PVT   00004B08  000000C5
+_mwfsima      CGROUP        CODE          PVT   00004BD0  00000153
+_MWFSIM0      CGROUP        CODE          PVT   00004D24  000000CA
+_MWFSIM4      CGROUP        CODE          PVT   00004DF0  000000BE
+_MWFSIM6      CGROUP        CODE          PVT   00004EB0  0000028F
+_mwfsimaa     CGROUP        CODE          PVT   00005140  0000004A
+_mwfsimab     CGROUP        CODE          PVT   0000518C  00000096
+_MWTERM2      CGROUP        CODE          PVT   00005224  00000091
+DATA          DGROUP        DATA          PUB   000052B8  0000000A
+_MWLITERALS   DGROUP        DATA          PUB   000052C4  000002DF
+@FDWRITE      DGROUP        DATA          PVT   000055A4  00000408
+?PRINTF_EXT-  DGROUP        DATA          COM   000059AC  00000030
+?_MWSYSTEM    DGROUP        DATA          COM   000059DC  00000004
+_MWLTCONV     DGROUP        DATA          COM   000059E0  00000008
+_mwinitfrst-  DGROUP        DATA          PUB   000059E8  00000000
+_mwinitmust-  DGROUP        DATA          PUB   000059E8  00000000
+_mwinitlast-  DGROUP        DATA          PUB   000059E8  00000000
+dseg          DGROUP        DATA          PVT   000059E8  0000004B
+_MW1167_USE-  DGROUP        DATA          COM   00005A33  0000000A
+_MWEMC_USED1                DATA          COM   00005A3D  0000000A
+_MW87_USED1   DGROUP        DATA          COM   00005A47  0000000A
+_MW387_USED1  DGROUP        DATA          COM   00005A51  00000002
+@CVARS        DGROUP        DATA          PVT   00005A54  00000260
+@_MWAPRINTF   DGROUP        DATA          PVT   00005CB4  00000050
+@_MWARG       DGROUP        DATA          PVT   00005D04  00000001
+?_MWSTATUS    DGROUP        DATA          COM   00005D08  00000008
+_MWDOSREGS    DGROUP        DATA          COM   00005D10  00000024
+@_FMODE       DGROUP        DATA          PVT   00005D34  00000002
+?_MWHEAP      DGROUP        DATA          COM   00005D38  00000008
+@_MWHEAP_MG-  DGROUP        DATA          PVT   00005D40  00000014
+?HEAP_LOCAL   DGROUP        DATA          COM   00005D54  0000001C
+@_MWTERM1     DGROUP        DATA          PVT   00005D70  00000009
+@_MWPRINTR    DGROUP        DATA          PVT   00005D7C  00000048
+@ATEXIT       DGROUP        DATA          PVT   00005DC4  00000088
+?_MWPORTIO    DGROUP        DATA          COM   00005E4C  00000014
+@_MWFLOA3     DGROUP        DATA          PVT   00005E60  0000009C
+?_MWFSIM      DGROUP        DATA          COM   00005EFC  000000FC
+_mwfdata      DGROUP        DATA          COM   00005FF8  0000001B
+@_MWTERM2     DGROUP        DATA          PVT   00006014  00000002
+?STACK        DGROUP        STACK         STK   00006018  00002000
+
+
+Public symbols
+
+     Name       Value      Module        Segment      Size
+------------  --------  ------------  ------------  --------
+__onexit_te-  00005DC4  atexit        @ATEXIT       
+_base         000059F8  init          dseg          
+_bufsiz       00005C48  cvars         @CVARS        
+_fdopen       00000B54  fopen         _MWFOPEN      
+_fmode        00005D34  _fmode        @_FMODE       
+_fopen_max    00005CAC  cvars         @CVARS        
+_fsopen       00000B70  fopen         _MWFOPEN      
+_gda          00005A00  init          dseg          
+_iob          00005A54  cvars         @CVARS        
+_mw1167       00005A21  init          dseg          
+_mw387        00005A1F  init          dseg          
+_mw8087       00005A1B  init          dseg          
+_mw_87_f2add  00004918  eflsupp       _mwfloat      
+_mw_87_f2co-  00004942  eflsupp       _mwfloat      
+_mw_87_f2div  0000493B  eflsupp       _mwfloat      
+_mw_87_f2mpy  00004934  eflsupp       _mwfloat      
+_mw_87_fbld   00004A06  eflsupp       _mwfloat      
+_mw_87_fbstp  000049FC  eflsupp       _mwfloat      
+_mw_87_fflt   00004958  eflsupp       _mwfloat      
+_mw_87_fllo-  00004998  eflsupp       _mwfloat      
+_mw_87_fload  0000497E  eflsupp       _mwfloat      
+_mw_87_flret  00004985  eflsupp       _mwfloat      
+_mw_87_fpop   000049B2  eflsupp       _mwfloat      
+_mw_87_fret   00004971  eflsupp       _mwfloat      
+_mw_87_ftlo-  000049A9  eflsupp       _mwfloat      
+_mw_87_ftret  0000499F  eflsupp       _mwfloat      
+_mw_87_fxam   000049F3  eflsupp       _mwfloat      
+_mw_87_round  000049E8  eflsupp       _mwfloat      
+_mw_87_trunc  000049CC  eflsupp       _mwfloat      
+_mw_87_ufflt  0000495F  eflsupp       _mwfloat      
+_mwabort      00005254  term2         _MWTERM2      
+_mwaddmany    00004BD0  fsima         _mwfsima      
+_mwaprintf    000023E8  aprintf       _MWAPRINTF    
+_mwarglen     00005A10  init          dseg          
+_mwargp       00005A04  init          dseg          
+_mwargvp      00005A0A  init          dseg          
+_mwbcd_to_r-  000041E8  floa4         _MWFLOA4      
+_mwc_create   000029A8  system3       _MWDOS_INTE-  
+_mwc_dos_na-  00002988  system3       _MWDOS_INTE-  
+_mwc_open     000029D0  system3       _MWDOS_INTE-  
+_mwc_unlink   00002A00  system3       _MWDOS_INTE-  
+_mwcall_one-  00003F54  atexit        ATEXIT        
+_mwcalldos    00003FEC  dos           _mwcalldos_   
+_mwcfclose_-  000005E0  fclose        _MWFCLOSE     
+_mwcfinit     000026F0  cfinit        _MWFINIT      
+_mwcfterm     00002738  cfinit        _MWFINIT      
+_mwcheck_he-  00003088  heap          HEAPCODE      
+_mwCPU        000059EC  init          dseg          
+_mwdisplay    00005224  term2         _MWTERM2      
+_mwdos        00002898  system1       _MWDOS_INTE-  
+_mwdos_exit   00002950  system1       _MWDOS_INTE-  
+_mwdshl       00004D11  fsima         _mwfsima      
+_mwdump_heap  00003FD8  c_heap1       _MWHEAP1      
+_mweach_all-  00002AF4  heap          HEAPCODE      
+_mweach_fre-  00002A80  heap          HEAPCODE      
+_mweach_item  00002A28  heap          HEAPCODE      
+_mwemc87      00005A23  init          dseg          
+_mwend        000030A8  term          _MWTERM1      
+_mwenv        00005A2C  init          dseg          
+_mwenvp       00005A14  init          dseg          
+_mwes         000059EE  init          dseg          
+_mwexpand_h-  000011CB  init          ?init         
+_mwfabs       000044C4  fsim1a        _MWFSIM1A     
+_mwfadd       00004200  fsim1         _MWFSIM1      
+_mwfbld       00004EB0  fsim6         _MWFSIM6      
+_mwfbstp      00004FA8  fsim6         _MWFSIM6      
+_mwfcmp       00004848  fsim1d        _MWFSIM1D     
+_mwfcompare   00004830  fsim1d        _MWFSIM1D     
+_mwfcompare-  00004794  fsim1d        _MWFSIM1D     
+_mwfdiv       00004644  fsim1c        _MWFSIM1C     
+_mwfdivr      00004638  fsim1c        _MWFSIM1C     
+_mwfdup       000044E4  fsim1a        _MWFSIM1A     
+_mwferr       00003F84  c_heap1       _MWHEAP1      
+_mwfileclass  000031C0  system4       _MWDOS_INTE-  
+_mwfinit      0000287C  dummypio      _mwdummypio   
+_mwflload     00004354  fsim0d        _MWFSIM0D     
+_mwfload      00004318  fsim0b        _MWFSIM0B     
+_mwfmpy       00004500  fsim1b        _MWFSIM1B     
+_mwfneg       00004468  fsim1a        _MWFSIM1A     
+_mwfpop       00004D60  fsim0         _MWFSIM0      
+_mwfpstacko-  00004D24  fsim0         _MWFSIM0      
+_mwfree       00002FCE  heap          HEAPCODE      
+_mwfsub       00004498  fsim1a        _MWFSIM1A     
+_mwfsubr      0000448C  fsim1a        _MWFSIM1A     
+_mwfterm      0000287C  dummypio      _mwdummypio   
+_mwftload     00004390  fsim0f        _MWFSIM0F     
+_mwftret      000043F0  fsim0f        _MWFSIM0F     
+_mwfwrite_    00001798  fwrite        _MWFWRITE     
+_mwfxam       00004DF0  fsim4         _MWFSIM4      
+_mwfxch       00004430  fsim1a        _MWFSIM1A     
+_mwget_expo-  000041AC  floa4         _MWFLOA4      
+_mwget_file-  000007C0  fopen         _MWFOPEN      
+_mwgetds      00001234  init          ?init         
+_mwhalt       000030E8  term          _MWTERM1      
+_mwheap_exp-  00005A32  init          dseg          
+_mwheaphi     000011AC  init          ?init         
+_mwheaplo     000011A0  init          ?init         
+_mwhmalloc    00002F30  heap          HEAPCODE      
+_mwinc_tos    00004D44  fsim0         _MWFSIM0      
+_mwINIT       00000BF0  init          ?init         
+_mwinit_buf   00001B3C  init_buf      _MWINIT_BUF   
+_mwinput      000059E8  init          dseg          
+_mwinsert_i-  00002BBC  heap          HEAPCODE      
+_mwis_286     00005A1A  init          dseg          
+_mwkbnewline  000048B4  kb2           _MWCONSOLE2   
+_mwkbputs     00004898  kb2           _MWCONSOLE2   
+_mwleast_fr-  00002CF4  heap          HEAPCODE      
+_mwload_ds_-  0000290C  system1       _MWDOS_INTE-  
+_mwload_ptr   000028D8  system1       _MWDOS_INTE-  
+_mwlseek      00003208  system5       _MWDOS_INTE-  
+_mwltox       00004A10  ltox          _mwltox_      
+_mwmalloc     00002F94  heap          HEAPCODE      
+_mwmalloc2    00002E18  heap          HEAPCODE      
+_mwnegmany    00004C4E  fsima         _mwfsima      
+_mwnormalize  00004D68  fsim0         _MWFSIM0      
+_mwOS         000059ED  init          dseg          
+_mwout_conv-  0000362C  printr        _MWPRINTR     
+_mwout_conv-  00003D58  printr        _MWPRINTR     
+_mwoutput     000059EA  init          dseg          
+_mwpad_to_f-  00001C6C  aprintf       _MWAPRINTF    
+_mwprognamep  00005A26  init          dseg          
+_mwreal_to_-  000041D0  floa4         _MWFLOA4      
+_mwrestore_-  00000C01  init          ?init         
+_mwrtox       00004B08  rtox          _mwrtox_      
+_mwsend_pad   00001C24  aprintf       _MWAPRINTF    
+_mwset_flag-  000048EE  eflsupp       _mwfloat      
+_mwset_flag-  000009C4  fopen         _MWFOPEN      
+_mwset_roun-  000048CC  eflsupp       _mwfloat      
+_mwset_stac-  0000122E  init          ?init         
+_mwset_up_a-  00002780  arg           _MWARG        
+_mwspecial_-  000040EC  floa4         _MWFLOA4      
+_mwss         00001231  init          ?init         
+_mwstack_li-  000052B8  init          DATA          
+_mwstack_ov-  0000529C  term2         _MWTERM2      
+_mwstackdump  00004884  c_stkdmp      _MWSTACKDUMP  
+_mwstkerr     00005290  term2         _MWTERM2      
+_mwsubmany1-  00004BF9  fsima         _mwfsima      
+_mwsubmany1-  00004C22  fsima         _mwfsima      
+_mwten_to_t-  0000406C  floa3         _MWFLOA3      
+_mwvsretcode  000030D0  term          _MWTERM1      
+_mwxdiv       0000518C  fsimab        _mwfsimab     
+_mwxmpy       00005140  fsimaa        _mwfsimaa     
+_mwxnormali-  00004C73  fsima         _mwfsima      
+_mwxshl       00004CA8  fsima         _mwfsima      
+_mwxshr       00004CB8  fsima         _mwfsima      
+_mwxshrcnt    00004CC4  fsima         _mwfsima      
+_mwxtol       00004A85  ltox          _mwltox_      
+_mwxtor       00004B6D  rtox          _mwrtox_      
+_mwzclose     00002930  system1       _MWDOS_INTE-  
+_mwzread      00003134  system4       _MWDOS_INTE-  
+_mwztrunc     000031AC  system4       _MWDOS_INTE-  
+_mwzwrite     00003160  system4       _MWDOS_INTE-  
+_osmajor      000052C0  osmajor       DATA          
+_osminor      000052C1  osmajor       DATA          
+_osversion    000052C0  osmajor       DATA          
+_psp          000059EE  init          dseg          
+_temp_file_-  00005CB0  cvars         @CVARS        
+_top          000059F4  init          dseg          
+atexit        00003F24  atexit        ATEXIT        
+DKB_client_-  00000420  c9300-0       FMC_CSEG      
+DKB_client_-  00000440  c9301-0       FMC_CSEG      
+DKB_read      000003C8  f9350         FMC_CSEG      
+DKB_restore   000003B8  f9330         FMC_CSEG      
+DKB_setmode   0000039C  f9300         FMC_CSEG      
+DKB_write     000003F4  f9360         FMC_CSEG      
+errno         00005D0A  errno         ?_MWSTATUS    
+fclose        0000053C  fclose        _MWFCLOSE     
+fflush        00000464  fclose        _MWFCLOSE     
+fopen         00000B38  fopen         _MWFOPEN      
+FormatToStr-  00000000  FDWRITE       FDWRITE       
+fprintf       00000700  printf        _MWPRINTF     
+fread         00001708  fread         _MWFREAD      
+free          00000728  ctop1         _MWCTOP1      
+fwrite        00001A84  fwrite        _MWFWRITE     
+IdentifyDes-  000000D0  FDWRITE       FDWRITE       
+IdentifyFor-  0000008C  FDWRITE       FDWRITE       
+img           000055A8  FDWRITE       @FDWRITE      
+imgSize       000055A4  FDWRITE       @FDWRITE      
+main          00000200  FDWRITE       FDWRITE       
+malloc        00000744  ctop1         _MWCTOP1      
+printf        000006DC  printf        _MWPRINTF     
+ReadImageFi-  00000044  FDWRITE       FDWRITE       
+testBuf       000055AC  FDWRITE       @FDWRITE      
+vfprintf      00000680  printf        _MWPRINTF     
+vprintf       000006BC  printf        _MWPRINTF     
+WriteDisk     00000174  FDWRITE       FDWRITE       
