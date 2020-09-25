@@ -169,3 +169,28 @@ PRINT_TALL				PROC
 						POP		ES
 						RET
 PRINT_TALL				ENDP
+
+
+
+; Input
+;   DI   First address of the line
+;        DI will be destroyed
+ERASE_LINE_TALL			PROC
+
+						PUSH	ES
+						PUSH	AX
+						PUSH	CX
+
+						MOV		AX,0C000H
+						MOV		ES,AX
+
+						XOR		AX,AX
+						MOV		CX,80*16/2
+						REP STOSW
+
+						POP		CX
+						POP		AX
+						POP		ES
+						RET
+
+ERASE_LINE_TALL			ENDP

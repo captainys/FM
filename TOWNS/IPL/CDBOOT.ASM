@@ -11,7 +11,9 @@ BOOT_FROM_SCSI_CD		PROC
 						CMP		AL,0FFH
 						JE		@f
 
-						MOV		CL,AL
+						CALL	WAIT_SCSI_CD_READY
+
+						MOV		CL,CS:[SCSI_ID_CDROM]
 						PUSH	CX
 						CALL	FIND_FBIOS_SECTOR
 						POP		CX
@@ -91,6 +93,38 @@ BOOT_FROM_SCSI_CD		ENDP
 
 BOOT_SCSICD_ERROR_MSG	DB		"BOOT SEQUENCE FAILED",0
 BOOT_SCSICD_FOUND_MSG	DB		"JMPF FOUND AT xxxx:xxxx",0
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WAIT_SCSI_CD_READY		PROC
+
+						MOV		AX,000AH
+						CALL	LOCATE
+						MOV		SI,OFFSET WAIT_SCSI_CD_READY
+						CALL	PRINT_TALL
+
+@@:
+						CALL	BUSY_WAIT_FFFFH
+
+						MOV		CL,CS:[SCSI_ID_CDROM]
+						CALL	SCSI_TEST_UNIT_READY
+						AND		AH,AH
+						JNE		@b
+
+						MOV		AX,000AH
+						CALL	LOCATE
+						CALL	ERASE_LINE_TALL
+
+						RET
+
+WAIT_SCSI_CD_READY		ENDP
+
+WAIT_SCSI_CD_READY_MSG	DB		"WAITING SCSI CD READY",0
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -211,8 +245,6 @@ FIND_LAST_SCSI_CD_STR2	DB	"SCSI CD DRIVE NOT FOUND",0
 ;   EAX Sector starting with "FBIOS"
 ;   CF  Set if not found
 FIND_FBIOS_SECTOR		PROC
-
-			CALL	TSUGARU_DEBUG_BREAK
 
 						MOV		AX,0040H
 						MOV		FS,AX
@@ -383,6 +415,21 @@ E8_OR_BE:
 
 
 FIND_JUMP_INSTRUCTION	ENDP
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+BUSY_WAIT_FFFFH			PROC
+						PUSH	CX
+						MOV		CX,0FFFFH
+@@:
+						LOOP	@b
+						POP		CX
+						RET
+BUSY_WAIT_FFFFH			ENDP
 
 
 

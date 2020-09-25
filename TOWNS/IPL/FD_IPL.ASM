@@ -39,11 +39,14 @@ MAIN					PROC
 						OR			AL,20H	; Floppy Disk
 						MOV			CS:[DEVICEID],AL
 
-						MOV			WORD PTR CS:[TRACK_SIDE],1
+
+						MOV			WORD PTR CS:[TRACK_SIDE],BOOTLOADER_FD_BEGIN_TRACK*2+BOOTLOADER_FD_BEGIN_SIDE
+						MOV			BYTE PTR CS:[SECTOR],BOOTLOADER_FD_BEGIN_SECTOR
 						MOV			WORD PTR CS:[BUFFADDR],0
 
 						MOV			AX,BOOTLOADER_SEGMENT
 						MOV			DS,AX
+
 @@:
 						MOV			AH,05H	 ; Read Sector
 						MOV			AL,CS:[DEVICEID]
@@ -51,8 +54,13 @@ MAIN					PROC
 						XOR			DH,DH
 						SHR			CX,1
 						RCL			DH,1
-						MOV			DL,1
-						MOV			BX,8
+
+						MOV			DL,CS:[SECTOR]
+
+						MOV			BL,9
+						SUB			BL,DL
+						XOR			BH,BH
+
 						MOV			DI,CS:[BUFFADDR]
 
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
@@ -62,8 +70,14 @@ MAIN					PROC
 
 						JB			READ_ERROR
 
+						MOV			BL,9
+						SUB			BL,CS:[SECTOR]
+						XOR			BH,BH
+						SHL			BX,10		; ReadSize=1024*SectorCount
+
+						MOV			BYTE PTR CS:[SECTOR],1
 						INC			WORD PTR CS:[TRACK_SIDE]
-						ADD			WORD PTR CS:[BUFFADDR],8192
+						ADD			WORD PTR CS:[BUFFADDR],BX
 						JNC			@b
 
 @@:
@@ -87,12 +101,14 @@ MAIN					ENDP
 
 						INCLUDE		DRAWFONT.ASM
 						INCLUDE		MEMBANK.ASM
+						INCLUDE		TSUGARU.ASM
 
 MESSAGE					DB	"FD BOOT",0
 ERROR_MESSAGE			DB	"SECTOR READ ERROR!",0
 
 DEVICEID				DB	0
 TRACK_SIDE				DW	0
+SECTOR					DB	0
 BUFFADDR				DW	0
 
 CODE					ENDS

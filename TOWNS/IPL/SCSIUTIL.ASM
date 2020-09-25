@@ -77,7 +77,7 @@ SCSI_READ_SECTOR_CMD	DB	28H,0,0,0,0,0,0,0,0,0
 ; Output
 ;   AH      0 Unit is ready
 ;           Non Zero (Most likely 2) Unit is not ready
-SESI_TEST_UNIT_READY	PROC
+SCSI_TEST_UNIT_READY	PROC
 						PUSH	DS
 
 						PUSH	CS
@@ -95,7 +95,7 @@ SESI_TEST_UNIT_READY	PROC
 						POP		DS
 						RET
 
-SESI_TEST_UNIT_READY	ENDP
+SCSI_TEST_UNIT_READY	ENDP
 
 SCSI_TEST_UNIT_READY_CMD	DB		0,0,0,0,0,0
 
