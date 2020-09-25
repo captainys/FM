@@ -11,9 +11,7 @@ IDENTIFY_SCSI_DEVICE	PROC
 						MOV		SI,OFFSET SCSI_INQURY_CMD
 
 						AND		CL,7
-						MOV		CH,CL
-						SHL		CH,5
-						MOV		[SI+1],CH
+						MOV		BYTE PTR [SI+1],0  ; Looks like Logical Unit ID needs to be zero.
 
 						MOV		EDI,DS
 						AND		EDI,0FFFFH
@@ -52,9 +50,7 @@ SCSI_READ_SECTOR		PROC
 						MOV		SI,OFFSET SCSI_READ_SECTOR_CMD
 
 						AND		CL,7
-						SHL		CL,5
-						MOV		[SI+1],CL
-						SHR		CL,5
+						MOV		BYTE PTR [SI+1],0 ; Looks like Logical Unit ID needs to be zero.
 
 						MOV		[SI+4],DH
 						MOV		[SI+5],DL
@@ -71,3 +67,28 @@ SCSI_READ_SECTOR		PROC
 SCSI_READ_SECTOR		ENDP
 
 SCSI_READ_SECTOR_CMD	DB	28H,0,0,0,0,0,0,0,0,0
+
+
+
+; Input
+;   CL SCSI ID
+SCSI_SENSE				PROC
+						PUSH	DS
+
+						PUSH	CS
+						POP		DS
+						AND		CL,7
+						MOV		SI,OFFSET SCSI_SENSE_CMD
+						MOV		EDI,0
+						MOV		DI,CS
+						SHL		EDI,4
+						ADD		EDI,OFFSET SCSI_SENSE_INFO
+						CALL	SCSI_COMMAND
+						POP		DS
+						RET
+
+SCSI_SENSE				ENDP
+
+
+SCSI_SENSE_CMD			DB	03H,0,0,0,18,0
+SCSI_SENSE_INFO			DB	18 dup(0)
