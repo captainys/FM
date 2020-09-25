@@ -81,10 +81,27 @@ BOOT_FROM_SCSI_CD		PROC
 						MOV		CX,0280H
 						MOV		DI,0
 						MOV		DX,0
-						DB		0EAH   ; JMPF
-IOSYS_ENTRY_IP			DW		0000H ; Fixed
-IOSYS_ENTRY_CS			DW		0000H
 
+						; Cannot use direct jump because at the time of MOV CS:[IOSYS_ENTRY_CS]
+						; This location is already in cache.
+						; I'm not sure about the logic of MASM indirect jump, but if I make it
+						; DWORD PTR it woks just fine.  
+						; FWORD PTR looks to fetch 48 bytes, and doesn't work.
+						; WORD PTR makes it near jump.
+						JMP		DWORD PTR CS:[IOSYS_ENTRY_IP]
+
+; As a reminder for myself, I first tried the following, which didn't work.
+; 
+; 				MOV		CS:[IOSYS_ENTRY_CS],FS
+; 
+; 				DB	0EAH   ; JMPF xxxx:xxxx
+; 				DW	0
+; IOSYS_ENTRY_CS	DW	0
+; 
+; However, when I copied FS to CS:[IOSYS_ENTRY_CS], the instruction was already
+; in the 80486 cache.  Therefore, the jump destination segment was not updated.
+; The code worked perfectly in Tsugaru, but it didn't work on actual TOWNS.
+; It took a while to debug.
 
 @@:
 						
@@ -93,6 +110,9 @@ BOOT_FROM_SCSI_CD		ENDP
 
 BOOT_SCSICD_ERROR_MSG	DB		"BOOT SEQUENCE FAILED",0
 BOOT_SCSICD_FOUND_MSG	DB		"JMPF FOUND AT xxxx:xxxx",0
+
+IOSYS_ENTRY_IP			DW		0000H ; Fixed
+IOSYS_ENTRY_CS			DW		0000
 
 
 
@@ -104,7 +124,7 @@ WAIT_SCSI_CD_READY		PROC
 
 						MOV		AX,000AH
 						CALL	LOCATE
-						MOV		SI,OFFSET WAIT_SCSI_CD_READY
+						MOV		SI,OFFSET WAIT_SCSI_CD_READY_MSG
 						CALL	PRINT_TALL
 
 @@:
@@ -439,30 +459,58 @@ BUSY_WAIT_FFFFH			ENDP
 
 ; Intercept IO.SYS jump to MSDOS.SYS
 IOSYS_INTERCEPT			PROC
+						PUSH	DS
+						PUSH	ES
+						PUSH	AX
+						PUSH	BX
+						PUSH	CX
+						PUSH	DX
+						PUSH	SI
+						PUSH	DI
+						PUSH	BP
 
 						PUSH	CS
 						POP		DS
 
+						MOV		AX,2800H
+						CALL	LOCATE
+						MOV		SI,OFFSET IOSYS_INTERCEPTED_MSG
+						CALL	PRINT_TALL
+
 						; Turned out MSDOS.SYS is copied to the conventional memory, but not installed yet.
 			; CALL	TSUGARU_DEBUG_BREAK
 
-						PUSH	AX
 						MOV		AL,CS:[SCSI_ID_CDROM]
 
-						DB		9AH		; CALLF YSSCSICD_SEGMENT:YSSCSICD_DIRECT_INSTALL
-						DW		YSSCSICD_DIRECT_INSTALL
-						DW		YSSCSICD_SEGMENT
-						POP		AX
+						CALL	DWORD PTR CS:[YSSCSICD_INSTALL_IP]
 
 			; CALL	TSUGARU_DEBUG_BREAK
 
-						DB		0EAH ; JMPF
+						MOV		AX,2801H
+						CALL	LOCATE
+						MOV		SI,OFFSET INSTALLED_HOOK_MSG
+						CALL	PRINT_TALL
+
+						POP		BP
+						POP		DI
+						POP		SI
+						POP		DX
+						POP		CX
+						POP		BX
+						POP		AX
+						POP		ES
+						POP		DS
+
+						JMP		DWORD PTR CS:[IOSYS_RESUME_IP]
+
+YSSCSICD_INSTALL_IP		DW		YSSCSICD_DIRECT_INSTALL
+YSSCSICD_INSTALL_CS		DW		YSSCSICD_SEGMENT
+
 IOSYS_RESUME_IP			DW		0
 IOSYS_RESUME_CS			DW		0
 
-
-
-IOSYS_INTERCEPT_MESSAGE	DB		"INTERCEPTED IO.SYS$",0
+IOSYS_INTERCEPTED_MSG	DB		"INTERCEPTED IO.SYS.",0
+INSTALLED_HOOK_MSG		DB		"INSTALLED INT 93H HOOK.",0
 SCSI_ID_CDROM			DB		0
 
 
