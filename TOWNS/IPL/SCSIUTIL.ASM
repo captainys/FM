@@ -30,8 +30,6 @@ IDENTIFY_SCSI_DEVICE	ENDP
 
 SCSI_INQURY_CMD			DB		12H,0,0,0,8,0
 
-SCSI_DATABUF			DB		256 dup (0)
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -70,6 +68,43 @@ SCSI_READ_SECTOR_CMD	DB	28H,0,0,0,0,0,0,0,0,0
 
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+; Input
+;   CL SCSI ID
+; Output
+;   AH      0 Unit is ready
+;           Non Zero (Most likely 2) Unit is not ready
+SESI_TEST_UNIT_READY	PROC
+						PUSH	DS
+
+						PUSH	CS
+						POP		DS
+						AND		CL,7
+						MOV		SI,OFFSET SCSI_TEST_UNIT_READY_CMD
+						MOV		EDI,0
+						MOV		DI,CS
+						SHL		EDI,4
+						ADD		EDI,OFFSET SCSI_DATABUF
+						; TEST_UNIT_READY is not supposed to return data.
+						; But, just in case.
+						CALL	SCSI_COMMAND
+
+						POP		DS
+						RET
+
+SESI_TEST_UNIT_READY	ENDP
+
+SCSI_TEST_UNIT_READY_CMD	DB		0,0,0,0,0,0
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
 ; Input
 ;   CL SCSI ID
 SCSI_SENSE				PROC
@@ -82,7 +117,7 @@ SCSI_SENSE				PROC
 						MOV		EDI,0
 						MOV		DI,CS
 						SHL		EDI,4
-						ADD		EDI,OFFSET SCSI_SENSE_INFO
+						ADD		EDI,OFFSET SCSI_DATABUF
 						CALL	SCSI_COMMAND
 						POP		DS
 						RET
@@ -91,4 +126,11 @@ SCSI_SENSE				ENDP
 
 
 SCSI_SENSE_CMD			DB	03H,0,0,0,18,0
-SCSI_SENSE_INFO			DB	18 dup(0)
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+SCSI_DATABUF			DB		256 dup (0)
