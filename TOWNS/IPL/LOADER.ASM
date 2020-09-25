@@ -22,6 +22,11 @@ REALMAIN:
 						PUSH	CS
 						POP		DS
 
+						MOV		BP,CS
+						SUB		BP,1000H
+						MOV		SS,BP
+						MOV		SP,0FFFEH ; IO.SYS will reset the stack pointer anyway.
+
 						MOV		CS:[INCOMING_BX],BX
 						AND		BH,0FH
 						AND		BL,0FH
