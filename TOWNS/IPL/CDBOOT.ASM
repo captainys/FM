@@ -219,7 +219,9 @@ FIND_LAST_SCSI_CD_LOOP:
 						CMP		CL,5
 						JA		@f
 						POP		AX	; Get CX value to AX
-						PUSH	AX
+
+						XOR		CX,CX ; Fast-forward the counter to zero so that it breaks the loop.
+						PUSH	CX
 @@:
 						POP		CX
 						AND		CL,CL
@@ -476,6 +478,8 @@ IOSYS_INTERCEPT			PROC
 						CALL	LOCATE
 						MOV		SI,OFFSET IOSYS_INTERCEPTED_MSG
 						CALL	PRINT_TALL
+
+						CALL	DRAW_AOMORI
 
 						; Turned out MSDOS.SYS is copied to the conventional memory, but not installed yet.
 			; CALL	TSUGARU_DEBUG_BREAK
