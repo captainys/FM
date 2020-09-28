@@ -53,6 +53,7 @@ REALMAIN:
 
 						; If it comes here, SYSROM already read the first sector of the SCSI CD.
 						; CD initialization must be done by here.
+						; Also, CD drive is supposed to be ready.
 
 						MOV		CL,BH
 						AND		CL,7
