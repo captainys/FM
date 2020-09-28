@@ -23,7 +23,7 @@ CLS						PROC
 						MOV		AX,0C000H
 						MOV		ES,AX
 						MOV		DI,0
-						MOV		CX,80*400
+						MOV		CX,80*400/2
 						MOV		AX,0
 						REP STOSW
 
@@ -33,6 +33,29 @@ CLS						PROC
 						POP		ES
 						RET
 CLS						ENDP
+
+
+
+CLEAR_FIVE_BELOW		PROC
+						PUSH	ES
+						PUSH	DI
+						PUSH	AX
+						PUSH	CX
+
+						MOV		AX,0C000H
+						MOV		ES,AX
+						MOV		DI,80*5*16
+						MOV		CX,80*20*16/2
+						MOV		AX,0
+						REP STOSW
+
+						POP		CX
+						POP		AX
+						POP		DI
+						POP		ES
+						RET
+CLEAR_FIVE_BELOW		ENDP
+
 
 
 ; Input

@@ -1,17 +1,20 @@
+; Incoming BL:Device Type   1:HD/CD  2:FD  8:CD
+; Incoming BH:Unit Number
 
 LOAD_YSSCSICD			PROC
 						MOV		WORD PTR [LOAD_YSSCSICD_BUFFADDR],0
 						MOV		BX,CS:[INCOMING_BX]
 						CMP		BL,2
-						JNE		@f
-						JMP		LOAD_YSSCSICD_FD
-@@:
+						JE		LOAD_YSSCSICD_FD
+						CMP		BL,1
+						JE		LOAD_YSSCSICD_FROM_SCSI
 						; CMP		BL,1
 						; JNE		@f
 						; JMP		LOAD_YSSCSICD_HD
 @@:
 						RET
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 LOAD_YSSCSICD_FD:
 						PUSH	DS
@@ -52,7 +55,39 @@ LOAD_YSSCSICD_FD:
 						POP		DS
 						RET
 
+
+LOAD_YSSCSICD_FROM_SCSI:
+						PUSH	DS
+
+						MOV		SI,OFFSET SCSI_READ_SECTOR_CMD
+
+						MOV		EDX,CS:[YSSCSICD_LBA_BEGIN]
+						MOV		[SI+4],DH
+						MOV		[SI+5],DL
+						ROR		EDX,16
+						MOV		[SI+2],DH
+						MOV		[SI+3],DL
+
+						MOV		DL,CS:[YSSCSICD_SECTOR_COUNT]
+						MOV		[SI+8],DL
+
+						MOV		EDI,YSSCSICD_SEGMENT*16
+
+						MOV		CL,BYTE PTR CS:[INCOMING_BX+1]	; Incoming BH=Unit Number
+
+						CALL	SCSI_COMMAND
+						JB		@b
+
+						MOV		BYTE PTR CS:[YSSCSICD_LOADED],1
+
+@@:
+						POP		DS
+						RET
+
 LOAD_YSSCSICD			ENDP
 
 LOAD_YSSCSICD_TRK_SIDE	DW	0
 LOAD_YSSCSICD_BUFFADDR	DW	0
+
+SCSI_CMD_READ_10		DB	28H,0,0,0,0,0,0,0,0,0
+
