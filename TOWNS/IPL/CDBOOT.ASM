@@ -272,7 +272,7 @@ FIND_FBIOS_SECTOR		PROC
 
 						MOV		WORD PTR CS:[FIND_BIOS_DEBUG_POS],000AH
 
-						MOV		EDX,10	; I think starting sector 10 is good enough
+						MOV		EDX,8	; I think starting sector 10 is good enough, but just in case start from 8
 FIND_FBIOS_SECTOR_LOOP:
 						PUSH	EAX
 						PUSH	ECX
@@ -302,7 +302,7 @@ FIND_FBIOS_SECTOR_LOOP:
 						JE		FIND_FBIOS_SECTOR_FOUND
 @@:
 						ADD		EDX,1
-						CMP		EDX,40
+						CMP		EDX,80	; Search up to this sector.
 						JNE		FIND_FBIOS_SECTOR_LOOP
 						MOV		AX,0105H
 						CALL	LOCATE
