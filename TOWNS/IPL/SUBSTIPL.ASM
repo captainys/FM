@@ -25,6 +25,7 @@ MAIN					PROC
 						CALL	VRAMMODE
 						CALL	CLS
 						CALL	DRAW_AOMORI
+						CALL	DEMOSPLASH_MESSAGE
 						POP		BX
 
 						CMP		BL,1
@@ -302,6 +303,7 @@ IOSYS_INTERCEPT:
 						POP		DS
 
 						CALL	DRAW_AOMORI
+						CALL	DEMOSPLASH_MESSAGE
 
 						; Turned out MSDOS.SYS is copied to the conventional memory, but not installed yet.
 						MOV		AL,CS:[YSSCSICD_SCSI_ID]
@@ -339,6 +341,41 @@ IOSYS_ENTRY_CS			DW		0
 
 
 MAIN					ENDP
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+DEMOSPLASH_MESSAGE		PROC
+						MOV		AX,280AH
+						CALL	LOCATE
+						MOV		SI,OFFSET MSG_DEMOSPLASH_1
+						CALL	PRINT_TALL
+
+						MOV		AX,280BH
+						CALL	LOCATE
+						MOV		SI,OFFSET MSG_DEMOSPLASH_2
+						CALL	PRINT_TALL
+
+						MOV		AX,280CH
+						CALL	LOCATE
+						MOV		SI,OFFSET MSG_DEMOSPLASH_3
+						CALL	PRINT_TALL
+
+						RET
+DEMOSPLASH_MESSAGE		ENDP
+
+MSG_DEMOSPLASH_1		DB		"PLEASE JOIN US AT DEMOSPLASH 2020",0
+MSG_DEMOSPLASH_2		DB		"AND 2021, 2022, ...",0
+MSG_DEMOSPLASH_3		DB		"http://demosplash.org",0
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 
 						INCLUDE	..\SCSILIB\SCSIIO.ASM
 
