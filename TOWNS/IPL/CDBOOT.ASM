@@ -473,14 +473,12 @@ IOSYS_INTERCEPT			PROC
 						PUSH	CS
 						POP		DS
 
-						; Printing message at this point (changes ANK font mapping)
-						; may break some text output.  Doesn't crash though.
-						; Comment out the following only for debugging.
+						MOV		AX,2800H
+						CALL	LOCATE
+						MOV		SI,OFFSET IOSYS_INTERCEPTED_MSG
+						CALL	PRINT_TALL
 
-						; MOV		AX,2800H
-						; CALL	LOCATE
-						; MOV		SI,OFFSET IOSYS_INTERCEPTED_MSG
-						; CALL	PRINT_TALL
+						CALL	DEMOSPLASH_MESSAGE
 
 						CALL	DRAW_AOMORI
 
@@ -493,10 +491,10 @@ IOSYS_INTERCEPT			PROC
 
 			; CALL	TSUGARU_DEBUG_BREAK
 
-						; MOV		AX,2801H
-						; CALL	LOCATE
-						; MOV		SI,OFFSET INSTALLED_HOOK_MSG
-						; CALL	PRINT_TALL
+						MOV		AX,2801H
+						CALL	LOCATE
+						MOV		SI,OFFSET INSTALLED_HOOK_MSG
+						CALL	PRINT_TALL
 
 						POP		BP
 						POP		DI
@@ -518,6 +516,8 @@ IOSYS_RESUME_CS			DW		0
 
 IOSYS_INTERCEPTED_MSG	DB		"INTERCEPTED IO.SYS.",0
 INSTALLED_HOOK_MSG		DB		"INSTALLED INT 93H HOOK.",0
+
+
 SCSI_ID_CDROM			DB		0
 
 

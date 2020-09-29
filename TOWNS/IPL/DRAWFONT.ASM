@@ -135,7 +135,6 @@ DRAWFONT				ENDP
 ; DS preserved
 DRAWFONT_TALL			PROC
 						PUSH	DS
-						SUB		SP,8
 
 						MOV		DX,0C000H
 						MOV		DS,DX
@@ -159,7 +158,10 @@ DRAWFONT_TALL			PROC
 						ADD		DI,0A0H
 						LOOP	@b
 
-						ADD		SP,8
+						MOV		DX,IO_KVRAM_OR_ANKFONT
+						XOR		AL,AL
+						OUT		DX,AL
+
 						POP		DS
 						RET
 DRAWFONT_TALL			ENDP
@@ -171,7 +173,11 @@ DRAWFONT_TALL			ENDP
 ;   DI        VRAM Address
 PRINT_TALL				PROC
 						PUSH	ES
+						PUSH	SI
+						PUSH	DI
 						PUSH	AX
+						PUSH	DX
+						PUSH	CX
 
 						MOV		AX,0C000H
 						MOV		ES,AX
@@ -187,8 +193,11 @@ PRINT_TALL				PROC
 						ADD		BX,1
 						JMP		@b
 @@:
-
+						POP		CX
+						POP		DX
 						POP		AX
+						POP		DI
+						POP		SI
 						POP		ES
 						RET
 PRINT_TALL				ENDP
