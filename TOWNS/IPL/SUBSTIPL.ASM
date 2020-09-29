@@ -6,6 +6,10 @@
 
 DATA_CODE				SEGMENT	USE16
 
+IOSYS_SEARCH_BEGIN		EQU		8	; I think starting sector 10 is good enough, but just in case start from 8
+IOSYS_SEARCH_END		EQU		80	; Search up to this sector-1.
+
+
 						INCLUDE		IODEF.ASM
 						INCLUDE		DEF.ASM
 
@@ -16,21 +20,103 @@ MAIN					PROC
 						PUSH	CS
 						POP		DS
 
+						PUSH	BX
+						CALL	INITGRAPHICS
+						CALL	VRAMMODE
+						CALL	CLS
+						CALL	DRAW_AOMORI
+						POP		BX
+
+						CMP		BL,1
+						JE		SCSICDBOOT
+
+						CMP		BL,8	; From Internal CD?  Lucky you for having a live internal CD drive!
+						JE		INTERNALCDBOOT
+
+						RETF			; Let's cycle to the next boot device.
+
+INTERNALCDBOOT:
+						; For patched image, I still need to install YSSCSICD.SYS.
+						; Let's find IO.SYS from the internal CD, and then jump to LOADED_IOSYS.
+						MOV		AX,0101H
+						CALL	LOCATE
+						MOV		SI,OFFSET MSG_INTERNAL_CD_BOOT
+						CALL	PRINT_TALL
+
+						MOV		DX,IOSYS_SEARCH_BEGIN
+
+INTERNAL_FIND_FBIOS_LOOP:
+						PUSH	DS
+						PUSH	DX
+
+						MOV		AX,0040H
+						MOV		DS,AX
+						MOV		FS,AX		; For later comparison
+						XOR		DI,DI
+
+						MOV		AX,05C0H	; Read Sector, Device=C0H
+						XOR		CX,CX		; CH must be 0, CL=High-byte of LBA
+						MOV		BX,1
+						; How can I write CALL 		FAR PTR 0FFFBH:0014H
+						DB			9AH		; CALLF FFFB:0014
+						DW			 0014H
+						DW			0FFFBH
+
+						POP		DX
+						POP		DS
+
+						JB		@f
+
+						CMP		DWORD PTR FS:[0],4F494246H ; "FBIO"
+						JNE		@f
+						CMP		BYTE PTR FS:[4],53H ; 'S'
+						JE		INTERNAL_FIND_FBIOS_SECTOR_FOUND
+@@:
+
+						INC		DX
+						CMP		DX,IOSYS_SEARCH_END
+						JNE		INTERNAL_FIND_FBIOS_LOOP
+
+						JMP		FBIOS_NOT_FOUND
+
+
+
+INTERNAL_FIND_FBIOS_SECTOR_FOUND:
+						PUSH	DS
+
+						MOV		AX,0040H
+						MOV		DS,AX
+						XOR		DI,DI
+
+						MOV		AX,05C0H	; Read Sector, Device=C0H
+						XOR		CX,CX		; CH must be 0, CL=High-byte of LBA
+						MOV		BX,64
+						; How can I write CALL 		FAR PTR 0FFFBH:0014H
+						DB			9AH		; CALLF FFFB:0014
+						DW			 0014H
+						DW			0FFFBH
+
+						POP		DS
+
+						JAE		LOADED_IOSYS
+						JMP		IOSYS_LOAD_FAILURE
+
+
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+						; Find IO.SYS from the SCSI drive.
+SCSICDBOOT:
 						; This IPL is for SCSI CD drive.
 						; If TOWNS SYSROM calls this place, BL must be 1 (SCSI), and BH must be SCSI ID.
 						AND		BH,7
 						MOV		BYTE PTR [YSSCSICD_SCSI_ID],BH
 
-
-						CALL	INITGRAPHICS
-						CALL	VRAMMODE
-						CALL	CLS
-
 						MOV		AX,0101H
 						CALL	LOCATE
 						MOV		SI,OFFSET MSG_DIRECT_SCSI_CD_BOOT
 						CALL	PRINT_TALL
-						CALL	DRAW_AOMORI
 
 
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -41,8 +127,8 @@ MAIN					PROC
 						MOV		AX,0040H
 						MOV		FS,AX
 
-						MOV		EDX,8	; I think starting sector 10 is good enough, but just in case start from 8
-FIND_FBIOS_SECTOR_LOOP:
+						MOV		EDX,IOSYS_SEARCH_BEGIN
+SCSI_FIND_FBIOS_SECTOR_LOOP:
 						PUSH	EAX
 						PUSH	ECX
 						PUSH	EDX
@@ -65,13 +151,14 @@ FIND_FBIOS_SECTOR_LOOP:
 						CMP		DWORD PTR FS:[0],4F494246H ; "FBIO"
    						JNE		@f
 						CMP		BYTE PTR FS:[4],53H ; 'S'
-						JE		FIND_FBIOS_SECTOR_FOUND
+						JE		SCSI_FIND_FBIOS_SECTOR_FOUND
 @@:
 						ADD		EDX,1
-						CMP		EDX,80	; Search up to this sector.
-						JNE		FIND_FBIOS_SECTOR_LOOP
+						CMP		EDX,IOSYS_SEARCH_END
+						JNE		SCSI_FIND_FBIOS_SECTOR_LOOP
 
 						; FBIOS not found.
+FBIOS_NOT_FOUND:
 						MOV		AX,0102H
 						CALL	LOCATE
 						MOV		SI,OFFSET MSG_FBIOS_NOT_FOUND
@@ -79,7 +166,7 @@ FIND_FBIOS_SECTOR_LOOP:
 @@:
 						JMP		@b
 
-FIND_FBIOS_SECTOR_FOUND:
+SCSI_FIND_FBIOS_SECTOR_FOUND:
 
 
 
@@ -95,15 +182,20 @@ FIND_FBIOS_SECTOR_FOUND:
 						MOV		EDI,0400H
 						MOV		CL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_COMMAND
-						JAE		LOADED_IO_SYS
+						JAE		LOADED_IOSYS
 
+IOSYS_LOAD_FAILURE:
 						MOV		AX,0102H
 						CALL	LOCATE
 						MOV		SI,OFFSET MSG_IOSYS_READ_FAILURE
 						CALL	PRINT_TALL
 @@:
 						JMP		@b
-LOADED_IO_SYS:
+
+
+
+LOADED_IOSYS:
+
 
 
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -233,6 +325,7 @@ IOSYS_INTERCEPT:
 @@:
 						JMP		@b
 
+MSG_INTERNAL_CD_BOOT	DB		"BOOT FROM INTERNAL CD",0
 MSG_DIRECT_SCSI_CD_BOOT	DB		"DIRECT SCSI CD BOOT",0
 MSG_FBIOS_NOT_FOUND		DB		"IO.SYS NOT FOUND",0
 MSG_IOSYS_READ_FAILURE	DB		"FAILED TO LOAD IO.SYS",0
@@ -276,7 +369,7 @@ SECTOR_BUFFER_COUNT		EQU		12
 MAX_SECTOR_SIZE			EQU		2340
 SCSI_DATA_BUF_LENGTH 	EQU 	(128+SECTOR_BUFFER_COUNT*MAX_SECTOR_SIZE)
 
-YSSCSICD_SCSI_ID		DB		0	; 0FFH:No SCSI CD  0 to 7:SCSI CD Found
+YSSCSICD_SCSI_ID		DB		0FFH	; 0FFH:No SCSI CD,   0 to 7:SCSI CD Found
 
 YSSCSICD_FLAGS_DEBUG_CONSOLE	EQU		1
 YSSCSICD_FLAGS_DEBUG_RS232C		EQU		2
