@@ -1,0 +1,189 @@
+INSTRUCTION_LOCATION		EQU		0506H	; (1,6)
+FIRST_MENU_ITEM_LOCATION	EQU		0509H	; (5,9)
+DISPLACED_DEMOSPLASh_MESSAGE_LOCATION	EQU		2A09H	; (42,9)
+
+
+
+BOOTMENU				PROC
+
+						CALL	CLEAR_FIVE_BELOW
+						MOV		AX,DISPLACED_DEMOSPLASh_MESSAGE_LOCATION
+						CALL	DEMOSPLASH_MESSAGE_MOVABLE
+
+						CALL	BOOTMENU_SETUP
+
+BOOTMENU_OUTER_LOOP:
+						MOV		AX,INSTRUCTION_LOCATION
+						CALL	LOCATE
+						MOV		SI,OFFSET INSTRUCTION_MESSAGE
+						CALL	PRINT_TALL
+
+						MOV		SI,OFFSET BOOTMENU_ITEM_BUFFER
+						MOVZX	CX,CS:[NUM_BOOTMENU_OPTIONS]
+						CALL	DRAWMENU
+
+						MOV		CL,CS:[NUM_BOOTMENU_OPTIONS]
+						MOV		AL,CS:[BOOTMENU_SELECTION]
+						CALL	DRAWARROW
+
+@@:
+						JMP		@b
+BOOTMENU				ENDP
+
+
+
+; Input
+;   DS:SI	Menu Top
+;   CX		Number of Items
+; Output
+;   CX,SI   Destroyed
+DRAWMENU				PROC
+						MOV		AX,FIRST_MENU_ITEM_LOCATION
+@@:
+						PUSH	CX
+						PUSH	AX
+						PUSH	SI
+						CALL	LOCATE
+						CALL	PRINT_TALL
+						POP		SI
+						POP		AX
+						POP		CX
+						INC		AL
+						ADD		SI,80
+						LOOP	@b
+
+						RET
+DRAWMENU				ENDP
+
+
+
+BOOTMENU_SETUP			PROC
+
+						MOV		BX,CS:[INCOMING_BX]
+
+						MOV		AH,5
+						MOV		AL,BH
+						AND		AL, 07H
+						OR		AL,0B0H
+
+						XOR		CX,CX
+						MOV		DX,1	; LBA=1 Partition Table
+
+						MOV		BX,1
+
+						MOV		DI,OFFSET PARTITION_TABLE
+
+						; How can I write CALL 		FAR PTR 0FFFBH:0014H
+						DB		9AH		; CALLF FFFB:0014
+						DW		 0014H
+						DW		0FFFBH
+
+						MOV		CS:[NUM_BOOTMENU_OPTIONS],4
+						MOV		SI,OFFSET PARTITION_TABLE+20H
+						MOV		DI,OFFSET BOOTMENU_ITEM_BUFFER+80*4+17
+						MOV		CX,10	; Up to 10 partitions
+
+BOOTMENU_SETUP_OUTER_LOOP:
+						CMP		BYTE PTR CS:[SI+1],0
+						JE		BOOTMENU_SETUP_DONE
+						CMP		BYTE PTR CS:[SI+1],90H	; I don't know about 90H, but HD Boot Loader stops checking when it see 90H
+						JE		BOOTMENU_SETUP_DONE
+
+						PUSH	SI
+						PUSH	DI
+						PUSH	CX
+						PUSH	ES
+
+						MOV		CX,CS
+						MOV		ES,CX
+						MOV		CX,16
+						ADD		SI,20H
+						REP		MOVSB
+						MOV		AL,']'
+						STOSB
+
+						POP		ES
+						POP		CX
+						POP		DI
+						POP		SI
+
+						INC		CS:[NUM_BOOTMENU_OPTIONS]
+						ADD		SI,030H
+						ADD		DI,80
+						LOOP	BOOTMENU_SETUP_OUTER_LOOP
+
+BOOTMENU_SETUP_DONE:
+
+						MOV		CL,CS:[MENU_DEFAULT_OPTION]
+						CMP		CL,CS:[NUM_BOOTMENU_OPTIONS]
+						JAE		@f
+						MOV		CS:[BOOTMENU_SELECTION],CL
+
+@@:
+						RET
+
+BOOTMENU_SETUP			ENDP
+
+
+
+
+; Input
+;   AL		Selection
+;   CL		Number of menu items
+DRAWARROW				PROC
+						PUSH	AX
+
+						MOV		AX,FIRST_MENU_ITEM_LOCATION
+						SUB		AH,4
+						AND		CH,CH
+
+@@:
+						PUSH	AX
+						PUSH	CX
+						CALL	LOCATE
+						MOV		SI,OFFSET ARROW_ERASE
+						CALL	PRINT_TALL
+						POP		CX
+						POP		AX
+						INC		AL
+						LOOP	@b
+
+						POP		CX
+						MOV		AX,FIRST_MENU_ITEM_LOCATION
+						SUB		AH,4
+						ADD		AL,CL
+						CALL	LOCATE
+						MOV		SI,OFFSET ARROW_DRAW
+						CALL	PRINT_TALL
+
+						RET
+
+DRAWARROW				ENDP
+
+
+
+
+INSTRUCTION_MESSAGE		DB		"USE GAMEPAD0 UP/DOWN TO MOVE CURSOR, A-BUTTON TO SELECT BOOT DEVICE",0
+
+NUM_BOOTMENU_OPTIONS	DB		14
+BOOTMENU_SELECTION		DB		3
+
+BOOTMENU_ITEM_BUFFER	DB		"INTERNAL CD DRIVE",0,62 dup(0)
+						DB		"FLOPPY DRIVE A   ",0,62 dup(0)
+						DB		"FLOPPY DRIVE B   ",0,62 dup(0)
+						DB		"SCSI CD DRIVE    ",0,62 dup(0)
+						DB		"HDD PARTITION 0 [",0,62 dup(0)
+						DB		"HDD PARTITION 1 [",0,62 dup(0)
+						DB		"HDD PARTITION 2 [",0,62 dup(0)
+						DB		"HDD PARTITION 3 [",0,62 dup(0)
+						DB		"HDD PARTITION 4 [",0,62 dup(0)
+						DB		"HDD PARTITION 5 [",0,62 dup(0)
+						DB		"HDD PARTITION 6 [",0,62 dup(0)
+						DB		"HDD PARTITION 7 [",0,62 dup(0)
+						DB		"HDD PARTITION 8 [",0,62 dup(0)
+						DB		"HDD PARTITION 9 [",0,62 dup(0)
+
+ARROW_ERASE				DB		"   ",0
+ARROW_DRAW				DB		">>>",0
+
+PARTITION_TABLE			DB		512 dup (0)
