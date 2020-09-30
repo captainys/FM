@@ -18,7 +18,7 @@ CODE					SEGMENT	USE16
 						INCLUDE		DEF.ASM
 
 ; From SYSROM
-; BL:Device Type   1:HD  2:FD  8:CD
+; BL:Device Type   1:SCSI  2:FD  8:CD
 ; BH:Unit Number
 
 MAIN					PROC
@@ -30,6 +30,11 @@ LOADER_LBA				DD		4		; Beginning Sector 4  ( +8192 bytes into ISO)
 YSSCSICD_LBA			DD		32		; Beginning Sector 32 (+65536 bytes into ISO)
 
 REALMAIN:
+						CMP		BL,1	; If in the internal CD-ROM drive, don't do anything.
+						JE		@f
+						RETF
+
+@@:
 						CLI
 						PUSH	CS
 						POP		DS
