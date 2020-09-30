@@ -16,9 +16,10 @@ MAIN					PROC
 						DB		"RESCUE"
 												; Offsets must be consisntent with DEF.H
 CONTROL_FLAGS			DW		0				; +8
-YSSCSICD_LBA_BEGIN		DD		0				; +10  For CD and HD IPL
+YSSCSICD_LBA			DD		0				; +10  For CD and HD IPL
 YSSCSICD_SECTOR_COUNT	DB		24				; +14  For CD and HD IPL
-MENU_DEFAULT_OPTION		DB		4				; +15  BOOT MENU Default Option
+						DB		0				; +15  Not used at this time.
+SELF_LBA				DD		0				; +16  Loader LBA (Set only when booting from HD)
 
 INCOMING_BX				DW		0
 LOADER_BIOS_DEVICE_ID	DB		0
