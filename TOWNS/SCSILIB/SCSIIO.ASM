@@ -341,6 +341,11 @@ SCSI_EXEC_DMA_TRANSFER_LOOP:
 						JE		SCSI_EXEC_DMA_TRANSFER_LOOP
 
 
+						; IO.SYS apparently won't reset Highest Byte of the DMA address.
+						; Make sure to clear when exit.
+						XOR		AL,AL
+						OUT		IO_DMA_ADDR_HIGH,AL
+
 
 						RET
 SCSI_EXEC_DMA			ENDP
