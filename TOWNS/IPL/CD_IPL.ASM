@@ -30,7 +30,9 @@ LOADER_LBA				DD		4		; Beginning Sector 4  ( +8192 bytes into ISO)
 YSSCSICD_LBA			DD		32		; Beginning Sector 32 (+65536 bytes into ISO)
 
 REALMAIN:
-						CMP		BL,1	; If in the internal CD-ROM drive, don't do anything.
+						CMP		BL,1	; SCSI CD?
+						JE		@f
+						CMP		BL,8	; Internal CD?
 						JE		@f
 						RETF
 
@@ -52,6 +54,35 @@ REALMAIN:
 						POP		BX
 						PUSH	BX
 
+						CMP		BL,1
+						JE		SCSICD
+
+
+
+INTERNALCD:
+						PUSH	DS
+						MOV		AX,8000H
+						MOV		DS,AX
+						XOR		DI,DI
+
+						MOV		AX,05C0H	; Read Sector, Device=0C0H
+						XOR		CX,CX
+						MOV		DX,WORD PTR CS:[LOADER_LBA]
+						MOV		BX,32		; 32 Sectors
+
+						; How can I write CALL 		FAR PTR 0FFFBH:0014H
+						DB		9AH		; CALLF FFFB:0014
+						DW		 0014H
+						DW		0FFFBH
+
+						POP		DS
+						JB		CD_ERROR
+
+						JMP		SECONDARY_LOADER_LOADED
+
+
+
+SCSICD:
 						MOV		AL,BH	; Unit number
 						OR		AL,0B0H	; SCSI Device
 						MOV		CS:[DEVICEID],AL
@@ -64,7 +95,7 @@ REALMAIN:
 						AND		CL,7
 						MOV		SI,OFFSET SCSI_READ_SECTOR_CMD
 
-						MOV		EDX,LOADER_LBA
+						MOV		EDX,CS:[LOADER_LBA]
 						MOV		[SI+4],DH
 						MOV		[SI+5],DL
 						ROR		EDX,16
@@ -76,8 +107,11 @@ REALMAIN:
 						MOV		EDI,80000H
 
 						CALL	SCSI_COMMAND
-						JB		@f
+						JB		CD_ERROR
 
+
+
+SECONDARY_LOADER_LOADED:
 						MOV		AX,BOOTLOADER_SEGMENT
 						MOV		FS,AX
 						MOV		WORD PTR FS:[LOADER_CONTROL_FLAGS_OFFSET],CONTROL_FLAG_PROMPT_CD
@@ -91,7 +125,9 @@ REALMAIN:
 						DW		0000H
 						DW		BOOTLOADER_SEGMENT
 
-@@:
+
+
+CD_ERROR:
 						MOV		AX,0102H
 						CALL	LOCATE
 						MOV		SI,OFFSET ERROR_MESSAGE
@@ -105,7 +141,7 @@ MAIN					ENDP
 						INCLUDE		DRAWFONT.ASM
 						INCLUDE		MEMBANK.ASM
 
-MESSAGE					DB	"SCSI-CD BOOT",0
+MESSAGE					DB	"CD BOOT",0
 ERROR_MESSAGE			DB	"SECTOR READ ERROR!",0
 
 SCSI_READ_SECTOR_CMD	DB	28H,0,0,0,0,0,0
