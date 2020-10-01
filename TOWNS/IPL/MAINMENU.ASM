@@ -1,3 +1,5 @@
+MENUITEM_LENGTH			EQU		80
+
 NUM_MAINMENU_OPTIONS	EQU		2
 
 MAINMENU_ITEMNUM_BOOTMENU		EQU		1
@@ -92,3 +94,39 @@ MOVE_ARROW_BY_PAD_UP:
 
 MOVE_ARROW_BY_PAD		ENDP
 
+
+
+
+; INPUT
+;   AL PAD
+; OUTPUT
+;   BX  -1 LEFT
+;        0 NEUTRAL
+;        1 RIGHT
+;   ZF=0 IF LEFT OR RIGHT,  ZF=1 IF NEUTRAL
+PAD_TO_LEFT_RIGHT		PROC
+						TEST	AL,40H
+						JNE		@f
+						MOV		BX,1
+						AND		BX,BX
+						RET
+@@:
+						TEST	AL,20H
+						JNE		@f
+						MOV		BX,-1
+@@:
+						AND		BX,BX
+						RET
+PAD_TO_LEFT_RIGHT		ENDP
+
+
+
+
+; INPUT/OUTPUT
+;	AL
+TOGGLE_1_0				PROC
+						AND		AL,1
+						XOR		AL,1
+						RET
+
+TOGGLE_1_0				ENDP
