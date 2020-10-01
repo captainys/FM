@@ -75,6 +75,20 @@ SCSI_STATUS_QUEUE_FULL                	EQU		28H
 SCSI_COMMAND			PROC
 						PUSHF
 
+
+						; Pentium model may be too fast for SCSI controller when multiple commands
+						; are shot in a short time.  Add 10ms delay.
+						PUSH	CX
+						PUSH	DX
+						MOV		CX,10000
+						MOV		DX,6CH
+@@:
+						OUT		DX,AL
+						LOOP	@b
+						POP		DX
+						POP		CX
+
+
 						CLI		; Expected to be used when the BIOS it no present.  Do all by polling.
 
 						MOV		BYTE PTR CS:[SCSI_PHASE_FLAG],0
@@ -95,6 +109,11 @@ SCSI_COMMAND			PROC
 						; Keep DS:SI command pointer in the loop.
 
 SCSI_PHASE_LOOP:
+						; I don't know if it is necessary, but SYSROM service routine reads STATUS I/O twice >>
+						MOV		DX,IO_SCSI_STATUS
+						IN		AL,DX
+						; I don't know if it is necessary, but SYSROM service routine reads STATUS I/O twice <<
+
 						MOV		DX,IO_SCSI_STATUS
 						IN		AL,DX
 						TEST	AL,08H			; Zero means BUSFREE
