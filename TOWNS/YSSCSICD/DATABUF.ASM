@@ -27,10 +27,7 @@
 ;
 ;//////////////////////////////////////////////////////////// */
 
-SECTOR_BUFFER_COUNT		EQU		12
-MAX_SECTOR_SIZE			EQU		2340
-
-SCSI_DATA_BUF_LENGTH 	EQU 	(128+SECTOR_BUFFER_COUNT*MAX_SECTOR_SIZE)
+SCSI_DATA_BUF_LENGTH 	EQU 	2340	; Just in case up to good for 1 sector.
 
 YSSCSICD_SCSI_ID		DB		0	; 0FFH:No SCSI CD  0 to 7:SCSI CD Found
 

@@ -236,6 +236,7 @@ INTERRUPT				ENDP
 						INCLUDE	HOOKBIOS.ASM
 						INCLUDE YS_EXT.ASM
 						INCLUDE	REDRFUNC.ASM
+						INCLUDE	..\SCSILIB\SCSIIO.ASM
 						INCLUDE SCSIUTIL.ASM
 						INCLUDE	FMR_SCSI.ASM
 
@@ -247,7 +248,7 @@ DATA_CODE				ENDS
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-						INCLUDE	WRHIGH.ASM
+						; INCLUDE	WRHIGH.ASM
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

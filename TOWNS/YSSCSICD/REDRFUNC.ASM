@@ -1029,8 +1029,14 @@ CDROM_BIOS_058H_GET_ELEVOL	ENDP
 
 CDROM_BIOS_READ_SECTOR_EX	PROC
 
-						MOV		CS:[PHYS_ADDR_HIGH],SI
-						MOV		CS:[PHYS_ADDR_LOW],DI
+						; SI=PHYS_ADDR_HIGH
+						; DI=PHYS_ADDR_LOW
+						XCHG	SI,DI
+						SHL		EDI,16
+						MOV		DI,SI
+						; Now EDI is the physical address
+
+
 
 						CMP		AH,15H
 						JNE		@f		; Jump if it is not Read Sector MSF
@@ -1062,88 +1068,42 @@ CDROM_BIOS_READ_SECTOR_EX	PROC
 
 						; Now all HSG,
 @@:
-						MOV		AX,CS
-						MOV		DS,AX
-						MOV		ES,AX		; DS=ES=CS
 
-						MOV		CS:[HSG_ADDRESS_HIGH],CX
-						MOV		CS:[HSG_ADDRESS_LOW],DX
-						MOV		CS:[NUM_SECT_LEFT],BX
+						; CL		SCSI ID
+						; DS:[SI]   SCSI Command
+						; EDI       Data Return Buffer Physical Address
 
-						; Debug Output
-						;PUSHA
-						;CALL	PRINT_AL
-						;CALL	PRINT_CRLF
-						;POPA
-						; Debug Output
+						; EDI is already set.
 
-						; while(0<NUM_SECT_LEFT)
-						; {
-READ_SECTOR_EX_LOOP:
-						MOV		AH,0		; Tentatively No Error
+						PUSH	DS
+						PUSH	CS
+						POP		DS
+						MOV		SI,OFFSET READ_SECTOR_EX_SCSI_CMD
 
-						MOV		BX,CS:[NUM_SECT_LEFT]
-						CMP		BX,0
-						JE		READ_SECTOR_EX_LOOP_END
+						; LBA is 24 bit in TOWNS.
+						MOV		[SI+3],CL
+						MOV		[SI+4],DH
+						MOV		[SI+5],DL
 
-						CMP		BX,SECTOR_BUFFER_COUNT
-						JL		@f
-						MOV		BX,SECTOR_BUFFER_COUNT
-@@:
-						SUB		CS:[NUM_SECT_LEFT],BX
+						MOV		[SI+7],BH	; Number of Sectors in Big Endian
+						MOV		[SI+8],BL
 
-						; BX=Num Sector to Read
-						PUSH	BX
-						MOV		CL,BYTE PTR CS:[HSG_ADDRESS_HIGH]
-						MOV		DX,CS:[HSG_ADDRESS_LOW]
-						LEA		DI,[SCSI_DATA_BUF]
-						MOV		AL,CS:[YSSCSICD_SCSI_ID]
-						; At this line
-						; AL     SCSI ID
-						; ES:DI  Destination
-						; BX     Read sector count
-						; CL|DX  HSG address
-						CALL	SCSI_READ_SECTOR_HSG
-						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						POP		BX
-						JC		READ_SECTOR_EX_LOOP_END
+						MOV		CL,CS:[YSSCSICD_SCSI_ID]
+						CALL	SCSI_COMMAND
+						POP		DS
 
+						JB		@f
 
-
-						;   DX:AX    Physical Address  DX=High_16_bit  AX=Low_16_bit
-						;   DS:SI    Source
-						;   CX       Transfer size/4
-						PUSH	BX
-						MOV		DX,CS:[PHYS_ADDR_HIGH]
-						MOV		AX,CS:[PHYS_ADDR_LOW]
-						MOV		CX,BX
-						SHL		CX,(11-2) ; 2048 bytes per sector (Left Shift by 11), CX should be #bytes/4 (Right Shift by 2)
-						LEA		SI,[SCSI_DATA_BUF]
-						CALL	WRITE_HIGH
-						POP		BX
-
-						ADD		WORD PTR CS:[HSG_ADDRESS_LOW],BX
-						ADC		WORD PTR CS:[HSG_ADDRESS_HIGH],0
-
-						SHL		BX,11 ; 2048 bytes per sector
-						ADD		WORD PTR CS:[PHYS_ADDR_LOW],BX
-						ADC		WORD PTR CS:[PHYS_ADDR_HIGH],0
-
-						JMP		READ_SECTOR_EX_LOOP
-						; }
-
-READ_SECTOR_EX_LOOP_END:
-						MOV		BX,CS:[NUM_SECT_LEFT]
+						XOR		BX,BX
 						MOV		[BP+INCOMING_BX],BX
-
+						MOV		AH,00H
+						RET
+@@:
+						MOV		AH,80H
+						MOV		CX,BIOSERR_DETAIL_HARDWARE
 						RET
 
-
-NUM_SECT_LEFT			DW		0
-HSG_ADDRESS_LOW			DW		0
-HSG_ADDRESS_HIGH		DW		0
-PHYS_ADDR_LOW			DW		0
-PHYS_ADDR_HIGH			DW		0
+READ_SECTOR_EX_SCSI_CMD	DB		28H,0,0,0,0,0,0,0,0,0
 
 CDROM_BIOS_READ_SECTOR_EX	ENDP
 
