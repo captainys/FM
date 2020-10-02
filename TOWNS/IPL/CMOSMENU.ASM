@@ -6,8 +6,9 @@ IO_CMOS_DRIVE_COUNTER_CHECKSUM	EQU		33CEH
 MAX_NUM_DRIVE_ASSIGNMENTS		EQU		'Q'-'D'
 
 CMOSMENU_RETUR_TO_MAINMENU		EQU		0
-CMOSMENU_SINGLE_DRIVE_MODE		EQU		1
-CMOSMENU_ITEMNUM_DRIVE_D		EQU		2
+CMOSMENU_ITEMNUM_DEL_LAST_DRV	EQU		1
+CMOSMENU_SINGLE_DRIVE_MODE		EQU		2
+CMOSMENU_ITEMNUM_DRIVE_D		EQU		3
 
 BOOTDEVICETYPE_FLOPPYDRIVE		EQU		0
 BOOTDEVICETYPE_ROMDRIVE			EQU		5
@@ -81,6 +82,13 @@ CMOSMENU_MAINLOOP:
 						JE		CMOSMENU_MAINLOOP
 
 						; AH is still the selection
+
+						CMP		AH,CMOSMENU_ITEMNUM_DEL_LAST_DRV
+						JNE		@f
+						CALL	CMOSMENU_DELETE_LAST_DRIVE
+						JMP		CMOSMENU_MAINLOOP
+
+@@:
 						CMP		AH,CMOSMENU_RETUR_TO_MAINMENU
 						JNE		CMOSMENU_MAINLOOP
 
@@ -193,6 +201,30 @@ CMOSMENU_LEFT_RIGHT_RETURN:
 						POP		AX
 						RET
 CMOSMENU_LEFT_RIGHT		ENDP
+
+
+
+CMOSMENU_DELETE_LAST_DRIVE	PROC
+						MOV		DI,OFFSET DRIVE_ASSIGNMENTS
+						CMP		BYTE PTR [DI],0FFH
+						JNE		@f
+						RET
+
+@@:
+						CMP		BYTE PTR [DI+2],0FFH
+						JE		@f
+						ADD		DI,2
+						JMP		@b
+
+@@:
+						MOV		AL,0FFH
+						CALL	CMOSMENU_STORE_VALUE
+						ADD		DI,1
+						MOV		AL,0FFH
+						CALL	CMOSMENU_STORE_VALUE
+						CALL	UPDATE_ASSIGNMENT_MENU
+						RET
+CMOSMENU_DELETE_LAST_DRIVE	ENDP
 
 
 
@@ -536,6 +568,7 @@ CMOSMENU_VALUECHANGED	DB	0
 
                            ; 01234567890123456789012345678901234567890123456789012345678901234567890123456789
 CMOSMENU_ITEMS			DB	"BACK TO MAIN MENU                                                              ",0
+						DB	"DELETE LAST DRIVE                                                              ",0
 						DB	"SINGLE DRIVE MODE                                                              ",0
 						DB	"DRIVE D                                                                        ",0
 						DB	"DRIVE E                                                                        ",0

@@ -116,6 +116,19 @@ PAD_TO_LEFT_RIGHT		PROC
 						TEST	AL,04H
 						JNE		@f
 						MOV		BX,-1
+						AND		BX,BX
+						RET
+@@:
+						TEST	AL,10H
+						JNE		@f
+						MOV		BX,1
+						AND		BX,BX
+						RET
+@@:
+						TEST	AL,20H
+						JNE		@f
+						MOV		BX,-1
+
 @@:
 						AND		BX,BX
 						RET
