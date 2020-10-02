@@ -460,6 +460,7 @@ BUSY_WAIT_FFFFH			ENDP
 
 ; Intercept IO.SYS jump to MSDOS.SYS
 IOSYS_INTERCEPT			PROC
+						PUSHF
 						PUSH	DS
 						PUSH	ES
 						PUSH	AX
@@ -472,6 +473,8 @@ IOSYS_INTERCEPT			PROC
 
 						PUSH	CS
 						POP		DS
+
+						CLD
 
 						MOV		AX,2800H
 						CALL	LOCATE
@@ -505,6 +508,7 @@ IOSYS_INTERCEPT			PROC
 						POP		AX
 						POP		ES
 						POP		DS
+						POPF
 
 						JMP		DWORD PTR CS:[IOSYS_RESUME_IP]
 

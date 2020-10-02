@@ -36,6 +36,7 @@ REALMAIN:
 						RETF
 @@:
 						CLI
+						CLD
 						PUSH		CS
 						POP			DS
 						PUSH		BX

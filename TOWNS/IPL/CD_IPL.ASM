@@ -38,6 +38,7 @@ REALMAIN:
 
 @@:
 						CLI
+						CLD
 						PUSH	CS
 						POP		DS
 						PUSH	BX

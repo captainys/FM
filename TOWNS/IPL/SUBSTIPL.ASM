@@ -17,6 +17,7 @@ MAIN					PROC
 						DB		"IPL4"
 
 						CLI
+						CLD
 						PUSH	CS
 						POP		DS
 
@@ -289,6 +290,7 @@ FIND_JUMP_INSTRUCTION_FOUND:
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						; IO.SYS Intercept
 IOSYS_INTERCEPT:
+						PUSHF
 						PUSH	DS
 						PUSH	ES
 						PUSH	AX
@@ -302,6 +304,7 @@ IOSYS_INTERCEPT:
 						PUSH	CS
 						POP		DS
 
+						CLD
 						CALL	DRAW_AOMORI
 						CALL	DEMOSPLASH_MESSAGE
 
@@ -319,6 +322,7 @@ IOSYS_INTERCEPT:
 						POP		AX
 						POP		ES
 						POP		DS
+						POPF
 
 						JMP		DWORD PTR CS:[IOSYS_RESUME_IP]
 

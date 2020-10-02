@@ -19,6 +19,7 @@ MAIN					PROC
 						DB			"IPL4"
 
 						CLI
+						CLD
 						PUSH		CS
 						POP			DS
 						PUSH		BX
