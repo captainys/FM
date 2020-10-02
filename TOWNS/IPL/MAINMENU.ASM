@@ -105,13 +105,15 @@ MOVE_ARROW_BY_PAD		ENDP
 ;        1 RIGHT
 ;   ZF=0 IF LEFT OR RIGHT,  ZF=1 IF NEUTRAL
 PAD_TO_LEFT_RIGHT		PROC
-						TEST	AL,40H
+						XOR		BX,BX
+
+						TEST	AL,08H
 						JNE		@f
 						MOV		BX,1
 						AND		BX,BX
 						RET
 @@:
-						TEST	AL,20H
+						TEST	AL,04H
 						JNE		@f
 						MOV		BX,-1
 @@:
