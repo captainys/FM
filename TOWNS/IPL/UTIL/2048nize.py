@@ -114,12 +114,27 @@ def main(argv):
 	print("Output CUE file:"+cueOutFName)
 	print("Output BIN file:"+binOutFName)
 
+	# ProcessCUE(cue,binOUTFName)
+	# WriteTextFile(cueOUTFName,cue)
+
+	print("It is Python, damn slow poorly-designed programming language, unlike C/C++.")
+	print("Python (not me) demands you to be patient and wait for extremely long time")
+	print("until it reads the binary file.")
+
 	with open(binInFName,"rb") as f: data=[d for d in f.read()]
 
+	print("There you go, the file is in the memory.  Now Python want you to wait extremely")
+	print("long until the data is processed.")
+
 	# process data here
-	# with open(out_name,"wb") as f: f.write(b''.join(data))
 
 	raise   # Working on it now
+
+	print("Processing done.  Wait extremely long time until Python writes to the file.")
+
+	# with open(out_name,"wb") as f: f.write(b''.join(data))
+
+	print("The processing done after extremely long wait.  You may be a philosopher by now.")
 
 	return;
 
