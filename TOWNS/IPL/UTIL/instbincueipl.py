@@ -11,10 +11,13 @@ def Error(msg):
 
 
 def Help():
-	print("2048nize.py - Convert BIN/CUE to 2048 bytes/sector data track.")
+	print("2048nize.py - Convert BIN/CUE to 2048 bytes/sector data track and install IPL.")
 	print("by CaptainYS")
 	print("Usage:")
-	print("  2048nize.py input.cue output.cue")
+	print("  2048nize.py input.cue output.cue IPL.BIN")
+	print("")
+	print("This program converts a data track of 2352 bytes/sector to 2048 bytes/sector")
+	print("and installs IPL.BIN in the first sectors of the image.")
 
 
 
@@ -117,9 +120,13 @@ def ProcessCUE(txt,binFName):
 
 
 def main(argv):
-	if(len(argv)<3):
+	if(len(argv)!=4):
 		Help()
 		quit()
+
+	with open(argv[3],"rb") as f: IPL=[d for d in f.read()]
+
+	print("IPL "+str(len(IPL))+" bytes")
 
 	cueIn=ReadTextFile(argv[1])
 	[binInFName,numSectors]=CheckCUE(cueIn,argv[1])
@@ -156,6 +163,7 @@ def main(argv):
 			print(str(sect)+"/"+str(numSectors))
 
 	data[writePtr:numSectors*2352]=[0]*(numSectors*2352-writePtr)
+	data[0:len(IPL)]=IPL
 
 	print("Processing done.  Wait extremely long time for writing output.")
 
