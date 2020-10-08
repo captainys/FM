@@ -36,7 +36,7 @@ def MSFStrToHSG(MSFStr):
 
 
 
-def MakeUpBINFileFromCUE(CUEFName,BINFName):
+def MakeUpFullPathBINFileFromCUE(CUEFName,BINFName):
 	path=os.path.split(CUEFName)[0]
 	return os.path.join(path,BINFName)
 
@@ -74,6 +74,7 @@ def CheckCUE(txt,CUEFName):
 			if 1==indexType and 2==readingTrack:
 				track2BeginTime=args[2]
 				track2Exists=True
+	binFName=MakeUpFullPathBINFileFromCUE(CUEFName,binFName)
 	print("[Input CUE]")
 	print("Number of Data Tracks="+str(nBIN))
 	print("Data Track Sector Length="+sectorLength)
@@ -82,7 +83,7 @@ def CheckCUE(txt,CUEFName):
 		print("Track2BeginTime="+track2BeginTime+"(HSG "+str(MSFStrToHSG(track2BeginTime))+")")
 		numDataSectors=MSFStrToHSG(track2BeginTime)
 	else:
-		fsize=os.path.getsize(MakeUpBINFileFromCUE(CUEFName,binFName))
+		fsize=os.path.getsize(binFName)
 		numDataSectors=fsize/2352
 		print("Track1 Number of Sectors="+str(numDataSectors))
 	return [binFName,numDataSectors]
@@ -94,12 +95,29 @@ def CheckCUE(txt,CUEFName):
 
 
 def main(argv):
-	if(3!=len(argv)):
+	if(len(argv)<3):
 		Help()
 		quit()
 
-	cue=ReadTextFile(argv[1])
-	[binFName,numSectors]=CheckCUE(cue,argv[1])
+	cueIn=ReadTextFile(argv[1])
+	[binInFName,numSectors]=CheckCUE(cueIn,argv[1])
+
+	cueOutFName=argv[2]
+	if os.path.exists(cueOutFName):
+		print("Output CUE file already exists.")
+
+	binOutFName=os.path.splitext(cueOutFName)[0]
+	binOutFName+=".BIN"
+	if os.path.exists(binOutFName):
+		print("Output BIN file already exists.")
+
+	print("Output CUE file:"+cueOutFName)
+	print("Output BIN file:"+binOutFName)
+
+	with open(binInFName,"rb") as f: data=[d for d in f.read()]
+
+	# process data here
+	# with open(out_name,"wb") as f: f.write(b''.join(data))
 
 	raise   # Working on it now
 
