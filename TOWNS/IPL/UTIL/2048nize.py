@@ -22,8 +22,19 @@ def ReadTextFile(fName):
 	fp=open(fName,"r")
 	txt=[]
 	for line in fp:
+		line=line.replace('\r','')
+		line=line.replace('\n','')
 		txt.append(line)
+	fp.close()
 	return txt
+
+
+
+def WriteTextFile(fName,txt):
+	fp=open(fName,"w")
+	for line in txt:
+		fp.write(line+'\n')
+	fp.close()
 
 
 
@@ -90,7 +101,18 @@ def CheckCUE(txt,CUEFName):
 
 
 
-# For every 2352 bytes skip first 16 bytes take 2048 bytes
+def ProcessCUE(txt,binFName):
+	txtOut=[]
+	for line in txt:
+		LINE=line.upper()
+		if 0<=LINE.find("FILE"):
+			txtOut.append('FILE "'+os.path.split(binFName)[1]+'" BINARY')
+		elif 0<=LINE.find("TRACK") and 0<=LINE.find("MODE1/"):
+			mode1pos=LINE.find("MODE1/")
+			txtOut.append(line[0:mode1pos+6]+"2048")
+		else:
+			txtOut.append(line)
+	return txtOut
 
 
 
@@ -114,27 +136,32 @@ def main(argv):
 	print("Output CUE file:"+cueOutFName)
 	print("Output BIN file:"+binOutFName)
 
-	# ProcessCUE(cue,binOUTFName)
-	# WriteTextFile(cueOUTFName,cue)
+	cueOut=ProcessCUE(cueIn,binOutFName)
 
-	print("It is Python, damn slow poorly-designed programming language, unlike C/C++.")
-	print("Python (not me) demands you to be patient and wait for extremely long time")
-	print("until it reads the binary file.")
+	WriteTextFile(cueOutFName,cueOut)
+
+	print("Please wait for extremely long time.")
 
 	with open(binInFName,"rb") as f: data=[d for d in f.read()]
 
-	print("There you go, the file is in the memory.  Now Python want you to wait extremely")
-	print("long until the data is processed.")
+	sect=int(0)
+	writePtr=int(0)
+	readPtr=int(16)
+	while sect<numSectors:
+		data[writePtr:writePtr+2048]=data[readPtr:readPtr+2048]
+		writePtr=writePtr+2048
+		readPtr=readPtr+2352
+		sect=sect+1
+		if 0==sect%1000:
+			print(str(sect)+"/"+str(numSectors))
 
-	# process data here
+	data[writePtr:numSectors*2352]=[0]*(numSectors*2352-writePtr)
 
-	raise   # Working on it now
+	print("Processing done.  Wait extremely long time for writing output.")
 
-	print("Processing done.  Wait extremely long time until Python writes to the file.")
+	with open(binOutFName,"wb") as f: f.write(bytearray(data))
 
-	# with open(out_name,"wb") as f: f.write(b''.join(data))
-
-	print("The processing done after extremely long wait.  You may be a philosopher by now.")
+	print("The processing done after extremely long wait.  You might be a philosopher by now.")
 
 	return;
 
