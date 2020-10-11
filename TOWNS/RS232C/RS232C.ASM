@@ -171,7 +171,7 @@ RS232C2_PUTC			ENDP
 ;   AL    Byte data if CF=0, Undefined if CF=1
 ;   CF=0  One byte was read from the RS232C.
 ;   CF=1  Nothing to read
-RS232C_GETC				PROC
+RS232C2_GETC			PROC
 						PUSH	DX
 						MOV		DX,0A02H
 						IN		AL,DX
@@ -187,6 +187,6 @@ RS232C_GETC				PROC
 						POP		DX
 						CLC
 						RET
-RS232C_GETC				ENDP
+RS232C2_GETC				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
