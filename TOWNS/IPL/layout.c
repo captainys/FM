@@ -58,6 +58,7 @@ int main(int ac,char *av[])
 
 	for(i=3; i+1<ac; i+=2)
 	{
+		unsigned int bytesRead=0;
 		unsigned int fileOffset=atoi(av[i+1]);
 		FILE *ifp=fopen(av[i],"rb");
 		if(NULL==ifp)
@@ -65,7 +66,8 @@ int main(int ac,char *av[])
 			fprintf(stderr,"Cannot open %s\n",av[i]);
 			return 1;
 		}
-		fread(outputBuf+fileOffset,1,outputSize-fileOffset,ifp);
+		bytesRead=fread(outputBuf+fileOffset,1,outputSize-fileOffset,ifp);
+		printf("%s at %d, %d bytes\n",av[i],fileOffset,bytesRead);
 		fclose(ifp);
 	}
 
