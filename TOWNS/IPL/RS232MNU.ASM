@@ -1,8 +1,9 @@
-NUM_RS232CMENU_OPTIONS	EQU	4
+NUM_RS232CMENU_OPTIONS	EQU	5
 
 RS232CMENU_ITEMNUM_19200BPS		EQU	1
 RS232CMENU_ITEMNUM_38400BPS		EQU	2
 RS232CMENU_ITEMNUM_SENDTEST		EQU	3
+RS232CMENU_ITEMNUM_RECVCMOS		EQU	4
 
 
 RS232CMENU				PROC
@@ -100,6 +101,12 @@ RS232CMENU_WAIT_PAD:
 						JMP		RS232CMENU_OUTER_LOOP
 
 @@:
+						CMP		AL,RS232CMENU_ITEMNUM_RECVCMOS
+						JNE		@f
+						CALL	RS232CMENU_RECEIVE_CMOS
+						JMP		RS232CMENU_OUTER_LOOP
+
+@@:
 						JMP		RS232CMENU_OUTER_LOOP
 
 
@@ -131,6 +138,7 @@ RS232CMENU_ITEM_BUFFER	DB		"RETURN TO MAIN MENU                                 
 						DB		"[X] 19200bps                                                                   ",0
 						DB		"[ ] 38400bps                                                                   ",0
 						DB		"SEND TEST STRING                                                               ",0
+						DB		"RECEIVE CMOS                                                                   ",0
 
 RS232CMENU_CURSOR_POS	DB		0
 RS232CMENU_BAUD_RATE	DB		0
@@ -141,3 +149,88 @@ RS232CMENU_RECEIVE_BUF      DB		32 dup(0),0
 RS232CMENU_RECEIVE_BUF_PTR  DB		0
 
 RS232CMENU_SETTING_MSG	DB		"8bit, No Parity, 1 stop bit",0
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+RS232CMENU_RECEIVE_CMOS	PROC
+		CALL	TSUGARU_DEBUG_BREAK
+
+						CALL	CLEAR_FIVE_BELOW
+						CALL	MENU_WAIT_PAD_RELEASE
+
+						MOV		AX,0106H
+						CALL	LOCATE
+						MOV		SI,OFFSET RS232C_START_XMODEM__MSG
+						CALL	PRINT_TALL
+
+@@:
+						CALL	READ_PADA
+						CMP		AL,3FH
+						JE		@b
+
+						CALL	MENU_WAIT_PAD_RELEASE
+
+						CALL	XMODEM_RECEIVE_INIT
+
+						; Receive Buffer
+						MOV		DI,OFFSET UNCHARTED_TERRITORY
+
+RS232CMENU_RECEIVE_CMOS_LOOP:
+						CALL	XMODEM_RECEIVE_ONE_STEP
+						JAE		RS232CMENU_RECEIVE_CMOS_NO_RECV
+
+						CMP		DI,OFFSET UNCHARTED_TERRITORY+8192 ; Receiving more than 8K?
+						JA		RS232CMENU_RECEIVE_CMOS_LOOP
+
+						ADD		DI,128
+						MOVZX	EAX,DI
+						SUB		EAX,OFFSET UNCHARTED_TERRITORY
+
+						PUSH	DI
+						ROL		EAX,8
+						PUSH	EAX
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [RS232C_SIZE_MSG_BUF],AX
+						POP		EAX
+						ROL		EAX,8
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [RS232C_SIZE_MSG_BUF+2],AX
+						ROL		EAX,8
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [RS232C_SIZE_MSG_BUF+4],AX
+						ROL		EAX,8
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [RS232C_SIZE_MSG_BUF+6],AX
+
+						MOV		AX,0107H
+						CALL	LOCATE
+						MOV		SI,OFFSET RS232C_SIZE_MSG_BUF
+						CALL	PRINT_TALL
+						POP		DI
+
+						JMP		RS232CMENU_RECEIVE_CMOS_LOOP
+
+RS232CMENU_RECEIVE_CMOS_NO_RECV:
+						CMP		AL,0FFH
+						JNE		RS232CMENU_RECEIVE_CMOS_LOOP
+
+		CALL	TSUGARU_DEBUG_BREAK
+
+						RET
+
+
+RS232CMENU_RECEIVE_CMOS	ENDP
+
+RS232C_START_XMODEM__MSG	DB "START XMODEM-SEND IN THE TERMINAL AND PUSH PAD0 BUTTON",0
+RS232C_SIZE_MSG_BUF			DB "00000000",0
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

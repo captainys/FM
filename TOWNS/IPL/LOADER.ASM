@@ -174,6 +174,13 @@ MESSAGE_LINE2			DB	"http://www.ysflight.com",0
 						INCLUDE		CMOSRST.ASM
 						INCLUDE		BOOTMENU.ASM
 
+
+						; After the end of the program.
+						; Can be used as a large buffer
+UNCHARTED_TERRITORY		DB		0
+
+
+
 CODE					ENDS
 
 						END		MAIN

@@ -43,12 +43,12 @@ XMODEM_RECEIVE_INIT		ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Input
-;   DS:DI  256-byte Data Buffer
+;   DS:DI  128-byte Data Buffer
 ; Output
 ;   AL=0   In session   AL=FFH  Transmission Ended
-;   CF=1   256-byte Data Buffer is filled
+;   CF=1   128-byte Data Buffer is filled
 ;   CF=0   Data buffer was not filled
-
+;
 XMODEM_RECEIVE_ONE_STEP	PROC
 						PUSH	DI
 
@@ -83,7 +83,7 @@ XMODEM_RECV_WAITSOH:
 
 						; End of Transmission
 						MOV		CS:[XMODEM_STATE],XMODEM_RECVSTA_EOT
-						JMP		XMODEM_RECV_ACK_EXIT
+						JMP		XMODEM_RECV_TRANSMISSION_ENDED
 
 XMODEM_RECV_WAITIDX1:
 						CALL	RS232C2_GETC
@@ -106,14 +106,14 @@ XMODEM_RECV_DATA:
 						MOV		[BX+DI],AL
 						ADD		CS:[XMODEM_CHECKSUM],AL
 						INC		BYTE PTR CS:[XMODEM_DATA_COUNT]
-						JB		XMODEM_RECV_NEXT_STEP_EXIT
+						JS		XMODEM_RECV_NEXT_STEP_EXIT
 						JMP		XMODEM_RECV_EXIT
 
 XMODEM_RECV_CHECKSUM:
 						CALL	RS232C2_GETC
 						JB		XMODEM_RECV_EXIT
 						CMP		AL,CS:[XMODEM_CHECKSUM]
-						JE		XMODEM_RECV_NAK_EXIT
+						JNE		XMODEM_RECV_NAK_EXIT
 						MOV		CS:[XMODEM_STATE],XMODEM_RECVSTA_WAITSOH
 						JMP		XMODEM_RECV_BLOCKEND_EXIT
 
@@ -124,6 +124,9 @@ XMODEM_RECV_EOT:
 						JB		XMODEM_RECV_EXIT
 						CMP		AL,XMODEM_ETB
 						JNE		XMODEM_RECV_EXIT
+						; Fall down to ACK and return AL=0FFH
+
+XMODEM_RECV_TRANSMISSION_ENDED:
 						MOV		AL,XMODEM_ACK
 						CALL	RS232C2_PUTC
 
@@ -163,7 +166,7 @@ XMODEM_RECV_ACK_EXIT:
 						RET
 
 XMODEM_RECV_BLOCKEND_EXIT:
-						MOV		AL,XMODEM_NAK
+						MOV		AL,XMODEM_ACK
 						CALL	RS232C2_PUTC
 						POP		DI
 						XOR		AL,AL
