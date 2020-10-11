@@ -79,13 +79,10 @@ SCSI_COMMAND			PROC
 						; Pentium model may be too fast for SCSI controller when multiple commands
 						; are shot in a short time.  Add 10ms delay.
 						PUSH	CX
-						PUSH	DX
 						MOV		CX,10000
-						MOV		DX,6CH
 @@:
-						OUT		DX,AL
+						OUT		6CH,AL
 						LOOP	@b
-						POP		DX
 						POP		CX
 
 

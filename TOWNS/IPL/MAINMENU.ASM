@@ -1,10 +1,11 @@
 MENUITEM_LENGTH			EQU		80
 
-NUM_MAINMENU_OPTIONS	EQU		3
+NUM_MAINMENU_OPTIONS	EQU		4
 
 MAINMENU_ITEMNUM_BOOTMENU		EQU		1
 MAINMENU_ITEMNUM_CMOSMENU		EQU		0
 MAINMENU_ITEMNUM_RESETCMOS		EQU		2
+MAINMENU_ITEMNUM_RS232CMENU		EQU		3
 
 MAINMENU				PROC
 
@@ -63,6 +64,12 @@ MAINMENU_OUTER_LOOP:
 						JMP		MAINMENU_OUTER_LOOP
 
 @@:
+						CMP		AH,MAINMENU_ITEMNUM_RS232CMENU
+						JNE		@f
+						CALL	RS232CMENU
+						JMP		MAINMENU_OUTER_LOOP
+
+@@:
 						JMP		MAINMENU_OUTER_LOOP
 
 MAINMENU				ENDP
@@ -74,6 +81,7 @@ MAINMENU_SELECTION		DB		0
 MAINMENU_ITEM_BUFFER	DB		"DRIVE LETTER ASSIGNMENTS                                                       ",0
 						DB		"BOOT MENU                                                                      ",0
 						DB		"RESET CMOS RAM                                                                 ",0
+						DB		"SERIAL (RS232C) MENU                                                           ",0
 
 
 ; Input
