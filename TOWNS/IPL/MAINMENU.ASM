@@ -155,6 +155,7 @@ PAD_TO_LEFT_RIGHT		PROC
 PAD_TO_LEFT_RIGHT		ENDP
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ; INPUT/OUTPUT
@@ -165,3 +166,75 @@ TOGGLE_1_0				PROC
 						RET
 
 TOGGLE_1_0				ENDP
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+; Input
+;   DS:SI    Triple confirmation message
+; Output
+;   AH       0  Confirmed
+;            1  Cancelled
+MENU_TRIPLE_CONFIRM		PROC
+
+
+						MOV		BX,3
+						MOV		AH,1	; CANCEL
+TRIPLE_CONFIRM_LOOP:
+						PUSH	BX
+						PUSH	SI
+						PUSH	AX
+
+						CALL	MENU_WAIT_PAD_RELEASE
+						CALL	CLEAR_FIVE_BELOW
+
+						POP		AX
+						POP		SI
+						PUSH	SI
+						PUSH	AX
+
+						MOV		CX,2		; 2 MENU ITEMS
+						CALL	DRAWMENU
+
+						POP		AX
+						PUSH	AX
+
+						MOV		CX,2		; 2 MENU ITEMS
+						MOV		AL,AH		; AL=CURRENT SELECTION
+						CALL	DRAWARROW
+
+						POP		AX
+						POP		SI
+
+@@:
+						CALL	READ_PADA
+						CMP		AL,3FH
+						JE		@b
+
+						MOV		CH,2
+						CALL	MOVE_ARROW_BY_PAD
+
+						POP		BX
+
+						AND		AL,30H
+						CMP		AL,30H
+						JE		TRIPLE_CONFIRM_LOOP
+
+						CMP		AH,1
+						JNE		@f
+						RET
+
+@@:
+						ADD		SI,MENUITEM_LENGTH*2
+						DEC		BX
+						JE		@f
+						MOV		AH,1	; CANCEL
+						JMP		TRIPLE_CONFIRM_LOOP
+
+@@:
+						RET
+
+MENU_TRIPLE_CONFIRM		ENDP
