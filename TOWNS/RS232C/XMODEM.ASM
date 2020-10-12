@@ -6,6 +6,13 @@ XMODEM_RECVSTA_DATA		EQU		4
 XMODEM_RECVSTA_CRC		EQU		5
 XMODEM_RECVSTA_EOT		EQU		6
 
+
+XMODEM_SENDSTA_WAIT_NAK_OR_C	EQU		0
+XMODEM_SENDSTA_WAIT_ACK			EQU		1
+XMODEM_SENDSTA_NEXT_PACKET		EQU		2
+XMODEM_SENDSTA_SENT_EOT			EQU		3
+
+
 XMODEM_SOH				EQU		01H
 XMODEM_EOT				EQU		04H
 XMODEM_ACK				EQU		06H
@@ -13,6 +20,8 @@ XMODEM_NAK				EQU		15H
 XMODEM_ETB				EQU		17H
 XMODEM_CAN				EQU		18H
 XMODEM_C				EQU		43H
+
+XMODEM_PACKET_SIZE		EQU		128
 
 
 
@@ -26,7 +35,11 @@ XMODEM_DATA_COUNT		DB		0
 XMODEM_CHECKSUM			DB		0
 
 XMODEM_TRANSFERRED		DD		0
+XMODEM_PACKET_COUNT		DB		0
+XMODEM_CHECKSUM_OR_CRC	DB		0		; 0 CHECKSUM  1 CRC
 
+XMODEM_MODE_CHECKSUM	EQU		0
+XMODEM_MODE_CRC			EQU		1
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -174,4 +187,202 @@ XMODEM_RECV_BLOCKEND_EXIT:
 						RET
 
 XMODEM_RECEIVE_ONE_STEP	ENDP
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+XMODEM_SEND_INIT		PROC
+						MOV		CS:[XMODEM_STATE],XMODEM_SENDSTA_WAIT_NAK_OR_C
+						MOV		WORD PTR CS:[XMODEM_DATA_COUNT],0
+						MOV		BYTE PTR CS:[XMODEM_PACKET_COUNT],1
+						MOV		CS:[XMODEM_CHECKSUM_OR_CRC],XMODEM_MODE_CHECKSUM	; Tentatively make it checksum mode.
+						RET
+XMODEM_SEND_INIT		ENDP
+
+
+
+; Input
+;   AH       0 Continue   1 No More Data  AH needs to be zero for the first 128 bytes
+;   DS:SI    128-byte data buffer
+; Output
+;   AL       0 Continue  FFH  EOT sent and acknowledged
+;   CF=1   128-byte Data Buffer is filled
+;   CF=0   Data buffer was not filled
+
+XMODEM_SEND_ONE_STEP	PROC
+						PUSH	SI
+						PUSH	AX
+
+						MOVZX	BX,BYTE PTR CS:[XMODEM_STATE]
+						SHL		BX,1
+						ADD		BX,OFFSET XMODEM_SEND_JUMPTABLE
+						JMP		CS:[BX]
+
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+XMODEM_SEND_JUMPTABLE:
+						DW		OFFSET XMODEM_SEND_WAIT_NAK_OR_C
+						DW		OFFSET XMODEM_SEND_WAITACK
+						DW		OFFSET XMODEM_SEND_NEXT_PACKET
+						DW		OFFSET XMODEM_SEND_EOT
+
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+XMODEM_SEND_WAIT_NAK_OR_C:
+						CALL	RS232C2_GETC
+						JB		XMODEM_SEND_EXIT
+						CMP		AL,XMODEM_NAK
+						JE		XMODEM_SEND_PACKET_AND_EXIT
+						CMP		AL,XMODEM_C	; CRC-mode
+						JNE		XMODEM_SEND_EXIT
+						MOV		CS:[XMODEM_CHECKSUM_OR_CRC],XMODEM_MODE_CRC
+						JMP		XMODEM_SEND_PACKET_AND_EXIT
+
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+XMODEM_SEND_WAITACK:
+						CALL	RS232C2_GETC
+						JB		XMODEM_SEND_EXIT
+						CMP		AL,XMODEM_ACK
+						JE		@f		; Packet Suceeeded
+						CMP		AL,XMODEM_NAK
+						JNE		XMODEM_SEND_EXIT
+						JMP		XMODEM_SEND_PACKET_AND_EXIT
+@@:
+						POP		AX
+						POP		SI
+
+						MOV		BYTE PTR CS:[XMODEM_STATE],XMODEM_SENDSTA_NEXT_PACKET
+						XOR		AL,AL
+						STC
+						RET
+
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+XMODEM_SEND_NEXT_PACKET:
+						MOV		BYTE PTR CS:[XMODEM_STATE],XMODEM_SENDSTA_WAIT_ACK	; Tentative
+
+						CMP		AH,0
+						JE		XMODEM_SEND_PACKET_AND_EXIT	; Jump if next packet needed
+
+						; All packets done.
+						MOV		AL,XMODEM_EOT
+						CALL	RS232C2_PUTC
+						MOV		BYTE PTR CS:[XMODEM_STATE],XMODEM_SENDSTA_SENT_EOT
+
+						POP		AX
+						POP		SI
+						XOR		AL,AL
+						CLC
+						RET
+
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+XMODEM_SEND_EOT:
+						CALL	RS232C2_GETC
+						JB		XMODEM_SEND_EXIT
+						CMP		AL,XMODEM_ACK
+						JNE		XMODEM_SEND_EXIT
+
+						POP		AX
+						POP		SI
+						MOV		AL,0FFH
+						CLC
+						RET
+
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+XMODEM_SEND_PACKET_AND_EXIT:
+						MOV		AL,XMODEM_SOH
+						CALL	RS232C2_PUTC
+						MOV		AL,CS:[XMODEM_PACKET_COUNT]
+						CALL	RS232C2_PUTC
+						MOV		AL,CS:[XMODEM_PACKET_COUNT]
+						XOR		AL,0FFH
+						CALL	RS232C2_PUTC
+
+						MOV		BYTE PTR CS:[XMODEM_CHECKSUM],0
+
+						MOV		CX,XMODEM_PACKET_SIZE
+XMODEM_SEND_PACKET_LOOP:
+						PUSH	CX
+						LODSB
+						ADD		CS:[XMODEM_CHECKSUM],AL
+						CALL	RS232C2_PUTC
+						POP		CX
+						LOOP	XMODEM_SEND_PACKET_LOOP
+
+						CMP		BYTE PTR CS:[XMODEM_CHECKSUM_OR_CRC],XMODEM_MODE_CRC
+						JE		XMODEM_SEND_PACKET_CRC
+
+						MOV		AL,CS:[XMODEM_CHECKSUM]
+						CALL	RS232C2_PUTC
+						JMP		@f
+
+XMODEM_SEND_PACKET_CRC:
+						SUB		SI,XMODEM_PACKET_SIZE
+						CALL	XMODEM_CALC_CRC
+						PUSH	AX
+						XCHG	AL,AH
+						CALL	RS232C2_PUTC
+						POP		AX
+						CALL	RS232C2_PUTC
+
+@@:
+						MOV		CS:[XMODEM_STATE],XMODEM_SENDSTA_WAIT_ACK
+						POP		AX
+						POP		SI
+						XOR		AL,AL
+						CLC
+						RET
+
+						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+XMODEM_SEND_EXIT:
+						POP		AX
+						POP		SI
+						XOR		AL,AL
+						CLC
+						RET
+
+
+XMODEM_SEND_ONE_STEP	ENDP
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Input
+;   DS:SI  Pointer to 128-byte buffer
+; Output
+;   AX     CRC
+XMODEM_CALC_CRC			PROC
+						XOR		DX,DX
+						MOV		CX,XMODEM_PACKET_SIZE
+
+XMODEM_CALC_CRC_OUTER_LOOP:
+						LODSB
+						; First shift, then xor: Take XOR of high-byte of DX and AL
+						XOR		DH,AL
+
+						MOV		AH,8
+XMODEM_CALC_CRC_INNER_LOOP:
+						SHL		DX,1
+						JAE		@f		; Jump if no carry, means DX WAS zero or positive.
+
+						XOR		DX,1021H
+@@:
+						DEC		AH
+						JNE		XMODEM_CALC_CRC_INNER_LOOP
+
+						LOOP	XMODEM_CALC_CRC_OUTER_LOOP
+
+						MOV		AX,DX
+						RET
+
+
+XMODEM_CALC_CRC			ENDP
 

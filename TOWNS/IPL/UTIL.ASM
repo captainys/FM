@@ -30,3 +30,29 @@ ITOX8					PROC
 
 ITOX8					ENDP
 
+
+
+; Input
+;   EAX    Number
+;   DS:DI  String Pointer (8 bytes)
+ITOX32					PROC
+						ROL		EAX,8
+						PUSH	EAX
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [DI],AX
+						POP		EAX
+						ROL		EAX,8
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [DI+2],AX
+						ROL		EAX,8
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [DI+4],AX
+						ROL		EAX,8
+						CALL	ITOX8
+						XCHG	AL,AH
+						MOV		WORD PTR [DI+6],AX
+						RET
+ITOX32					ENDP

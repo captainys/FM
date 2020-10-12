@@ -1,9 +1,12 @@
-NUM_RS232CMENU_OPTIONS	EQU	5
+NUM_RS232CMENU_OPTIONS	EQU	7
 
 RS232CMENU_ITEMNUM_19200BPS		EQU	1
 RS232CMENU_ITEMNUM_38400BPS		EQU	2
 RS232CMENU_ITEMNUM_SENDTEST		EQU	3
 RS232CMENU_ITEMNUM_RECVCMOS		EQU	4
+RS232CMENU_ITEMNUM_SENDCMOS		EQU	5
+RS232CMENU_ITEMNUM_DUMPROM		EQU	6
+
 
 
 RS232CMENU				PROC
@@ -39,10 +42,9 @@ RS232CMENU_OUTER_LOOP:
 						MOV		SI,OFFSET RS232CMENU_RECEIVE_STR
 						CALL	PRINT_TALL
 
-						MOV		AX,0114H
-						CALL	LOCATE
+						MOV		AX,0113H
 						MOV		SI,OFFSET RS232CMENU_SETTING_MSG
-						CALL	PRINT_TALL
+						CALL	DRAW_TEXT
 
 RS232CMENU_WAIT_PAD:
 						CALL	RS232C2_GETC
@@ -107,6 +109,18 @@ RS232CMENU_WAIT_PAD:
 						JMP		RS232CMENU_OUTER_LOOP
 
 @@:
+						CMP		AL,RS232CMENU_ITEMNUM_SENDCMOS
+						JNE		@f
+						CALL	RS232CMENU_SEND_CMOS
+						JMP		RS232CMENU_OUTER_LOOP
+
+@@:
+						CMP		AL,RS232CMENU_ITEMNUM_DUMPROM
+						JNE		@f
+						CALL	RS232CMENU_SEND_ROMS
+						JMP		RS232CMENU_OUTER_LOOP
+
+@@:
 						JMP		RS232CMENU_OUTER_LOOP
 
 
@@ -120,20 +134,6 @@ RS232CMENU_SEND_TEST	PROC
 						PUSH	CS
 						POP		DS
 
-						MOV		AL,1
-						MOV		DX,0480H
-						OUT		DX,AL
-
-						PUSH	ES
-						MOV		AX,0D800H
-						MOV		ES,AX
-						MOV		SI,OFFSET RS232CMENU_SEND_TEST_TEXT
-						XOR		DI,DI
-						MOV		CX,2000H
-						REP		MOVSB
-						POP		ES
-
-						; Just in case
 						MOV		SI,OFFSET RS232CMENU_SEND_TEST_TEXT
 @@:
 						LODSB
@@ -153,18 +153,25 @@ RS232CMENU_ITEM_BUFFER	DB		"RETURN TO MAIN MENU                                 
 						DB		"[X] 19200bps                                                                   ",0
 						DB		"[ ] 38400bps                                                                   ",0
 						DB		"SEND TEST STRING                                                               ",0
-						DB		"RECEIVE CMOS                                                                   ",0
+						DB		"RECEIVE (RESTORE) CMOS RAM                                                     ",0
+						DB		"SEND (BACKUP) CMOS RAM                                                         ",0
+						DB		"SEND (DUMP) ROM IMAGE                                                          ",0
 
 RS232CMENU_CURSOR_POS	DB		0
 RS232CMENU_BAUD_RATE	DB		0
 RS232CMENU_BAUD_RATE_TO_AL_TABLE	DB	4,2
 
-RS232CMENU_RECEIVE_STR		DB		"RECEIVED:"
+RS232CMENU_RECEIVE_STR		DB		"RECV TEST:"
 RS232CMENU_RECEIVE_BUF      DB		32 dup(0),0
 RS232CMENU_RECEIVE_BUF_PTR  DB		0
 
 RS232CMENU_SETTING_MSG	DB		"8bit, No Parity, 1 stop bit",0
-
+						DB		0
+						DB		"I encourage you to dump your ROM image and keep it in a safe place",0
+						DB		"if you haven't done yet.  There might be different versions of the",0
+						DB		"system ROMs even for the same model, some of which may be rare.",0
+						DB		"You may own a hardware with a rare version of the system ROM.",0
+						DB		0FFH,0FFH
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -204,25 +211,8 @@ RS232CMENU_RECEIVE_CMOS_LOOP:
 						SUB		EAX,OFFSET UNCHARTED_TERRITORY
 
 						PUSH	DI
-						ROL		EAX,8
-						PUSH	EAX
-						CALL	ITOX8
-						XCHG	AL,AH
-						MOV		WORD PTR [RS232C_SIZE_MSG_BUF],AX
-						POP		EAX
-						ROL		EAX,8
-						CALL	ITOX8
-						XCHG	AL,AH
-						MOV		WORD PTR [RS232C_SIZE_MSG_BUF+2],AX
-						ROL		EAX,8
-						CALL	ITOX8
-						XCHG	AL,AH
-						MOV		WORD PTR [RS232C_SIZE_MSG_BUF+4],AX
-						ROL		EAX,8
-						CALL	ITOX8
-						XCHG	AL,AH
-						MOV		WORD PTR [RS232C_SIZE_MSG_BUF+6],AX
-
+						MOV		DI,OFFSET RS232C_SIZE_MSG_BUF
+						CALL	ITOX32
 						MOV		AX,0107H
 						CALL	LOCATE
 						MOV		SI,OFFSET RS232C_SIZE_MSG_BUF
@@ -246,8 +236,26 @@ RS232CMENU_RECEIVE_CMOS_NO_RECV:
 						RET
 
 @@:
-		CALL	TSUGARU_DEBUG_BREAK
+						MOV		DX,0480H
+						IN		AL,DX
+						AND		AL,3
+						PUSH	AX
+						MOV		AL,1
+						OUT		DX,AL
 
+						PUSH	ES
+						MOV		AX,0D800H
+						MOV		ES,AX
+						MOV		SI,OFFSET UNCHARTED_TERRITORY
+						XOR		DI,DI
+						MOV		CX,2000H
+						REP		MOVSB
+						POP		ES
+
+						POP		AX
+						OUT		DX,AL
+
+						; Just in case >>
 						MOV		SI,OFFSET UNCHARTED_TERRITORY
 						MOV		DX,3000H
 @@:
@@ -256,6 +264,7 @@ RS232CMENU_RECEIVE_CMOS_NO_RECV:
 						ADD		DX,2
 						CMP		DX,4000H
 						JNE		@b
+						; Just in case <<
 
 						CALL	CLEAR_FIVE_BELOW
 						MOV		AX,0107H
@@ -312,3 +321,128 @@ RS232C_NEED_RESET_MESSAGE	DB	"CMOS OVERWRITTEN BY THE BINARY RECEIVED VIA RS232C
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+RS232CMENU_SEND_CMOS	PROC
+
+						; Copy CMOS to buffer.
+						PUSH	ES
+						PUSH	DS
+
+						MOV		DX,0480H
+						IN		AL,DX
+						AND		AL,3
+						PUSH	AX
+						MOV		AL,1
+						OUT		DX,AL
+
+						MOV		AX,0D800H
+						MOV		DS,AX
+						XOR		SI,SI
+						PUSH	CS
+						POP		ES
+						MOV		DI,OFFSET UNCHARTED_TERRITORY
+						MOV		CX,2000H
+						REP		MOVSB
+
+						POP		AX
+						OUT		DX,AL
+
+						; Just in case >>
+						MOV		DI,OFFSET UNCHARTED_TERRITORY
+						MOV		DX,3000H
+@@:
+						IN		AL,DX
+						STOSB
+						ADD		DX,2
+						CMP		DX,4000H
+						JNE		@b
+						; Just in case <<
+
+						POP		DS
+						POP		ES
+
+
+						CALL	CLEAR_FIVE_BELOW
+						CALL	MENU_WAIT_PAD_RELEASE
+
+						MOV		AX,0106H
+						CALL	LOCATE
+						MOV		SI,OFFSET RS232C_START_XMODEM_RECV_MSG
+						CALL	PRINT_TALL
+
+						CALL	XMODEM_SEND_INIT
+						MOV		SI,OFFSET UNCHARTED_TERRITORY
+						MOV		AH,0
+
+RS232CMENU_SEND_CMOS_OUTER_LOOP:
+						CALL	XMODEM_SEND_ONE_STEP
+						JAE		RS232CMENU_SEND_CMOS_OUTER_NO_DATA
+
+						ADD		SI,128
+
+						PUSH	SI
+						PUSH	AX
+
+						MOVZX	EAX,SI
+						SUB		EAX,OFFSET UNCHARTED_TERRITORY
+						MOV		DI,OFFSET RS232C_SIZE_MSG_BUF
+						CALL	ITOX32
+
+						MOV		AX,0107H
+						CALL	LOCATE
+						MOV		SI,OFFSET RS232C_SIZE_MSG_BUF
+						CALL	PRINT_TALL
+
+						POP		AX
+						POP		SI
+
+						CMP		SI,OFFSET UNCHARTED_TERRITORY+8192
+						JB		RS232CMENU_SEND_CMOS_OUTER_LOOP
+						MOV		AH,1
+						JMP		RS232CMENU_SEND_CMOS_OUTER_LOOP
+
+RS232CMENU_SEND_CMOS_OUTER_NO_DATA:
+						CMP		AL,0FFH
+						JNE		RS232CMENU_SEND_CMOS_OUTER_LOOP
+
+						RET
+
+RS232CMENU_SEND_CMOS	ENDP
+
+
+RS232C_START_XMODEM_RECV_MSG	DB		"START XMODEM-RECEIVE ON THE TERMINAL",0
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+MYTOWNS_INFO		DB		"MYTOWNS.ROM "
+					DD		32,0
+
+FMT_SYS_INFO		DB		"FMT_SYS.ROM "
+					DD		FMT_SYS_SIZE,FMT_SYS_START
+FMT_DOS_INFO		DB		"FMT_DOS.ROM "
+					DD		FMT_DOS_SIZE,FMT_DOS_START
+FMT_DIC_INFO		DB		"FMT_DIC.ROM "
+					DD		FMT_DIC_SIZE,FMT_DIC_START
+FMT_FNT_INFO		DB		"FMT_FNT.ROM "
+					DD		FMT_FNT_SIZE,FMT_FNT_START
+FMT_F20_INFO		DB		"FMT_F20.ROM "
+					DD		FMT_F20_SIZE,FMT_F20_START
+
+FMT_SYS_INFO_386SX	DB		"FMT_SYS.ROM "
+					DD		FMT_SYS_SIZE,FMT_SYS_386SX_START
+FMT_DOS_INFO_386SX	DB		"FMT_DOS.ROM "
+					DD		FMT_DOS_SIZE,FMT_DOS_386SX_START
+FMT_DIC_INFO_386SX	DB		"FMT_DIC.ROM "
+					DD		FMT_DIC_SIZE,FMT_DIC_386SX_START
+FMT_FNT_INFO_386SX	DB		"FMT_FNT.ROM "
+					DD		FMT_FNT_SIZE,FMT_FNT_386SX_START
+
+RS232C_DUMP_ROMS_BUFFER_USED	DW		0
+
+RS232CMENU_SEND_ROMS	PROC
+					RET
+RS232CMENU_SEND_ROMS	ENDP
+
