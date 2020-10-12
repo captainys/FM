@@ -153,9 +153,9 @@ RS232CMENU_ITEM_BUFFER	DB		"RETURN TO MAIN MENU                                 
 						DB		"[X] 19200bps                                                                   ",0
 						DB		"[ ] 38400bps                                                                   ",0
 						DB		"SEND TEST STRING                                                               ",0
-						DB		"RECEIVE (RESTORE) CMOS RAM                                                     ",0
-						DB		"SEND (BACKUP) CMOS RAM                                                         ",0
-						DB		"SEND (DUMP) ROM IMAGE                                                          ",0
+						DB		"RECEIVE (RESTORE) CMOS RAM XMODEM                                              ",0
+						DB		"SEND (BACKUP) CMOS RAM     XMODEM                                              ",0
+						DB		"SEND (DUMP) ROM IMAGE      XMODEM                                              ",0
 
 RS232CMENU_CURSOR_POS	DB		0
 RS232CMENU_BAUD_RATE	DB		0
@@ -459,6 +459,7 @@ RS232CMENU_SEND_ROMS	PROC
 					MOV		SI,OFFSET RS232C_START_XMODEM_RECV_MSG
 					CALL	PRINT_TALL
 
+					CALL	RS232CMENU_CLEAR_SEND_BUFFER
 					CALL	RS232CMENU_SEND_ROMS_FILL_INIT_SERIALROM
 					; CS:[RS232C_DUMP_ROMS_BUFFER_USED] is initialized to 48 in RS232CMENU_SEND_ROMS_FILL_INIT_SERIALROM
 
@@ -485,9 +486,8 @@ RS232CMENU_SEND_ROMS_LOOP:
 					CALL	XMODEM_SEND_ONE_STEP
 					JAE		RS232CMENU_SEND_ROMS_NO_DATA
 
-					MOV		BYTE PTR CS:[RS232C_DUMP_ROMS_BUFFER_USED],0
-
 					PUSH	AX
+					CALL	RS232CMENU_CLEAR_SEND_BUFFER
 					CALL	RS232CMENU_SEND_ROM_FILL_NEXT
 					POP		AX
 
@@ -609,3 +609,23 @@ RS232CMENU_SEND_ROM_FILL_NEXT_EXIT:
 					POP		ES
 					RET
 RS232CMENU_SEND_ROM_FILL_NEXT	ENDP
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+RS232CMENU_CLEAR_SEND_BUFFER	PROC
+					PUSH	ES
+
+					MOV		BYTE PTR CS:[RS232C_DUMP_ROMS_BUFFER_USED],0
+
+					PUSH	CS
+					POP		ES
+					MOV		CX,128
+					MOV		DI,OFFSET UNCHARTED_TERRITORY
+					XOR		AL,AL
+					REP	 STOSB
+
+					POP		ES
+					RET
+RS232CMENU_CLEAR_SEND_BUFFER	ENDP
