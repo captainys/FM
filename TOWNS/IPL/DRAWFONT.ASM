@@ -20,6 +20,9 @@ CLS						PROC
 						PUSH	AX
 						PUSH	CX
 
+						MOV		AL,15
+						CALL	COLOR
+
 						MOV		AX,0C000H
 						MOV		ES,AX
 						MOV		DI,0
@@ -41,6 +44,9 @@ CLEAR_FIVE_BELOW		PROC
 						PUSH	DI
 						PUSH	AX
 						PUSH	CX
+
+						MOV		AL,15
+						CALL	COLOR
 
 						MOV		AX,0C000H
 						MOV		ES,AX
