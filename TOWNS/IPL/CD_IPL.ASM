@@ -24,7 +24,11 @@ CODE					SEGMENT	USE16
 MAIN					PROC
 
 						DB		"IPL4"
-						JMP		REALMAIN
+
+						; ****ing MASM kindly inserts NOP after JMP and messes up the offsets.  Good job, Microsoft.
+						DB		0EBH,(REALMAIN-@f)  ; JMP		REALMAIN
+@@:
+						DB		5EH dup (0)
 
 LOADER_LBA				DD		4		; Beginning Sector 4  ( +8192 bytes into ISO)
 YSSCSICD_LBA			DD		32		; Beginning Sector 32 (+65536 bytes into ISO)
