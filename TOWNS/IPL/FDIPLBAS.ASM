@@ -6,6 +6,11 @@ MAIN					PROC
 
 						DB			"IPL4"
 
+						JMP			@f
+
+						DB			55H dup (0)
+
+@@:
 						CLI
 						CLD
 						PUSH		CS
@@ -16,8 +21,7 @@ MAIN					PROC
 						CALL		VRAMMODE
 						CALL		CLS
 
-						MOV			AX,0101H
-						CALL		LOCATE
+						MOV			DI,01H+01H*(80*16)
 						MOV			SI,OFFSET MESSAGE
 						CALL		PRINT_TALL
 
@@ -33,10 +37,10 @@ MAIN					PROC
 						MOV			BYTE PTR CS:[SECTOR],BOOTLOADER_FD_BEGIN_SECTOR
 						MOV			WORD PTR CS:[BUFFADDR],0
 
+@@:
 						MOV			AX,BOOTLOADER_SEGMENT
 						MOV			DS,AX
 
-@@:
 						MOV			AH,05H	 ; Read Sector
 						MOV			AL,CS:[DEVICEID]
 						MOV			CX,CS:[TRACK_SIDE]
@@ -82,8 +86,7 @@ MAIN					PROC
 
 
 READ_ERROR:
-						MOV			AX,0102H
-						CALL		LOCATE
+						MOV			DI,01H+02H*(80*16)
 						MOV			SI,OFFSET ERROR_MESSAGE
 						CALL		PRINT_TALL
 @@:	
@@ -91,3 +94,125 @@ READ_ERROR:
 
 
 MAIN					ENDP
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+INITGRAPHICS			PROC
+
+						MOV		DX,IO_FMR_GVRAMDISPMODE
+						MOV		AL,27H  ; Show all planes, write to Page 0 (Page 0 is upper half of VRAM Layer 0)
+						OUT		DX,AL
+
+						MOV		DX,IO_FMR_GVRAMMASK
+						MOV		AL,0FH  ; Write to all planes
+						OUT		DX,AL
+
+						RET
+
+INITGRAPHICS			ENDP
+
+
+
+CLS						PROC
+						PUSH	ES
+						PUSH	DI
+						PUSH	AX
+						PUSH	CX
+
+						AND		AL,0FH
+						MOV		DX,IO_FMR_GVRAMMASK
+						OUT		DX,AL
+
+						MOV		AX,0C000H
+						MOV		ES,AX
+						MOV		DI,0
+						MOV		CX,80*400/2
+						MOV		AX,0
+						REP STOSW
+
+						POP		CX
+						POP		AX
+						POP		DI
+						POP		ES
+						RET
+CLS						ENDP
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; DI:  VRAM ADDRESS
+; AH:  ASCII Code
+; C0000H must be in FM-R VRAM mode.
+; BX preserved
+; DS preserved
+DRAWFONT_TALL			PROC
+						PUSH	DS
+
+						MOV		DX,0C000H
+						MOV		DS,DX
+
+						MOV		DX,IO_KVRAM_OR_ANKFONT
+						MOV		AL,1
+						OUT		DX,AL
+
+						; ANK Font ROM CA000H-
+						MOV		AL,8
+						MUL		AH
+						ADD		AX,0A000H
+
+						MOV		CX,8
+						MOV		SI,AX
+@@:
+						MOV		DH,DS:[SI]
+						MOV		[DI],DH
+						MOV		[DI+50H],DH
+						INC		SI
+						ADD		DI,0A0H
+						LOOP	@b
+
+						MOV		DX,IO_KVRAM_OR_ANKFONT
+						XOR		AL,AL
+						OUT		DX,AL
+
+						POP		DS
+						RET
+DRAWFONT_TALL			ENDP
+
+
+
+; Input
+;   DS:SI     String
+;   DI        VRAM Address
+PRINT_TALL				PROC
+						PUSH	ES
+						PUSH	SI
+						PUSH	DI
+						PUSH	AX
+						PUSH	DX
+						PUSH	CX
+
+						MOV		AX,0C000H
+						MOV		ES,AX
+						MOV		BX,SI
+@@:
+						MOV		SI,BX
+						LODSB
+						CMP		AL,0
+						JE		@f
+						MOV		AH,AL
+						CALL	DRAWFONT_TALL
+						ADD		DI,1-80*16
+						ADD		BX,1
+						JMP		@b
+@@:
+						POP		CX
+						POP		DX
+						POP		AX
+						POP		DI
+						POP		SI
+						POP		ES
+						RET
+PRINT_TALL				ENDP
