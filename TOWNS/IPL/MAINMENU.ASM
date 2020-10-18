@@ -1,11 +1,12 @@
 MENUITEM_LENGTH			EQU		80
 
-NUM_MAINMENU_OPTIONS	EQU		4
+NUM_MAINMENU_OPTIONS	EQU		5
 
 MAINMENU_ITEMNUM_BOOTMENU		EQU		1
 MAINMENU_ITEMNUM_CMOSMENU		EQU		0
 MAINMENU_ITEMNUM_RESETCMOS		EQU		2
 MAINMENU_ITEMNUM_RS232CMENU		EQU		3
+MAINMENU_ITEMNUM_IPLDEBUGMENU	EQU		4
 
 MAINMENU				PROC
 
@@ -70,6 +71,12 @@ MAINMENU_OUTER_LOOP:
 						JMP		MAINMENU_OUTER_LOOP
 
 @@:
+						CMP		AH,MAINMENU_ITEMNUM_IPLDEBUGMENU
+						JNE		@f
+						CALL	IPLDEBUG
+						JMP		MAINMENU_OUTER_LOOP
+
+@@:
 						JMP		MAINMENU_OUTER_LOOP
 
 MAINMENU				ENDP
@@ -82,6 +89,7 @@ MAINMENU_ITEM_BUFFER	DB		"DRIVE LETTER ASSIGNMENTS                              
 						DB		"BOOT MENU                                                                      ",0
 						DB		"RESET CMOS RAM                                                                 ",0
 						DB		"SERIAL (RS232C) MENU                                                           ",0
+						DB		"IPL DEBUG (DUMP B0000 to B00FF)                                                ",0
 
 
 ; Input
@@ -154,6 +162,26 @@ PAD_TO_LEFT_RIGHT		PROC
 						RET
 PAD_TO_LEFT_RIGHT		ENDP
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+MENU_WAIT_PAD_PRESS		PROC
+						MOV		AX,INSTRUCTION_LOCATION
+						CALL	LOCATE
+						MOV		SI,OFFSET MENU_ASKPRESS_MESSAGE
+						CALL	PRINT_TALL
+
+						CALL	WAIT_BUTTON_PRESS
+
+						MOV		AX,INSTRUCTION_LOCATION
+						CALL	LOCATE
+						CALL	ERASE_LINE_TALL
+
+						RET
+MENU_WAIT_PAD_PRESS		ENDP
+
+MENU_ASKPRESS_MESSAGE	DB		"PRESS PAD0 BUTTON",0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

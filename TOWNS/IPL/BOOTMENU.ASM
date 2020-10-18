@@ -350,6 +350,15 @@ TRYBOOT_NOT_FROM_SCSI_CD:
 						JAE		@f
 
 						; Boot from Floppy Disk
+						MOV		AL,CS:[BOOTMENU_SELECTION]
+						SUB		AL,BOOTMENU_ITEMNUM_FD0
+						OR		AL,20H
+						MOV		AH,3  ; Restore
+						XOR		CH,CH
+						DB		9AH		; CALLF FFFB:0014
+						DW		0014H,0FFFBH
+
+
 						MOV		BH,CS:[BOOTMENU_SELECTION]
 						SUB		BH,BOOTMENU_ITEMNUM_FD0
 						MOV		BL,02H

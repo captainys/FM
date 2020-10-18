@@ -6,11 +6,13 @@ MAIN					PROC
 
 						DB			"IPL4"
 
-						JMP			@f
+						; ****ing MASM kindly inserts NOP after JMP and messes up the offsets.  Good job, Microsoft.
+						DB		0EBH,(REALMAIN-@f)  ; JMP		REALMAIN
+@@:
 
 						DB			55H dup (0)
 
-@@:
+REALMAIN:
 						CLI
 						CLD
 						PUSH		CS
@@ -32,15 +34,23 @@ MAIN					PROC
 						OR			AL,20H	; Floppy Disk
 						MOV			CS:[DEVICEID],AL
 
+						; FD Restore (AL=Device ID) >>
+						MOV			AH,03H
+						XOR			CH,CH
+						; How can I write CALL 		FAR PTR 0FFFBH:0014H
+						DB			9AH		; CALLF FFFB:0014
+						DW			0014H,0FFFBH
+						; FD Restore (AL=Device ID) <<
+
 
 						MOV			WORD PTR CS:[TRACK_SIDE],BOOTLOADER_FD_BEGIN_TRACK*2+BOOTLOADER_FD_BEGIN_SIDE
 						MOV			BYTE PTR CS:[SECTOR],BOOTLOADER_FD_BEGIN_SECTOR
 						MOV			WORD PTR CS:[BUFFADDR],0
 
-@@:
 						MOV			AX,BOOTLOADER_SEGMENT
 						MOV			DS,AX
 
+@@:
 						MOV			AH,05H	 ; Read Sector
 						MOV			AL,CS:[DEVICEID]
 						MOV			CX,CS:[TRACK_SIDE]
@@ -58,8 +68,7 @@ MAIN					PROC
 
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
 						DB			9AH		; CALLF FFFB:0014
-						DW			 0014H
-						DW			0FFFBH
+						DW			0014H,0FFFBH
 
 						JB			READ_ERROR
 
@@ -86,6 +95,8 @@ MAIN					PROC
 
 
 READ_ERROR:
+						PUSH		CS
+						POP			DS
 						MOV			DI,01H+02H*(80*16)
 						MOV			SI,OFFSET ERROR_MESSAGE
 						CALL		PRINT_TALL
