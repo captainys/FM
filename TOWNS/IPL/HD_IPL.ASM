@@ -6,6 +6,7 @@
 
 
 DEFAULT_LOADER_LBA		EQU		33
+FIRST_PARTITION_LBA		EQU		3
 
 
 
@@ -28,8 +29,8 @@ MAIN					PROC
 						DB		"FM TOWNS RESCUE BOOT LOADER BY CAPTAINYS"	; 40 chars
 						DB		54 dup (0)									; 40+54=0x5E (Why 0x5E?  I don't know Fujitsu's IPL leaves this many bytes.)
 
-LOADER_LBA					DD		DEFAULT_LOADER_LBA			; +2
-YSSCSICD_LBA				DD		(DEFAULT_LOADER_LBA+128)	; +6
+LOADER_LBA				DD		DEFAULT_LOADER_LBA-FIRST_PARTITION_LBA
+YSSCSICD_LBA			DD		(DEFAULT_LOADER_LBA+128-FIRST_PARTITION_LBA)
 
 
 REALMAIN:
@@ -51,11 +52,36 @@ REALMAIN:
 						MOV			SI,OFFSET MESSAGE
 						CALL		PRINT_TALL
 
+
+						; Find which partition it is booting from and
+						; add displacement to LOADER_LBA and YSSCSICD_LBA
+						ADD		AX,0100H	; Partition Table is written in B100:0000
+						MOV		FS,AX
+						MOV		SI,0020H
+@@:
+						; Master Boot Sector or REIPL.COM marks the starting-partition with 0FFH.
+						; Valid boot partition must start with FF 01
+						MOV		EAX,FS:[SI+2]	; Tentative
+						CMP		WORD PTR FS:[SI],01FFH
+						JE		@f
+						ADD		SI,030H
+						CMP		SI,0200H
+						JL		@b
+
+						; If not found, this is not read from MBS or REIPL.COM.  This probably is the MBS.
+						; In which case, the displacement should be 3 sectors (first partition)
+						MOV		EAX,FIRST_PARTITION_LBA
+@@:
+						ADD		DWORD PTR DS:[LOADER_LBA],EAX
+						ADD		DWORD PTR DS:[YSSCSICD_LBA],EAX
+
+
 						POP			BX
 						PUSH		BX
 
 						MOV		AX,BOOTLOADER_SEGMENT
 						MOV		DS,AX
+
 
 						MOV		AH,05H	; Read Sector
 
@@ -75,7 +101,7 @@ REALMAIN:
 						DW		 0014H
 						DW		0FFFBH
 
-						JB		@f
+						JB		ERROR_END
 
 						MOV		AX,BOOTLOADER_SEGMENT
 						MOV		FS,AX
@@ -96,11 +122,11 @@ REALMAIN:
 						; Not really happen, but if the loader fails, return to the system ROM.
 						RETF
 
-@@:
+ERROR_END:
 						PUSH	CS
 						POP		DS
 						MOV		DI,01H+01H*(80*16)
-						MOV		SI,OFFSET MESSAGE
+						MOV		SI,OFFSET ERROR_MESSAGE
 						CALL	PRINT_TALL
 @@:
 						JMP		@b
@@ -232,7 +258,7 @@ PRINT_TALL				ENDP
 						INCLUDE		MEMBANK.ASM
 
 MESSAGE					DB	"SCSI-HD BOOT",0
-ERROR_MESSAGE			DB	"SECTOR READ ERROR!",0
+ERROR_MESSAGE			DB	"SOMETHING WENT WRONG.",0
 
 CODE					ENDS
 
