@@ -4,14 +4,23 @@ import mmap
 
 
 
+def PARTITION_TABLE_FILE_OFFSET():
+	return int(512)
+
+
+def SECTOR_LENGTH():
+	return int(512)
+
+
+
 def Help():
 	print("transpart.py - FM TOWNS HD Image Partition Transplanter.")
 	print("by CaptainYS")
 	print("Usage:")
 	print("  transpart.py SOURCE.BIN SRC_PARTITION_NAME DESTINATION.BIN DST_PARTITION_NAME")
 	print("")
-	print("  CAUTION! This progam will write to the hard-disk image without confirmation")
-	print("           prompt.  Make sure you don't overwrite the partition you need!")
+	print("  CAUTION! Make sure to take a backup copy of your hard-disk image before using")
+	print("           this utility!")
 	print("")
 	print("  This program transplants a partition in the source hard-disk image to the")
 	print("  destination hard-disk image.")
@@ -42,10 +51,18 @@ def DropLastSpace(s):
 
 def ReadPartitionTableSector(fName):
 	ifp=open(fName,"rb")
-	ifp.seek(512,0);
-	sector=ifp.read(512)
+	ifp.seek(PARTITION_TABLE_FILE_OFFSET(),0);
+	sector=ifp.read(SECTOR_LENGTH())
 	ifp.close()
 	return sector
+
+
+
+def WritePartitionTableSector(fName,sectorData):
+	ofp=open(fname,"r+b")
+	ofp.seek(PARTITION_TABLE_FILE_OFFSET(),0);
+	ofp.write(bytearray(sectorData))
+	ofp.close()
 
 
 
@@ -72,7 +89,7 @@ def GetPartitionList(partSect):
 			partitionName=partitionName+chr(partSect[fileOffset+32+j])
 		partitionType=DropLastSpace(partitionType)
 		partitionName=DropLastSpace(partitionName)
-		lst.append([bootPart,startSector,sectorCount,partitionType,partitionName])
+		lst.append([bootPart,int(startSector),int(sectorCount),partitionType,partitionName])
 	return lst
 
 def StartSector(partition):
@@ -99,6 +116,66 @@ def FindPartition(partName,partList):
 
 def MakeDestinationPartition(dstFile,dstPartList,dstPartitionName,srcPartition):
 	dstSize=os.path.getsize(dstFile)
+	dstNumSectors=int(int(dstSize)/SECTOR_LENGTH())
+
+	lastPartIdx=int(0)
+	for i in range(0,10):
+		if ""!=PartitionName(dstPartList[i]) and 0<SectorCount(dstPartList[i]):
+			lastPartIdx=i;
+	if 9<=lastPartIdx:
+		ErrorExit("Last Partition Entry is Already Used.")
+
+	lastPart=dstPartList[lastPartIdx]
+	nextSector=StartSector(lastPart)+SectorCount(lastPart)
+
+	availableSectors=dstNumSectors-nextSector
+
+	if availableSectors<SectorCount(srcPartition):
+		extendSectorCount=SectorCount(srcPartition)-availableSectors
+		zero=[0]*SECTOR_LENGTH()
+		ofp=open(dstFile,"ab")
+		for i in range(0,extendSectorCount):
+			ofp.write(bytearray(zero))
+		ofp.close()
+
+
+	nextPart=lastPartIdx+1
+	nextPartLength=SectorCount(srcPartition)
+	partSect=[d for d in ReadPartitionTableSector(dstFile)]
+	fileOffset=0x20+nextPart*0x30
+
+	partSect[fileOffset  ]=0	# Not a boot sector
+	partSect[fileOffset+1]=1	# I think it is a 'valid' flag.
+
+	partSect[fileOffset+2]= nextSector     &255
+	partSect[fileOffset+3]=(nextSector>> 8)&255
+	partSect[fileOffset+4]=(nextSector>>16)&255
+	partSect[fileOffset+5]=(nextSector>>24)&255
+
+	partSect[fileOffset+6]= nextPartLength     &255
+	partSect[fileOffset+7]=(nextPartLength>> 8)&255
+	partSect[fileOffset+8]=(nextPartLength>>16)&255
+	partSect[fileOffset+9]=(nextPartLength>>24)&255
+
+	for i in range(0,16):
+		if i<len(PartitionType(srcPartition)):
+			partSect[fileOffset+0x10+i]=ord(PartitionType(srcPartition)[i])
+		else:
+			partSect[fileOffset+0x10+i]=ord(' ')
+
+	for i in range(0,16):
+		if i<len(PartitionName(srcPartition)):
+			partSect[fileOffset+0x20+i]=ord(PartitionName(srcPartition)[i])
+		else:
+			partSect[fileOffset+0x20+i]=ord(' ')
+
+	# Debugging >>
+	#for part in GetPartitionList(partSect):
+	#	print(part)
+	# Debugging <<
+
+	print("IMAKOKO")
+	quit()
 
 
 

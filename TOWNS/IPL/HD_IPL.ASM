@@ -25,8 +25,8 @@ MAIN					PROC
 						; ****ing MASM kindly inserts NOP after JMP and messes up the offsets.  Good job, Microsoft.
 						DB		0EBH,(REALMAIN-@f)  ; JMP		REALMAIN
 @@:
-
-						DB		5EH dup (0)
+						DB		"FM TOWNS RESCUE BOOT LOADER BY CAPTAINYS"	; 40 chars
+						DB		54 dup (0)									; 40+54=0x5E (Why 0x5E?  I don't know Fujitsu's IPL leaves this many bytes.)
 
 LOADER_LBA					DD		DEFAULT_LOADER_LBA			; +2
 YSSCSICD_LBA				DD		(DEFAULT_LOADER_LBA+128)	; +6
