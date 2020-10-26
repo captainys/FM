@@ -383,6 +383,8 @@ TRYBOOT_NOT_FROM_SCSI_CD:
 
 @@:
 						; Boot from Hard-Disk Partition
+						CALL	SETUP_PARTITION_TABLE_B100_SEGMENT
+
 						MOV		AL,CS:[BOOTMENU_SELECTION]
 						SUB		AL,BOOTMENU_ITEMNUM_PARTITION_0
 						MOV		AH,30H
@@ -402,6 +404,50 @@ TRYBOOT_NOT_FROM_SCSI_CD:
 
 						JMP		TRYBOOT_FROMDEVICE
 TRYBOOT					ENDP
+
+
+
+; To tell Fujitsu's boot sector which partition it is booting from,
+; partition table needs to be loaded from B100:0000, and
+; boot-partition flag needs to be set according to the selected
+; partition.
+SETUP_PARTITION_TABLE_B100_SEGMENT	PROC
+						PUSH	DS
+						PUSH	ES
+
+
+						MOV		AX,CS
+						MOV		DS,AX
+						MOV		AX,0B100H
+						MOV		ES,AX
+
+						MOV		SI,OFFSET PARTITION_TABLE
+						XOR		DI,DI
+						MOV		CX,512
+						REP MOVSB
+
+
+						MOV		DI,0020H
+						MOV		CX,10
+						XOR		AL,AL
+@@:
+						MOV		BYTE PTR ES:[DI],0	; Tentatively clear boot-partition flag
+						ADD		DI,0030H
+						LOOP	@b
+
+
+						MOV		AL,CS:[BOOTMENU_SELECTION]
+						SUB		AL,BOOTMENU_ITEMNUM_PARTITION_0
+						MOV		AH,30H
+						MUL		AH
+						ADD		AX,20H
+						MOV		DI,AX
+						MOV		BYTE PTR ES:[DI],0FFH	; Boot-partition flag
+
+						POP		ES
+						POP		DS
+						RET
+SETUP_PARTITION_TABLE_B100_SEGMENT	ENDP
 
 
 
