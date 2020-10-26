@@ -63,7 +63,7 @@ REALMAIN:
 						; Master Boot Sector or REIPL.COM marks the starting-partition with 0FFH.
 						; Valid boot partition must start with FF 01
 						MOV		EAX,FS:[SI+2]	; Tentative
-						CMP		WORD PTR FS:[SI],01FFH
+						CMP		BYTE PTR FS:[SI],0FFH
 						JE		@f
 						ADD		SI,030H
 						CMP		SI,0200H
