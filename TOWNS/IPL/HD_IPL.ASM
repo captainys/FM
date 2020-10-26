@@ -55,6 +55,7 @@ REALMAIN:
 
 						; Find which partition it is booting from and
 						; add displacement to LOADER_LBA and YSSCSICD_LBA
+						MOV		AX,CS
 						ADD		AX,0100H	; Partition Table is written in B100:0000
 						MOV		FS,AX
 						MOV		SI,0020H

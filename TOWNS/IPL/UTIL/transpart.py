@@ -4,6 +4,12 @@ import mmap
 
 
 
+# Can I write:
+#   #define PARTITION_TABLE_FILE_OFFSET 512
+# or
+#   const unsigned int PARTITION_TABLE_FILE_OFFSET=512;
+# ?
+
 def PARTITION_TABLE_FILE_OFFSET():
 	return int(512)
 
@@ -11,6 +17,9 @@ def PARTITION_TABLE_FILE_OFFSET():
 def SECTOR_LENGTH():
 	return int(512)
 
+
+def MAX_NUM_PARTITIONS():
+	return int(10)
 
 
 def Help():
@@ -59,16 +68,16 @@ def ReadPartitionTableSector(fName):
 
 
 def WritePartitionTableSector(fName,sectorData):
-	ofp=open(fname,"r+b")
+	ofp=open(fName,"r+b")
 	ofp.seek(PARTITION_TABLE_FILE_OFFSET(),0);
-	ofp.write(bytearray(sectorData))
+	ofp.write(sectorData)
 	ofp.close()
 
 
 
 def GetPartitionList(partSect):
 	lst=[]
-	for i in range(0,10):
+	for i in range(0,MAX_NUM_PARTITIONS()):
 		fileOffset=0x20+i*0x30
 		bootPart=False
 		startSector=0
@@ -114,12 +123,21 @@ def FindPartition(partName,partList):
 
 
 
+def ErrorIfMultipleMatch(partName,partList):
+	count=int(0)
+	for part in partList:
+		if PartitionName(part)==partName:
+			count=count+1
+	if 1<count:
+		ErrorExit("More than one partition has the name="+partName)
+
+
 def MakeDestinationPartition(dstFile,dstPartList,dstPartitionName,srcPartition):
 	dstSize=os.path.getsize(dstFile)
 	dstNumSectors=int(int(dstSize)/SECTOR_LENGTH())
 
 	lastPartIdx=int(0)
-	for i in range(0,10):
+	for i in range(0,MAX_NUM_PARTITIONS()):
 		if ""!=PartitionName(dstPartList[i]) and 0<SectorCount(dstPartList[i]):
 			lastPartIdx=i;
 	if 9<=lastPartIdx:
@@ -157,7 +175,7 @@ def MakeDestinationPartition(dstFile,dstPartList,dstPartitionName,srcPartition):
 	partSect[fileOffset+8]=(nextPartLength>>16)&255
 	partSect[fileOffset+9]=(nextPartLength>>24)&255
 
-	for i in range(0,16):
+	for i in range(0,MAX_NUM_PARTITIONS()):
 		if i<len(PartitionType(srcPartition)):
 			partSect[fileOffset+0x10+i]=ord(PartitionType(srcPartition)[i])
 		else:
@@ -174,8 +192,31 @@ def MakeDestinationPartition(dstFile,dstPartList,dstPartitionName,srcPartition):
 	#	print(part)
 	# Debugging <<
 
-	print("IMAKOKO")
-	quit()
+	WritePartitionTableSector(dstFile,bytearray(partSect))
+
+
+
+def MatchDestinationPartitionSize(dstFile,dstPartList,dstPartition,sectorCount):
+	partIdx=int(-1)
+	for i in range(0,MAX_NUM_PARTITIONS()):
+		if PartitionName(dstPartList[i])==PartitionName(dstPartition):
+			partIdx=i
+			break
+
+	if partIdx<0:
+		ErrorExit("Destination Partition Not Found.")
+
+	partSect=[d for d in ReadPartitionTableSector(dstFile)]
+	sectorCount=int(sectorCount)
+
+	partSect[0x20+0x30*partIdx+6]=( sectorCount     )&255
+	partSect[0x20+0x30*partIdx+7]=((sectorCount)>> 8)&255
+	partSect[0x20+0x30*partIdx+8]=((sectorCount)>>16)&255
+	partSect[0x20+0x30*partIdx+9]=((sectorCount)>>24)&255
+
+	print(partSect)
+
+	WritePartitionTableSector(dstFile,bytearray(partSect))
 
 
 
@@ -212,7 +253,10 @@ def main(argv):
 		ErrorExit("Source Partition not found.")
 
 
-	
+	ErrorIfMultipleMatch(argv[2],srcPartList)
+	ErrorIfMultipleMatch(argv[4],dstPartList)
+
+
 	print("!!!!Warning!!!!")
 	print("Failure of the operation may corrupt your hard-disk image.")
 	while True:
@@ -239,21 +283,36 @@ def main(argv):
 		dstPart=FindPartition(argv[4],dstPartList)
 		if None==dstPart:
 			ErrorExit("Destination Partition was supposed to be created, but something went wrong.")
-	elif PartitionSize(dstPart)<PartitionSize(srcPart):
+	elif SectorCount(dstPart)<SectorCount(srcPart):
 		ErrorExit("Destination Partition is smaller than Source Partition")
+	else:
+		MatchDestinationPartitionSize(argv[3],dstPartList,dstPart,SectorCount(srcPart))
 
-	quit()
 
+	print("Source Partition:")
+	print(srcPart)
+	print("Destination Partition:")
+	print(dstPart)
 
+	copyBytes=SectorCount(srcPart)*SECTOR_LENGTH()
+
+	srcStart=StartSector(srcPart)*SECTOR_LENGTH()
+	srcEnd=srcStart+copyBytes
+	dstStart=StartSector(dstPart)*SECTOR_LENGTH()
+	dstEnd=dstStart+copyBytes
 
 	srcFp=open(argv[1],"r+b")
 	dstFp=open(argv[3],"r+b")
 
 	srcMM=mmap.mmap(srcFp.fileno(),0)
 	dstMM=mmap.mmap(dstFp.fileno(),0)
+	dstMM[dstStart:dstEnd]=srcMM[srcStart:srcEnd]
+	dstMM.flush()
 
 	srcFp.close()
 	dstFp.close()
+
+	print("Partition Transplantation Completed.")
 
 	return;
 
