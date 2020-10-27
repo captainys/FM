@@ -27,6 +27,7 @@ def Help():
 	print("by CaptainYS")
 	print("Usage:")
 	print("  transpart.py SOURCE.BIN SRC_PARTITION_NAME DESTINATION.BIN DST_PARTITION_NAME")
+	print("  transpart.py SOURCE.BIN SRC_PARTITION_NAME DESTINATION.BIN DST_PARTITION_NAME BOOT")
 	print("")
 	print("  CAUTION! Make sure to take a backup copy of your hard-disk image before using")
 	print("           this utility!")
@@ -36,6 +37,9 @@ def Help():
 	print("")
 	print("  If the destination hard-disk image already has the partition name same as the")
 	print("  DST_PARTITION_NAME, it will overwrites an existing partition with the same name.")
+	print("")
+	print("  By adding BOOT as the last parameter, transplanted partition will be marked as")
+	print("  BOOT partition.")
 	print("")
 	print("  Otherwise, it will appends the source partition to the destination hard-disk")
 	print("  image.")
@@ -182,8 +186,8 @@ def MakeDestinationPartition(dstFile,dstPartList,dstPartitionName,srcPartition):
 			partSect[fileOffset+0x10+i]=ord(' ')
 
 	for i in range(0,16):
-		if i<len(PartitionName(srcPartition)):
-			partSect[fileOffset+0x20+i]=ord(PartitionName(srcPartition)[i])
+		if i<len(dstPartitionName):
+			partSect[fileOffset+0x20+i]=ord(dstPartitionName[i])
 		else:
 			partSect[fileOffset+0x20+i]=ord(' ')
 
@@ -214,16 +218,42 @@ def MatchDestinationPartitionSize(dstFile,dstPartList,dstPartition,sectorCount):
 	partSect[0x20+0x30*partIdx+8]=((sectorCount)>>16)&255
 	partSect[0x20+0x30*partIdx+9]=((sectorCount)>>24)&255
 
-	print(partSect)
+	WritePartitionTableSector(dstFile,bytearray(partSect))
+
+
+
+def MakeBootPartition(dstFile,dstPartList,dstPart):
+	partIdx=int(-1)
+	for i in range(0,MAX_NUM_PARTITIONS()):
+		if PartitionName(dstPartList[i])==PartitionName(dstPart):
+			partIdx=i
+			break
+
+	if partIdx<0:
+		ErrorExit("Destination Partition Not Found.")
+
+	partSect=[d for d in ReadPartitionTableSector(dstFile)]
+
+	for i in range(0,MAX_NUM_PARTITIONS()):
+		partSect[0x20+0x30*i]=0
+
+	partSect[0x20+0x30*partIdx]=0xFF
 
 	WritePartitionTableSector(dstFile,bytearray(partSect))
 
 
 
 def main(argv):
-	if(len(argv)!=5):
+	if len(argv)!=5 and len(argv)!=6:
 		Help()
 		quit()
+
+	makeBootPartition=False
+	if 6==len(argv):
+		if argv[5]=="BOOT":
+			makeBootPartition=True
+		else:
+			ErrorExit("Unrecognized last parameter:"+argv[5])
 
 	print("From="+argv[1])
 	print("To  ="+argv[3])
@@ -287,6 +317,11 @@ def main(argv):
 		ErrorExit("Destination Partition is smaller than Source Partition")
 	else:
 		MatchDestinationPartitionSize(argv[3],dstPartList,dstPart,SectorCount(srcPart))
+
+
+	if True==makeBootPartition:
+		MakeBootPartition(argv[3],dstPartList,dstPart)
+		dstPart[0]=True
 
 
 	print("Source Partition:")
