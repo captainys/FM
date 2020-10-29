@@ -90,6 +90,7 @@ def GetPartitionList(partSect):
 		partitionType=""
 		if 0xFF==partSect[fileOffset]:
 			bootPart=True
+		partitionCode=partSect[fileOffset+1]
 		startSector=partSect[fileOffset+2]+partSect[fileOffset+3]*0x100+partSect[fileOffset+4]*0x10000+partSect[fileOffset+5]*0x1000000
 		sectorCount=partSect[fileOffset+6]+partSect[fileOffset+7]*0x100+partSect[fileOffset+8]*0x10000+partSect[fileOffset+9]*0x1000000
 		for j in range(0,16):
@@ -102,20 +103,23 @@ def GetPartitionList(partSect):
 			partitionName=partitionName+chr(partSect[fileOffset+32+j])
 		partitionType=DropLastSpace(partitionType)
 		partitionName=DropLastSpace(partitionName)
-		lst.append([bootPart,int(startSector),int(sectorCount),partitionType,partitionName])
+		lst.append([bootPart,partitionCode,int(startSector),int(sectorCount),partitionType,partitionName])
 	return lst
 
-def StartSector(partition):
+def PartitionCode(partition):
 	return partition[1]
 
-def SectorCount(partition):
+def StartSector(partition):
 	return partition[2]
 
-def PartitionType(partition):
+def SectorCount(partition):
 	return partition[3]
 
-def PartitionName(partition):
+def PartitionType(partition):
 	return partition[4]
+
+def PartitionName(partition):
+	return partition[5]
 
 
 
@@ -167,7 +171,7 @@ def MakeDestinationPartition(dstFile,dstPartList,dstPartitionName,srcPartition):
 	fileOffset=0x20+nextPart*0x30
 
 	partSect[fileOffset  ]=0	# Not a boot sector
-	partSect[fileOffset+1]=1	# I think it is a 'valid' flag.
+	partSect[fileOffset+1]=PartitionCode(srcPartition)	# 0:Partition Not Present  1:DOS Partition?   90H:OASYS
 
 	partSect[fileOffset+2]= nextSector     &255
 	partSect[fileOffset+3]=(nextSector>> 8)&255
