@@ -94,7 +94,75 @@ READ_PADA				PROC
 						IN		AL,DX
 						AND		AL,3FH
 
+
+						PUSH	AX
+						MOV		DX,IO_KEYBOARD_STATE
+						IN		AL,DX
+						AND		AL,1
+						JE		READ_PADA_KEY_INPUT_DONE
+
+						MOV		DX,IO_KEYBOARD_DATA
+						IN		AL,DX
+
+						MOV		AH,CS:[LAST_KEY_READ]
+						MOV		CS:[LAST_KEY_READ],AL
+						AND		AH,90H
+						CMP		AH,80H
+						JNE		READ_PADA_KEY_INPUT_DONE
+
+						CMP		AL,4FH	; Left
+						JNE		@f
+						POP		AX
+						AND		AL,0FFH-04H
+						JMP		READ_PADA_THERE_WAS_KEY_INPUT
+@@:
+						CMP		AL,51H	; Right
+						JNE		@f
+						POP		AX
+						AND		AL,0FFH-08H
+						JMP		READ_PADA_THERE_WAS_KEY_INPUT
+@@:
+						CMP		AL,4DH	; Up
+						JNE		@f
+						POP		AX
+						AND		AL,0FFH-01H
+						JMP		READ_PADA_THERE_WAS_KEY_INPUT
+@@:
+						CMP		AL,50H	; Down
+						JNE		@f
+						POP		AX
+						AND		AL,0FFH-02H
+						JMP		READ_PADA_THERE_WAS_KEY_INPUT
+@@:
+						CMP		AL,35H	; Space
+						JNE		@f
+						POP		AX
+						AND		AL,0FFH-10H
+						JMP		READ_PADA_THERE_WAS_KEY_INPUT
+@@:
+						CMP		AL,73H	; Execute
+						JNE		@f
+						POP		AX
+						AND		AL,0FFH-10H
+						JMP		READ_PADA_THERE_WAS_KEY_INPUT
+@@:
+						CMP		AL,1DH	; Return
+						JNE		@f
+						POP		AX
+						AND		AL,0FFH-10H
+						JMP		READ_PADA_THERE_WAS_KEY_INPUT
+@@:
+
+READ_PADA_KEY_INPUT_DONE:
+						POP		AX
+READ_PADA_THERE_WAS_KEY_INPUT:
+
+
 						POP		DX
 						RET
 
 READ_PADA				ENDP
+
+
+LAST_KEY_READ			DB		0
+
