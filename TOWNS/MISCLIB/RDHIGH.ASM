@@ -47,16 +47,12 @@ READ_HIGHB				PROC
 
 						CLI
 
-						MOV		EAX,CR0
-						PUSH	EAX
-						OR		AL,1
-						MOV		CR0,EAX
-
-
 						SGDT	FWORD PTR CS:[GDT_BACKUP]
-
-
 						LGDT	FWORD PTR CS:[GDT_INFO]
+
+						MOV		EDX,CR0
+						OR		DL,1
+						MOV		CR0,EDX
 
 						; https://wiki.osdev.org/Unreal_Mode suggest one jump "to tell 386/486 not to crash".
 						JMP		@f
@@ -75,13 +71,13 @@ READ_HIGHB				PROC
 						REP		MOVSB
 
 
-						LGDT	FWORD PTR CS:[GDT_BACKUP]
-
-						POP		EAX
-						MOV		CR0,EAX
+						AND		DL,0FEH
+						MOV		CR0,EDX
 
 						JMP		@f
 @@:
+
+						LGDT	FWORD PTR CS:[GDT_BACKUP]
 
 						POPF
 						POP		EAX
