@@ -74,6 +74,20 @@ WAIT_PADA_RELEASE		PROC
 						CMP		AL,3FH
 						JNE		@b
 
+
+						; Clear key buffer as well.
+@@:
+						MOV		DX,IO_KEYBOARD_STATE
+						IN		AL,DX
+						AND		AL,1
+						JE		@f
+
+						MOV		DX,IO_KEYBOARD_DATA
+						IN		AL,DX
+						JMP		@b
+
+
+@@:
 						POP		DX
 						POP		AX
 						RET
