@@ -155,7 +155,6 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 			RS232C_CLI();
 			RS232C_PUTC(XMODEM_NAK);
 			nBuffFilled-=XMODEM_PACKET_SIZE;
-exit(1);
 		}
 		else
 		{

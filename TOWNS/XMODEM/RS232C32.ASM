@@ -21,8 +21,8 @@ RS232C_INIT			PROC
 						PUSH	EAX
 						PUSH	EDX
 
-						; [ESP]EDX  [ESP+4]EAX  [ESP+8]EFLAGS  [ESP+12]EIP  [ESP+16]1st Param
-						MOV		EAX,[ESP+16]
+						; [ESP]EDX  [ESP+4]EAX  [ESP+8]EIP  [ESP+12]1st Param
+						MOV		EAX,[ESP+12]
 
 						PUSH	EAX
 
