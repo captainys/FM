@@ -10,6 +10,8 @@ extern void XModemSend(unsigned int dataLength,const unsigned char data[],int ba
 #define BUFFERSIZE 3200*1024
 #define NUM_SECTOR_BUF 64
 
+#define BIOSERR_FLAG_DDM   4
+#define BIOSERR_FLAG_CRC   0x10
 
 struct D77Header
 {
@@ -116,8 +118,61 @@ struct CommandParameterInfo
 	unsigned int mode;
 	unsigned int baudRate;
 	unsigned int startTrk,endTrk;
+	unsigned int firstRetryCount;
+	unsigned int secondRetryCount;
 	char outFName[512];
 };
+
+/*! Returns the BIOS error code.
+*/
+int ReadSector(int devNo,DKB_SEC sector,struct D77SectorHeader *sectorHdr,char *dataBuf)
+{
+	InitializeD77SectorHeader(sectorHdr);
+
+	sectorHdr->C=sector.trakno;
+	sectorHdr->H=sector.hedno;
+	sectorHdr->R=sector.secno;
+	sectorHdr->N=sector.seccnt;
+
+	sectorHdr->numSectorPerTrack=0; // Tentative.  Should be updated later.
+
+	sectorHdr->densityFlag=0;     // 0:Double Density   0x40 Single Density
+	sectorHdr->actualSectorLength=(128<<sectorHdr->N);
+
+	int secnum,biosErr;
+	biosErr=DKB_read(devNo,sector.trakno,sector.hedno,sector.secno,1,dataBuf,&secnum);
+
+	if(0!=(0x8000&biosErr))
+	{
+		if(0!=(biosErr&BIOSERR_FLAG_DDM))
+		{
+			sectorHdr->DDM=0x10;
+		}
+		if(0!=(biosErr&BIOSERR_FLAG_CRC))
+		{
+			sectorHdr->CRCError=0xB0;
+		}
+	}
+
+	return biosErr;
+}
+
+void FormatSectorStatus(char str[4],struct D77SectorHeader *sectorHdr)
+{
+	str[0]=0;
+	if(0x10==sectorHdr->DDM)
+	{
+		strcat(str,"D");
+	}
+	if(0xB0==sectorHdr->CRCError)
+	{
+		strcat(str,"C");
+	}
+	while(strlen(str)<3)
+	{
+		strcat(str," ");
+	}
+}
 
 unsigned int ReadTrack(
    int devNo,int track,int side,struct CommandParameterInfo *cpi,unsigned char d77Image[],struct D77Header *hdr,unsigned int trackTable[],unsigned char *nextTrackData)
@@ -162,68 +217,50 @@ unsigned int ReadTrack(
 	int nActual=0;
 	for(i=0; i<nTrackSector; ++i)
 	{
-		int retry;
-		for(retry=0; retry<3; ++retry)
+		int retry,biosErr=0;
+		// Strategy:  First retry up to firstRetryCount and if no error, take it.
+		//            If finally it has a CRC error, always read secondRetryCount times.  Maybe a sign of KOROKORO-protect.
+		for(retry=0; retry<cpi->firstRetryCount; ++retry)
 		{
-			printf("%02x%02x%02x%02x",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
-
 			struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
-			InitializeD77SectorHeader(sectorHdr);
-
-			sectorHdr->C=sector[i].trakno;
-			sectorHdr->H=sector[i].hedno;
-			sectorHdr->R=sector[i].secno;
-			sectorHdr->N=sector[i].seccnt;
-
-			sectorHdr->numSectorPerTrack=nTrackSector;
-
-			sectorHdr->densityFlag=0;     // 0:Double Density   0x40 Single Density
-			sectorHdr->actualSectorLength=(128<<sectorHdr->N);
-
-
 			char *dataBuf=(char *)(sectorHdr+1);
-			int secnum,biosErr;
-			biosErr=DKB_read(devNo,sector[i].trakno,sector[i].hedno,sector[i].secno,1,dataBuf,&secnum);
+			biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
 
-			if(0!=(0x8000&biosErr))
+			if(0==(biosErr&BIOSERR_FLAG_CRC)) // No retry if no CRC error.
 			{
-				if(0!=(biosErr&4))
+				printf("%02x%02x%02x%02x   ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
+				if(5==(nActual%6))
 				{
-					sectorHdr->DDM=0x10;
+					printf("\n");
 				}
-				if(0!=(biosErr&0x10))
-				{
-					sectorHdr->CRCError=0xB0;
-				}
-			}
 
-			char sta[4]={0,0,0,0};
-
-			if(0x10==sectorHdr->DDM)
-			{
-				strcat(sta,"D");
-			}
-			if(0xB0==sectorHdr->CRCError)
-			{
-				strcat(sta,"C");
-			}
-			while(strlen(sta)<3)
-			{
-				strcat(sta," ");
-			}
-			printf("%s",sta);
-
-			trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
-
-			if(5==(nActual%6))
-			{
-				printf("\n");
-			}
-			++nActual;
-
-			if(0==sectorHdr->CRCError) // No retry if no CRC error.
-			{
+				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
+				++nActual;
 				break;
+			}
+		}
+
+		if(0!=(biosErr&BIOSERR_FLAG_CRC))  // If finally I couldn't read without CRC error.
+		{
+			for(retry=0; retry<cpi->secondRetryCount; ++retry)
+			{
+				printf("%02x%02x%02x%02x",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
+
+				struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
+				char *dataBuf=(char *)(sectorHdr+1);
+				biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
+
+				char sta[4]={0,0,0,0};
+				FormatSectorStatus(sta,sectorHdr);
+				printf("%s",sta);
+
+				if(5==(nActual%6))
+				{
+					printf("\n");
+				}
+
+				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
+				++nActual;
 			}
 		}
 	}
@@ -340,6 +377,8 @@ void InitializeCommandParameterInfo(struct CommandParameterInfo *cpi)
 	cpi->mode=MODE_2HD_1232K;
 	cpi->baudRate=0;
 	cpi->outFName[0]=0;
+	cpi->firstRetryCount=8;
+	cpi->secondRetryCount=3;
 }
 
 int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header *hdr,int ac,char *av[])
