@@ -116,6 +116,7 @@ struct CommandParameterInfo
 	unsigned int mode;
 	unsigned int baudRate;
 	unsigned int startTrk,endTrk;
+	char outFName[512];
 };
 
 unsigned int ReadTrack(
@@ -337,7 +338,8 @@ void InitializeCommandParameterInfo(struct CommandParameterInfo *cpi)
 	cpi->listOnly=0;
 	cpi->drive=0;
 	cpi->mode=MODE_2HD_1232K;
-	cpi->baudRate=38400;
+	cpi->baudRate=0;
+	cpi->outFName[0]=0;
 }
 
 int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header *hdr,int ac,char *av[])
@@ -353,7 +355,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 	{
 		cpi->drive-='A';
 	}
-	else if('a'<=cpi->drive && cpi->drive<='a')
+	else if('a'<=cpi->drive && cpi->drive<='z')
 	{
 		cpi->drive-='a';
 	}
@@ -388,6 +390,11 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 		cpi->endTrk=76;
 		hdr->mediaType=0x20;
 	}
+	else
+	{
+		fprintf(stderr,"Unknown media type %s\n",av[2]);
+		return -1;
+	}
 
 	for(int i=3; i<ac; ++i)
 	{
@@ -396,6 +403,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 			if(i+1<ac)
 			{
 				cpi->startTrk=atoi(av[i+1]);
+				++i;
 			}
 			else
 			{
@@ -408,6 +416,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 			if(i+1<ac)
 			{
 				cpi->endTrk=atoi(av[i+1]);
+				++i;
 			}
 			else
 			{
@@ -418,6 +427,20 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 		else if(0==strcmp(av[i],"-LISTONLY") || 0==strcmp(av[i],"-listonly"))
 		{
 			cpi->listOnly=1;
+			printf("List-Only Mode.\n");
+		}
+		else if(0==strcmp(av[i],"-OUT") || 0==strcmp(av[i],"-out"))
+		{
+			if(i+1<ac)
+			{
+				strcpy(cpi->outFName,av[i+1]);
+				++i;
+			}
+			else
+			{
+				fprintf(stderr,"Too few arguments for %s\n",av[i]);
+				return -1;
+			}
 		}
 		else if(0==strcmp(av[i],"-19200BPS") || 0==strcmp(av[i],"-19200bps"))
 		{
@@ -432,6 +455,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 			if(i+1<ac)
 			{
 				strncpy(hdr->diskName,av[i+1],17);
+				++i;
 			}
 			else
 			{
@@ -444,12 +468,18 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 			if(i+1<ac)
 			{
 				hdr->writeProtected=1;
+				++i;
 			}
 			else
 			{
 				fprintf(stderr,"Too few arguments for %s\n",av[i]);
 				return -1;
 			}
+		}
+		else
+		{
+			fprintf(stderr,"Unknown option %s\n",av[i]);
+			return -1;
 		}
 	}
 
@@ -470,6 +500,7 @@ int main(int ac,char *av[])
 
 
 	struct CommandParameterInfo cpi;
+	InitializeCommandParameterInfo(&cpi);
 	if(ac<3 || 0!=RecognizeCommandParameter(&cpi,hdr,ac,av))
 	{
 		printf("Make D77 file and send to RS232C via XMODEM\n");
@@ -487,20 +518,23 @@ int main(int ac,char *av[])
 		printf("    -starttrk trackNum  Start track (Between 0 and 76 if 2HD)\n");
 		printf("    -endtrk   trackNum  End track (Between 0 and 76 if 2HD)\n");
 		printf("    -listonly           List track info only.  No RS232C transmission\n");
-		printf("    -19200bps           Slow down to 19200bps (default 38400bps)\n");
-		printf("    -38400bps           Transmit at 38400bps (default)\n");
+		printf("    -out filename.d77   Save image to .d77 file.\n");
+		printf("    -19200bps           Transmit the image at 19200bps\n");
+		printf("    -38400bps           Transmit the image at 38400bps\n");
 		printf("    -name diskName      Specify disk name up to 16 chars.\n");
 		printf("    -writeprotect       Write protect the disk image.\n");
 		return 1;
 	}
 
+	if(0==cpi.listOnly && 0==cpi.baudRate && 0==cpi.outFName[0])
+	{
+		fprintf(stderr,"No output is specified.\n");
+		fprintf(stderr,"Specify baud rate for XMODEM transfer or output file name.\n");
+		return 1;
+	}
+
+
 	int d77Size=ReadDisk(&cpi,d77Image);
-
-
-	// Force it to be 128xN.  XMODEM's limitation.
-	d77Size=((d77Size+127)&~127);
-	struct D77Header *d77HeaderPtr=(struct D77Header *)d77Image;
-	d77HeaderPtr->diskSize=d77Size;
 
 
 	if(d77Size<0)
@@ -510,8 +544,30 @@ int main(int ac,char *av[])
 	}
 	if(0==cpi.listOnly)
 	{
-		int baud=(cpi.baudRate==38400 ? 2 : 4);
-		XModemSend(d77Size,d77Image,baud);
+		if(0!=cpi.outFName[0])
+		{
+			FILE *fp=fopen(cpi.outFName,"wb");
+			if(NULL!=fp)
+			{
+				fwrite(d77Image,1,d77Size,fp);
+				fclose(fp);
+				printf("Saved to %s\n",cpi.outFName);
+			}
+			else
+			{
+				fprintf(stderr,"Cannot open outputu file.\n");
+			}
+		}
+		if(0!=cpi.baudRate)
+		{
+			// Force it to be 128xN.  XMODEM's limitation.
+			d77Size=((d77Size+127)&~127);
+			struct D77Header *d77HeaderPtr=(struct D77Header *)d77Image;
+			d77HeaderPtr->diskSize=d77Size;
+
+			int baud=(cpi.baudRate==38400 ? 2 : 4);
+			XModemSend(d77Size,d77Image,baud);
+		}
 	}
 
 	return 0;

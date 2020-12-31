@@ -29,5 +29,6 @@
 
 #define XMODEM_MODE_CRC                 0
 #define XMODEM_MODE_CHECKSUM            1
+#define XMODEM_MODE_UNKNOWN             -1
 
 #endif
