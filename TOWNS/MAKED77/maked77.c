@@ -504,16 +504,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 		}
 		else if(0==strcmp(av[i],"-WRITEPROTECT") || 0==strcmp(av[i],"-writeprotect"))
 		{
-			if(i+1<ac)
-			{
-				hdr->writeProtected=1;
-				++i;
-			}
-			else
-			{
-				fprintf(stderr,"Too few arguments for %s\n",av[i]);
-				return -1;
-			}
+			hdr->writeProtected=1;
 		}
 		else
 		{
