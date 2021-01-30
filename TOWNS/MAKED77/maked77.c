@@ -85,13 +85,50 @@ void SetDriveMode(unsigned int drive,unsigned int mode)
 	switch(mode)
 	{
 	case MODE_2D:
-		DKB_setmode(drive,MODE1_MFM_MODE|MODE1_2D|MODE1_256_BYTE_PER_SEC,0x2F);
+		DKB_setmode(drive,MODE1_MFM_MODE|MODE1_2D|MODE1_256_BYTE_PER_SEC,0x0210);
 		break;
 	case MODE_2DD:
-		DKB_setmode(drive,MODE1_MFM_MODE|MODE1_2DD|MODE1_512_BYTE_PER_SEC,0x28);
+		DKB_setmode(drive,MODE1_MFM_MODE|MODE1_2DD|MODE1_512_BYTE_PER_SEC,0x0208);
 		break;
 	case MODE_2HD_1232K:
-		DKB_setmode(drive,MODE1_MFM_MODE|MODE1_2HD|MODE1_1024_BYTE_PER_SEC,0x28);
+		DKB_setmode(drive,MODE1_MFM_MODE|MODE1_2HD|MODE1_1024_BYTE_PER_SEC,0x0208);
+		break;
+	}
+}
+
+void VerifyDriveMode(unsigned int drive,unsigned int mode)
+{
+	drive&=0x0F;
+	drive|=0x20;
+
+	unsigned int mode1,mode2;
+	DKB_rdmode(drive,&mode1,&mode2);
+
+	printf("BIOS MODE1 %02x\n",mode1);
+	printf("BIOS MODE2 %04x\n",mode2);
+
+	switch(mode)
+	{
+	case MODE_2D:
+		if((mode1&0xF0)!=(MODE1_MFM_MODE|MODE1_2D))
+		{
+			printf("Error!  BIOS not set in the 2D mode.\n");
+			exit(1);
+		}
+		break;
+	case MODE_2DD:
+		if((mode1&0xF0)!=(MODE1_MFM_MODE|MODE1_2DD))
+		{
+			printf("Error!  BIOS not set in the 2D mode.\n");
+			exit(1);
+		}
+		break;
+	case MODE_2HD_1232K:
+		if((mode1&0xF0)!=(MODE1_MFM_MODE|MODE1_2HD))
+		{
+			printf("Error!  BIOS not set in the 2D mode.\n");
+			exit(1);
+		}
 		break;
 	}
 }
@@ -289,6 +326,8 @@ unsigned int ReadTrack(
 
 int CheckDiskMediaType(unsigned int driveStatus,unsigned int mediaType)
 {
+	printf("Media Status:%02x\n",driveStatus);
+
 	printf("BIOS Detected:\n");
 	switch(driveStatus&0x30)
 	{
@@ -301,6 +340,15 @@ int CheckDiskMediaType(unsigned int driveStatus,unsigned int mediaType)
 	default:
 		printf("Unsupported disk type.\n");
 		return -1;
+	}
+
+	if(0==(driveStatus&0x80))
+	{
+		printf("MFM (double density) mode.\n");
+	}
+	else
+	{
+		printf("FM (single density) mode.\n");
 	}
 
 	if((driveStatus&0x30)==0 && mediaType!=MODE_2HD_1232K)
@@ -351,7 +399,8 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 		return -1;
 	}
 
-	SetDriveMode(cpi->drive,MODE_2HD_1232K);
+	SetDriveMode(cpi->drive,cpi->mode);
+	VerifyDriveMode(cpi->drive,cpi->mode);
 
 
 
