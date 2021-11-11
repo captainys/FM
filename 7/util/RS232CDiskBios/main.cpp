@@ -1163,10 +1163,10 @@ bool D77ServerCommandParameterInfo::Recognize(int ac,char *av[])
 			switch(fixedOrderIndex)
 			{
 			case 0:
-				d77FName[0]=arg;
+				d77FName[0]=av[i];
 				break;
 			case 1:
-				portStr=arg;
+				portStr=av[i];
 				break;
 			}
 			++fixedOrderIndex;
@@ -1511,7 +1511,7 @@ void SubCPU(void)
 	comPort.SetDesiredFlowControl(YsCOMPort::FLOWCONTROL_NONE);
 	if(true!=comPort.Open(fc80.cpi.portStr.c_str()))
 	{
-		fprintf(stderr,"Cannot open port.\n");
+		fprintf(stderr,"Cannot open port: %s\n",fc80.cpi.portStr.c_str());
 		fc80.SetFatalError();
 		return;
 	}
@@ -1697,7 +1697,11 @@ void SubCPU(void)
 							}
 							unsigned char sendBuf[1];
 							sendBuf[0]=(sectorSize>>7);
-							comPort.Send(1,sendBuf);
+							auto len=comPort.Send(1,sendBuf);
+							if(true==verboseMode)
+							{
+								printf("Transmitted %d bytes.\n",len);
+							}
 
 							sectorDataFilled=0;
 							sectorDataNeeded=sectorSize;
@@ -1705,7 +1709,11 @@ void SubCPU(void)
 						else
 						{
 							const unsigned char sendBuf[1]={1};  // Make it fake 128-byte sector
-							comPort.Send(1,sendBuf);
+							auto len=comPort.Send(1,sendBuf);
+							if(true==verboseMode)
+							{
+								printf("Transmitted %d bytes.\n",len);
+							}
 							sectorDataFilled=0;
 							sectorDataNeeded=128;
 						}
@@ -1765,9 +1773,17 @@ void SubCPU(void)
 							sectorSize>>=7;
 							unsigned char sendBuf[1];
 							sendBuf[0]=sectorSize;
-							comPort.Send(1,sendBuf);
+							auto len=comPort.Send(1,sendBuf);
+							if(true==verboseMode)
+							{
+								printf("Transmitted %d bytes.\n",len);
+							}
 
-							comPort.Send(sectorData.size(),sectorData.data());
+							len=comPort.Send(sectorData.size(),sectorData.data());
+							if(true==verboseMode)
+							{
+								printf("Transmitted %d bytes.\n",len);
+							}
 
 							unsigned char errCode[1]={0};
 							if(true==diskPtr->GetDDM(track,side,sector))
@@ -1778,7 +1794,11 @@ void SubCPU(void)
 							{
 								errCode[0]=BIOS_ERROR_CRC_ERROR;
 							}
-							comPort.Send(1,errCode);
+							len=comPort.Send(1,errCode);
+							if(true==verboseMode)
+							{
+								printf("Transmitted %d bytes.\n",len);
+							}
 						}
 						else
 						{

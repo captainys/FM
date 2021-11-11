@@ -11,7 +11,7 @@ if(MSVC)
 	endif()
 	set(COMPORT_SOURCE comport.cpp comport_win.cpp comport.h)
 else()
-	set(COMPORT_SOURCE comport.cpp comport_null.cpp comport.h)
+	set(COMPORT_SOURCE comport.cpp comport_unix.cpp comport.h)
 endif()
 
 
