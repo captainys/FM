@@ -1895,5 +1895,5 @@ Text Notes 12400 9900 1    50   ~ 0
 Text Notes 16500 9400 1    50   ~ 0
 =1 if AB56=00 and AB12=11 and AB347=0
 Text Notes 13750 10050 0    50   ~ 0
-~WFD02~=\nAB=00000010 and\n~IOS~=0 (IOS=1) and\nEE=1 and\nEQ=1 and\n~ERW~=1 (ERW=0)\n
+WFD02=\nAB=00000010 and\n~IOS~=0 (IOS=1) and\nEE=1 and\nEQ=1 and\n~ERW~=1 (ERW=0)\n
 $EndSCHEMATC
