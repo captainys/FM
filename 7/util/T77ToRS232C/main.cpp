@@ -288,10 +288,10 @@ bool T77ServerCommandParameterInfo::Recognize(int ac,char *av[])
 			switch(fixedOrderIndex)
 			{
 			case 0:
-				t77FName=arg;
+				t77FName=av[i];
 				break;
 			case 1:
-				portStr=arg;
+				portStr=av[i];
 				break;
 			}
 			++fixedOrderIndex;
@@ -990,7 +990,7 @@ void SubCPU(void)
 	comPort.SetDesiredFlowControl(YsCOMPort::FLOWCONTROL_NONE);
 	if(true!=comPort.Open(fc80.cpi.portStr.c_str()))
 	{
-		fprintf(stderr,"Cannot open port.\n");
+		fprintf(stderr,"Cannot open port: %s\n",fc80.cpi.portStr.c_str());
 		fc80.SetFatalError();
 		return;
 	}
