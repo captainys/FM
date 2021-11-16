@@ -532,7 +532,7 @@ $EndComp
 Wire Wire Line
 	12300 7850 12300 6700
 Wire Wire Line
-	12300 6700 14700 6700
+	12300 6700 12900 6700
 Wire Wire Line
 	6900 7850 9800 7850
 Wire Wire Line
@@ -540,35 +540,23 @@ Wire Wire Line
 Wire Wire Line
 	6950 8050 12750 8050
 Wire Wire Line
-	12200 7300 12200 6600
-Wire Wire Line
-	12200 6600 14700 6600
-Wire Wire Line
 	4250 7300 9400 7300
 Wire Wire Line
 	12600 7650 12600 7000
 Wire Wire Line
 	6850 7650 12600 7650
-Connection ~ 13850 19700
 Wire Wire Line
-	13300 7450 13300 8100
+	13300 7450 13300 8200
 Wire Wire Line
-	13300 8100 14650 8100
-Wire Wire Line
-	8750 7450 13300 7450
+	8750 7450 12900 7450
 Wire Wire Line
 	13550 6900 13550 8000
 Wire Wire Line
-	13550 8000 14650 8000
+	13550 8000 14450 8000
 Wire Wire Line
 	9100 6900 13550 6900
 Wire Wire Line
 	12600 7000 14700 7000
-Wire Wire Line
-	14650 8200 14300 8200
-Wire Wire Line
-	14300 8200 14300 18600
-Connection ~ 14300 18600
 Wire Wire Line
 	9250 6700 9250 6150
 Wire Wire Line
@@ -1538,8 +1526,6 @@ Wire Wire Line
 Connection ~ 13050 18600
 Connection ~ 13050 19700
 Wire Wire Line
-	13050 19700 13850 19700
-Wire Wire Line
 	16100 19700 16500 19700
 Wire Wire Line
 	15500 18600 16500 18600
@@ -1561,12 +1547,6 @@ Wire Wire Line
 Connection ~ 17350 19700
 Wire Wire Line
 	17350 19700 17800 19700
-Wire Wire Line
-	13050 18600 14300 18600
-Wire Wire Line
-	14300 18600 15500 18600
-Wire Wire Line
-	13850 19700 15300 19700
 Wire Wire Line
 	7700 18800 7700 18600
 Wire Wire Line
@@ -1746,16 +1726,10 @@ Text Label 7050 7850 0    50   ~ 0
 EAB5
 Text Label 7050 8050 0    50   ~ 0
 EAB7
-Text Notes 14550 8300 0    50   ~ 0
-+5V
-Text Notes 14050 6500 0    50   ~ 0
-GND
 Wire Wire Line
 	12750 7200 14700 7200
 Wire Wire Line
-	14700 6500 13850 6500
-Wire Wire Line
-	13850 6500 13850 19700
+	14700 6500 14550 6500
 Wire Wire Line
 	15650 7550 15750 7550
 Wire Wire Line
@@ -1770,14 +1744,14 @@ Wire Wire Line
 	11550 9450 11550 9900
 Wire Wire Line
 	11400 10000 11750 10000
-Text Notes 10500 9900 0    50   ~ 0
-AB347=0
+Text Notes 10500 9700 0    50   ~ 0
+AB347=000
 Text Notes 10300 10100 0    50   ~ 0
 AB1=1
 Text Notes 11300 10150 0    50   ~ 0
-=0\nif AB347=0,AB0=1
+=0\nif AB347=000,AB1=1
 Text Notes 11400 9200 0    50   ~ 0
-=0 if AB02=0
+=0 if AB02=00
 Text Notes 10750 9450 0    50   ~ 0
 =0 if IOS (FDxx)
 Wire Wire Line
@@ -1850,7 +1824,7 @@ Connection ~ 9400 7300
 Wire Wire Line
 	9400 7300 12200 7300
 Text Notes 12350 8550 0    50   ~ 0
-AB56=0
+AB56=00
 Wire Wire Line
 	10800 10000 10650 10000
 Wire Wire Line
@@ -1858,4 +1832,62 @@ Wire Wire Line
 Connection ~ 10650 10100
 Wire Wire Line
 	10650 10100 10800 10100
+Wire Wire Line
+	12200 6600 14550 6600
+Wire Wire Line
+	12200 7300 12200 6600
+$Comp
+L Device:Jumper_NC_Small JP10
+U 1 1 62352C12
+P 13000 6700
+F 0 "JP10" H 13000 6912 50  0000 C CNN
+F 1 "Jumper_NC_Small" H 13000 6821 50  0000 C CNN
+F 2 "" H 13000 6700 50  0001 C CNN
+F 3 "~" H 13000 6700 50  0001 C CNN
+	1    13000 6700
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:Jumper_NC_Small JP11
+U 1 1 62352F76
+P 13000 7450
+F 0 "JP11" H 13000 7662 50  0000 C CNN
+F 1 "Jumper_NC_Small" H 13000 7571 50  0000 C CNN
+F 2 "" H 13000 7450 50  0001 C CNN
+F 3 "~" H 13000 7450 50  0001 C CNN
+	1    13000 7450
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	13100 6700 14700 6700
+Wire Wire Line
+	13100 7450 13300 7450
+Text Label 13300 8200 0    50   ~ 0
+EAB1or5
+Text Label 13250 6700 0    50   ~ 0
+EAB5or1
+Text Notes 15550 6600 0    50   ~ 0
+=1 if AB56=00
+Text Notes 14800 7350 0    50   ~ 0
+           =1\nif AB347=000
+Text Notes 15200 8200 0    50   ~ 0
+=1 if AB12=11
+Wire Wire Line
+	13300 8200 14650 8200
+Wire Wire Line
+	13050 18600 15500 18600
+Wire Wire Line
+	14450 8000 14450 8100
+Wire Wire Line
+	14450 8100 14650 8100
+Connection ~ 14450 8000
+Wire Wire Line
+	14450 8000 14650 8000
+Wire Wire Line
+	13050 19700 15300 19700
+Wire Wire Line
+	14550 6500 14550 6600
+Connection ~ 14550 6600
+Wire Wire Line
+	14550 6600 14700 6600
 $EndSCHEMATC
