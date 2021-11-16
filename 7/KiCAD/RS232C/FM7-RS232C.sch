@@ -1824,7 +1824,7 @@ Connection ~ 9400 7300
 Wire Wire Line
 	9400 7300 12200 7300
 Text Notes 12350 8550 0    50   ~ 0
-AB56=00
+=1 if AB56=00
 Wire Wire Line
 	10800 10000 10650 10000
 Wire Wire Line
@@ -1890,4 +1890,8 @@ Wire Wire Line
 Connection ~ 14550 6600
 Wire Wire Line
 	14550 6600 14700 6600
+Text Notes 12400 9900 1    50   ~ 0
+=1 if all input=0
+Text Notes 16500 9400 1    50   ~ 0
+=1 if AB56=00 and AB12=11 and AB347=0
 $EndSCHEMATC
