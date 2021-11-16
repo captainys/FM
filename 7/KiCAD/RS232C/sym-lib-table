@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name i8251A_UART)(type Legacy)(uri ${KIPRJMOD}/i8251A_UART.lib)(options "")(descr ""))
+  (lib (name LineReceiverTransmitter)(type Legacy)(uri ${KIPRJMOD}/LineReceiverTransmitter.lib)(options "")(descr ""))
+)

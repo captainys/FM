@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name i8251A)(type KiCad)(uri ${KIPRJMOD}/i8251A.pretty)(options "")(descr ""))
+)
