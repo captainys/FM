@@ -1288,7 +1288,7 @@ Wire Wire Line
 Wire Wire Line
 	20350 19600 20350 19700
 Wire Wire Line
-	20350 19700 26100 19700
+	20350 19700 22250 19700
 Wire Wire Line
 	20250 18750 20250 18700
 Wire Wire Line
@@ -1543,7 +1543,7 @@ Wire Wire Line
 	16950 19700 17350 19700
 Connection ~ 17350 18600
 Wire Wire Line
-	17350 18600 26500 18600
+	17350 18600 22250 18600
 Connection ~ 17350 19700
 Wire Wire Line
 	17350 19700 17800 19700
@@ -1632,7 +1632,6 @@ NoConn ~ 16600 15950
 NoConn ~ 16600 16150
 NoConn ~ 16600 16350
 NoConn ~ 16600 14750
-NoConn ~ 16600 13800
 NoConn ~ 16600 13700
 NoConn ~ 20750 13550
 $Comp
@@ -1896,4 +1895,68 @@ Text Notes 16500 9400 1    50   ~ 0
 =1 if AB56=00 and AB12=11 and AB347=0
 Text Notes 13750 10050 0    50   ~ 0
 WFD02=\nAB=00000010 and\n~IOS~=0 (IOS=1) and\nEE=1 and\nEQ=1 and\n~ERW~=1 (ERW=0)\n
+Text Notes 17550 12550 0    50   ~ 0
+Read if ERW=1 and EE=1
+Text Notes 17600 12050 0    50   ~ 0
+Write if ERW=0 and EE=1
+Text Label 16600 13900 0    50   ~ 0
+38400bps
+Text Label 16750 14000 0    50   ~ 0
+19200bps
+Text Label 16650 14450 0    50   ~ 0
+9600bps
+Text Label 16650 14550 0    50   ~ 0
+4800bps
+Text Label 16650 14650 0    50   ~ 0
+2400bps
+$Comp
+L Device:Jumper_NO_Small JP6
+U 1 1 61A0FB63
+P 17300 13800
+F 0 "JP6" H 17300 13893 50  0000 C CNN
+F 1 "Jumper_NO_Small" H 17300 13894 50  0001 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 17300 13800 50  0001 C CNN
+F 3 "~" H 17300 13800 50  0001 C CNN
+	1    17300 13800
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	17400 13800 17750 13800
+Wire Wire Line
+	17750 13800 17750 13900
+Connection ~ 17750 13900
+Wire Wire Line
+	17200 13800 16600 13800
+Text Label 16600 13800 0    50   ~ 0
+76800bps
+Text Notes 17500 13700 0    50   ~ 0
+Intel 8251 unofficially supports up to 38400bps.\n76800bps never succeeded.\nNonetheless, there might be a compatible chip\nthat can go up to higher bps.
+$Comp
+L Connector:TestPoint TP_5V1
+U 1 1 61AD1210
+P 22250 18600
+F 0 "TP_5V1" H 22308 18718 50  0000 L CNN
+F 1 "TestPoint" H 22308 18627 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_D1.5mm_Drill0.7mm" H 22450 18600 50  0001 C CNN
+F 3 "~" H 22450 18600 50  0001 C CNN
+	1    22250 18600
+	1    0    0    -1  
+$EndComp
+Connection ~ 22250 18600
+Wire Wire Line
+	22250 18600 26500 18600
+$Comp
+L Connector:TestPoint TP_GND1
+U 1 1 61AD166F
+P 22250 19700
+F 0 "TP_GND1" H 22308 19818 50  0000 L CNN
+F 1 "TestPoint" H 22308 19727 50  0000 L CNN
+F 2 "TestPoint:TestPoint_THTPad_D1.5mm_Drill0.7mm" H 22450 19700 50  0001 C CNN
+F 3 "~" H 22450 19700 50  0001 C CNN
+	1    22250 19700
+	1    0    0    -1  
+$EndComp
+Connection ~ 22250 19700
+Wire Wire Line
+	22250 19700 26100 19700
 $EndSCHEMATC
