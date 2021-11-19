@@ -416,7 +416,7 @@ Text Label 7800 6000 0    50   ~ 0
 EDB7
 Text Label 9100 10600 0    50   ~ 0
 EE
-Text Label 5850 10500 0    50   ~ 0
+Text Label 9100 10500 0    50   ~ 0
 EQ
 Wire Wire Line
 	3700 12400 5100 12400
@@ -1747,8 +1747,6 @@ Text Notes 10500 9700 0    50   ~ 0
 AB347=000
 Text Notes 10300 10100 0    50   ~ 0
 AB1=1
-Text Notes 11300 10150 0    50   ~ 0
-=0\nif AB347=000,AB1=1
 Text Notes 11400 9200 0    50   ~ 0
 =0 if AB02=00
 Text Notes 10750 9450 0    50   ~ 0
@@ -1959,4 +1957,22 @@ $EndComp
 Connection ~ 22250 19700
 Wire Wire Line
 	22250 19700 26100 19700
+Text Notes 12400 6700 0    50   ~ 0
+EAB5
+Text Notes 12050 7450 0    50   ~ 0
+EAB1
+Text Notes 12300 6600 0    50   ~ 0
+EAB6
+Text Notes 14250 7000 0    50   ~ 0
+EAB3
+Text Notes 14250 7100 0    50   ~ 0
+EAB4
+Text Notes 14250 7200 0    50   ~ 0
+EAB7
+Text Notes 14100 8000 0    50   ~ 0
+EAB2
+Text Notes 11300 10150 0    50   ~ 0
+=0\nif AB347=000,AB1=1
+Text Notes 10900 10950 0    50   ~ 0
+~ERW
 $EndSCHEMATC
