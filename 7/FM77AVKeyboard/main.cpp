@@ -9,7 +9,11 @@
 
 #include "fm77avkeyboardemu.h"
 #include "filedialog.h"
-#include "comport.h"
+#ifndef YS_RASPBERRYPI
+	#include "comport.h"
+#else
+	#include "RaspPITransmit.h"
+#endif
 #include "cheaputil.h"
 #include "gui.h"
 #include "clipboard.h"
@@ -115,18 +119,21 @@ void FM77AVKeyboardEmulatorMain::Initialize(void)
 	ignoreNextLButtonUp=false;
 	autoPortScan=true;
 
+#ifndef YS_RASPBERRYPI
 	availablePort=YsCOMPort::FindAvailablePortName();
 
 	port=(0<availablePort.size() ? availablePort.back() : "0");
 	if(0<availablePort.size())
 	{
-printf("%s %d\n",__FUNCTION__,__LINE__);
 		fm77avKeyboardEmu.Connect(port);
 	}
 	else
 	{
 		fm77avKeyboardEmu.SetIRToyNotFoundError();
 	}
+#else
+	InitTransmitter();
+#endif
 
 	prevPort="";
 	prevMode=FM77AVKeyboardEmulator::MODE_NULL;

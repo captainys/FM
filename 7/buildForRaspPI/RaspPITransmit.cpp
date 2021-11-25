@@ -1,3 +1,7 @@
+#include <chrono>
+#include <thread>
+#include <stdio.h>
+
 #include "pigpio.h"
 
 

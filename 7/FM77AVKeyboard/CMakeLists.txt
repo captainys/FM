@@ -45,7 +45,10 @@ add_executable(${TARGET_NAME}_gl1 MACOSX_BUNDLE
 	clipboard.cpp
 )
 
-
-target_link_libraries(${TARGET_NAME} cheapgui fm77avkey fssimplewindow ysgl ysbitmapfont comportlib irtoylib)
-
-target_link_libraries(${TARGET_NAME}_gl1 cheapgui_gl1 fm77avkey fssimplewindow ysgl ysbitmapfont comportlib irtoylib)
+if(NOT YS_RASPBERRYPI)
+	target_link_libraries(${TARGET_NAME} cheapgui fm77avkey fssimplewindow ysgl ysbitmapfont comportlib irtoylib)
+	target_link_libraries(${TARGET_NAME}_gl1 cheapgui_gl1 fm77avkey fssimplewindow ysgl ysbitmapfont comportlib irtoylib)
+else()
+	target_link_libraries(${TARGET_NAME} cheapgui fm77avkey fssimplewindow ysgl ysbitmapfont RaspPITransmit irtoylib)
+	target_link_libraries(${TARGET_NAME}_gl1 cheapgui_gl1 fm77avkey fssimplewindow ysgl ysbitmapfont RaspPITransmit irtoylib)
+endif()

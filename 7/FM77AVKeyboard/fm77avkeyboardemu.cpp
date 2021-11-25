@@ -11,6 +11,11 @@
 #include "cheaputil.h"
 #include "gui.h"
 
+#ifdef YS_RASPBERRYPI
+#include "RaspPITransmit.h"
+#endif
+
+
 /*
 What's found so far.
 
@@ -142,12 +147,14 @@ void FM77AVKeyboardScheduler::AddStroke(int keyCode,bool shift,bool ctrl,bool gr
 
 void FM77AVKeyboardScheduler::Flush(IRToy_Controller &irToy)
 {
+#ifndef YS_RASPBERRYPI
 	// STATE_WAITINGREADY is only for the Arduino-based 
 	if(IRToy_Controller::STATE_GOWILD!=irToy.GetState() &&
 	   (true!=irToy.IsArduino() || IRToy_Controller::STATE_ARDUINO_WAITING_READY!=irToy.GetState() || 0<irToy.GetRecordingSize()))
 	{
 		return;
 	}
+#endif
 
 	FM77AVKeyEvent toSend;
 	toSend.keyCode=AVKEY_NULL;
@@ -167,6 +174,7 @@ void FM77AVKeyboardScheduler::Flush(IRToy_Controller &irToy)
 		auto code30=FM77AVMake30BitPattern(toSend);
 		if(0<code30.size())
 		{
+		#ifndef YS_RASPBERRYPI
 			if(true!=irToy.IsArduino())
 			{
 				char code40[41];
@@ -182,6 +190,9 @@ void FM77AVKeyboardScheduler::Flush(IRToy_Controller &irToy)
 				irToy.Make30Bit(code30.c_str());
 				irToy.Transmit30Bit();
 			}
+		#else
+			Transmit30BitAutoRetry(code30.c_str(),5);
+		#endif
 		}
 		repeatTimer=std::chrono::system_clock::now();
 	}
