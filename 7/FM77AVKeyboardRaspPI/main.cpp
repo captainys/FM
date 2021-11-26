@@ -101,7 +101,7 @@ int RealMain(std::string devPath)
                     if(1==evt[i].value)
                     {
                         std::cout << "Key Press" << std::endl;
-                        auto found=keymap.find(evt[i].code);
+                        auto found=keymap.map.find(evt[i].code);
                         if(keymap.end()!=found)
                         {
 							std::string ptn=FM77AVGetKeyPress30BitPattern(found->second);
@@ -112,7 +112,7 @@ int RealMain(std::string devPath)
                     else if(2==evt[i].value)
                     {
                         std::cout << "Key Repeat" << std::endl;
-                        auto found=keymap.find(evt[i].code);
+                        auto found=keymap.map.find(evt[i].code);
                         if(keymap.end()!=found)
                         {
 							std::string ptn=FM77AVGetKeyPress30BitPattern(found->second);
@@ -123,7 +123,7 @@ int RealMain(std::string devPath)
                     else if(0==evt[i].value)
                     {
                         std::cout << "Key Release" << std::endl;
-                        auto found=keymap.find(evt[i].code);
+                        auto found=keymap.map.find(evt[i].code);
                         if(keymap.end()!=found)
                         {
 							std::string ptn=FM77AVGetKeyRelease30BitPattern(found->second);
