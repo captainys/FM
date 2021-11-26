@@ -1,3 +1,4 @@
+#include <linux/input.h>
 #include "fm77avkeymap.h"
 #include "../FM77AVKeyboard/fm77avkey.h"
 
@@ -105,8 +106,8 @@ void FM77AVKeyMap::MakeUS101KeyMap(void)
 	map[KEY_KPPLUS]=          AVKEY_NUM_PLUS;
 	map[KEY_KPENTER]=         AVKEY_NUM_RETURN;
 
-	map[FSKEY_HENKAN]         AVKEY_LEFT_SPACE;
-	map[FSKEY_MUHENKAN]=      AVKEY_RIGHT_SPACE;
+	map[KEY_HENKAN]           AVKEY_LEFT_SPACE;
+	map[KEY_MUHENKAN]=        AVKEY_RIGHT_SPACE;
 
 	map[KEY_LEFTCTRL]=        AVKEY_CTRL;
 	map[KEY_RIGHTCTRL]=       AVKEY_GRAPH;
