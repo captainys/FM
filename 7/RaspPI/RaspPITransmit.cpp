@@ -1,3 +1,4 @@
+#include <vector>
 #include <chrono>
 #include <thread>
 #include <stdio.h>
@@ -10,6 +11,10 @@ const int LED_OUT_PIN=18;
 
 bool InitTransmitter(void)
 {
+   // gpioCfgClock needs to be *before* gpioInitialise.
+   gpioCfgClock(1,PI_CLOCK_PCM,0);
+   gpioCfgClock(1,PI_CLOCK_PWM,0);
+
 	if(0<=gpioInitialise())
    {
       gpioSetMode(LED_OUT_PIN,PI_OUTPUT);
@@ -18,6 +23,138 @@ bool InitTransmitter(void)
    return false;
 }
 
+
+
+int MakeOnOffCycle(int onOffCycle[30],const char bits[30],const unsigned int pulseWidth[30])
+{
+   char prev='1';
+   int nCycle=0;
+   int curCycle=0;
+
+   for(int i=0; i<30; ++i)
+   {
+      if(prev!=bits[i])
+      {
+         onOffCycle[nCycle++]=curCycle;
+         curCycle=pulseWidth[i];
+         prev=bits[i];
+      }
+      else
+      {
+         curCycle+=pulseWidth[i];
+      }
+   }
+
+   onOffCycle[nCycle++]=curCycle;
+
+   return nCycle;
+}
+
+std::vector <gpioPulse_t> MakeWaveForm(int nCycle,const int cycle[],int dataPin)
+{
+   std::vector <gpioPulse_t> pulse;
+   unsigned int leftOver=0;
+   unsigned int onOff=1;
+   const unsigned int dutyMicrosec=13;
+
+   for(int i=0; i<nCycle; ++i)
+   {
+      if(0!=onOff)
+      {
+         gpioPulse_t p;
+         auto us=cycle[i]+leftOver; // leftOver is supposed to be zero.
+         unsigned int pwm=1;
+         while(dutyMicrosec<=us)
+         {
+            if(1==pwm)
+            {
+               p.gpioOn=(1<<dataPin);
+               p.gpioOff=0;
+               p.usDelay=dutyMicrosec;
+            }
+            else
+            {
+               p.gpioOn=0;
+               p.gpioOff=(1<<dataPin);
+               p.usDelay=dutyMicrosec;
+            }
+            pulse.push_back(p);
+            pwm=1-pwm;
+            us-=dutyMicrosec;
+         }
+         if(1==pwm)
+         {
+            p.gpioOn=(1<<dataPin);
+            p.gpioOff=0;
+            p.usDelay=us;
+            pulse.push_back(p);
+            leftOver=0;
+         }
+         else
+         {
+            leftOver=us;     
+         }
+      }
+      else
+      {
+         gpioPulse_t p;
+         p.gpioOn=0;
+         p.gpioOff=(1<<dataPin);
+         p.usDelay=cycle[i]+leftOver;
+         pulse.push_back(p);
+         leftOver=0;
+      }
+      onOff=1-onOff;
+   }
+   if(0<pulse.size() && 0==pulse.back().gpioOff)
+   {
+      gpioPulse_t p;
+      p.gpioOn=0;
+      p.gpioOff=(1<<dataPin);
+      p.usDelay=10;
+      pulse.push_back(p);
+   }
+   return pulse;
+}
+
+#ifndef SOFTWARE_PWM
+bool Transmit30Bit(const char bits[30])
+{
+   const int W0=100,W1=125,W2=175;
+
+   unsigned int pulse[30]=
+   {
+      W0,W1,W2,W0,W1,W2,W0,W1,W2,W0,W1,W2,W0,W1,W2,
+      W0,W1,W2,W0,W1,W2,W0,W1,W2,W0,W1,W2,W0,W1,W2,
+   };
+
+   int onOffCycle[30];
+   int nCycle=MakeOnOffCycle(onOffCycle,bits,pulse);
+
+   auto waveForm=MakeWaveForm(nCycle,onOffCycle,LED_OUT_PIN);
+
+   gpioWrite(LED_OUT_PIN,0);
+
+   gpioWaveClear();
+
+   gpioWaveAddNew();
+   gpioWaveAddGeneric(waveForm.size(),waveForm.data());
+
+   auto waveId=gpioWaveCreate();
+   if(0<=waveId)
+   {
+      gpioWaveTxSend(waveId,PI_WAVE_MODE_ONE_SHOT);
+      while(gpioWaveTxBusy());
+   }
+
+   gpioWaveClear();
+
+
+   gpioWrite(LED_OUT_PIN,0);
+
+   return true;
+}
+#else
 bool Transmit30Bit(const char bits[30])
 {
    // const char bits[]="101010110110101010101001010101";
@@ -108,6 +245,7 @@ bool Transmit30Bit(const char bits[30])
 
    return true;
 }
+#endif
 
 void Transmit30BitAutoRetry(const char bit[30],int nRetry)
 {
