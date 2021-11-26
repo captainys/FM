@@ -65,6 +65,11 @@ void Device::Close(void)
 }
 
 
+void WaitBetweenKeyCode(unsigned int ms)
+{
+    auto t0=std::chrono::high_resolution_clock::now();
+    while(std::chrono::high_resolution_clock::now()-t0<std::chrono::milliseconds(ms));
+}
 
 
 int RealMain(std::string devPath)
@@ -109,8 +114,8 @@ int RealMain(std::string devPath)
 							std::string ptn=FM77AVGetKeyPress30BitPattern(found->second);
                             keyState[found->second]=true;
                             holdDown=found->second;
-							Transmit30Bit(ptn.c_str());
-                            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+							Transmit30Bit(ptn.c_str()); // 4ms
+                            WaitBetweenKeyCode(40);
 						}
                     }
                     else if(2==evt[i].value)
@@ -123,7 +128,7 @@ int RealMain(std::string devPath)
                             keyState[found->second]=true;
                             holdDown=AVKEY_NULL;
 							Transmit30Bit(ptn.c_str());
-                            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                            WaitBetweenKeyCode(40);
 						}
                     }
                     else if(0==evt[i].value)
@@ -136,7 +141,7 @@ int RealMain(std::string devPath)
                             keyState[found->second]=false;
                             holdDown=AVKEY_NULL;
 							Transmit30Bit(ptn.c_str());
-                            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                            WaitBetweenKeyCode(40);
 						}
                     }
                 }
@@ -146,7 +151,7 @@ int RealMain(std::string devPath)
         {
             std::string ptn=FM77AVGetKeyPress30BitPattern(holdDown);
             Transmit30Bit(ptn.c_str());
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            WaitBetweenKeyCode(40);
         }
 
         auto e=keyState.find(AVKEY_E);
