@@ -63,7 +63,8 @@ void FM77AVKeyMap::MakeUS101KeyMap(void)
 	map[KEY_PRINT]=           AVKEY_NULL;
 	map[KEY_CAPSLOCK]=        AVKEY_CAPS;
 	map[KEY_SCROLLLOCK]=      AVKEY_NULL;
-	map[KEY_PAUSEBREAK]=      AVKEY_NULL;
+	map[KEY_BREAK]=           AVKEY_BREAK;
+	map[KEY_PAUSE]=           AVKEY_BREAK;
 	map[KEY_BACKSPACE]=       AVKEY_BACKSPACE;
 	map[KEY_TAB]=             AVKEY_TAB;
 	map[KEY_ENTER]=           AVKEY_RETURN;
@@ -106,7 +107,7 @@ void FM77AVKeyMap::MakeUS101KeyMap(void)
 	map[KEY_KPPLUS]=          AVKEY_NUM_PLUS;
 	map[KEY_KPENTER]=         AVKEY_NUM_RETURN;
 
-	map[KEY_HENKAN]           AVKEY_LEFT_SPACE;
+	map[KEY_HENKAN]=          AVKEY_LEFT_SPACE;
 	map[KEY_MUHENKAN]=        AVKEY_RIGHT_SPACE;
 
 	map[KEY_LEFTCTRL]=        AVKEY_CTRL;
