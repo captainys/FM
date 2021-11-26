@@ -20,5 +20,5 @@ add_executable(FM77AVKeyboardCUI
 	../FM77AVKeyboard/fm77avkey.cpp
 	../FM77AVKeyboard/fm77avkey.h
 )
-target_include_directories(FM77AVKeyboardCUI ../FM77AVKeyboard)
+target_include_directories(FM77AVKeyboardCUI PUBLIC ../FM77AVKeyboard)
 target_link_libraries(FM77AVKeyboardCUI pigpio pthread rt)

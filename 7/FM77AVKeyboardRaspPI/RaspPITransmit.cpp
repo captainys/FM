@@ -88,9 +88,14 @@ bool Transmit30Bit(const char bits[30])
    {
       auto dt=(int)std::chrono::duration_cast<std::chrono::microseconds>(timeStamp[i+1]-timeStamp[i]).count();
       int err=(pulse[i]-dt);
-      printf("Needed %d  Observed %d  Err %d\n",(int)pulse[i],(int)dt,(int)err);
       if(err<-5 || 5<err)
       {
+         for(int j=0; j<30; ++j)
+         {
+            auto dt=(int)std::chrono::duration_cast<std::chrono::microseconds>(timeStamp[j+1]-timeStamp[j]).count();
+            int err=(pulse[j]-dt);
+            printf("Needed %d  Observed %d  Err %d\n",(int)pulse[j],(int)dt,(int)err);
+         }
          printf("Too much error!\n");
          return false;
       }
