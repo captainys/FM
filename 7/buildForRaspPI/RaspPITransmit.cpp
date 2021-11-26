@@ -10,7 +10,12 @@ const int LED_OUT_PIN=18;
 
 bool InitTransmitter(void)
 {
-	return 0<=gpioInitialise();
+	if(0<=gpioInitialise())
+   {
+      gpioSetMode(LED_OUT_PIN,PI_OUTPUT);
+      return true;
+   }
+   return false;
 }
 
 bool Transmit30Bit(const char bits[30])
