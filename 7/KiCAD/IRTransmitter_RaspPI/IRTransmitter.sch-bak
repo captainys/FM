@@ -71,13 +71,13 @@ $EndComp
 $Comp
 L Device:LED D3
 U 1 1 5D23ECDE
-P 1900 3800
-F 0 "D3" V 1845 3878 50  0000 L CNN
-F 1 "LED" V 1936 3878 50  0000 L CNN
-F 2 "LED_THT:LED_D5.0mm" H 1900 3800 50  0001 C CNN
-F 3 "~" H 1900 3800 50  0001 C CNN
-	1    1900 3800
-	0    1    1    0   
+P 1850 3700
+F 0 "D3" V 1795 3778 50  0000 L CNN
+F 1 "LED" V 1886 3778 50  0000 L CNN
+F 2 "LED_THT:LED_D5.0mm" H 1850 3700 50  0001 C CNN
+F 3 "~" H 1850 3700 50  0001 C CNN
+	1    1850 3700
+	-1   0    0    1   
 $EndComp
 $Comp
 L Device:R_US R1
@@ -115,16 +115,14 @@ $EndComp
 $Comp
 L Device:R_US R3
 U 1 1 5D23F264
-P 1550 4050
-F 0 "R3" V 1345 4050 50  0000 C CNN
-F 1 "220" V 1436 4050 50  0000 C CNN
-F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" V 1590 4040 50  0001 C CNN
-F 3 "~" H 1550 4050 50  0001 C CNN
-	1    1550 4050
+P 2400 3700
+F 0 "R3" V 2195 3700 50  0000 C CNN
+F 1 "220" V 2286 3700 50  0000 C CNN
+F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" V 2440 3690 50  0001 C CNN
+F 3 "~" H 2400 3700 50  0001 C CNN
+	1    2400 3700
 	0    1    1    0   
 $EndComp
-Text Label 1250 3400 0    50   ~ 0
-GPIO17
 Text Label 2450 3300 0    50   ~ 0
 GPIO18
 Wire Wire Line
@@ -143,16 +141,6 @@ Text GLabel 2300 2800 0    50   Input ~ 0
 +5V
 Wire Wire Line
 	4400 2800 4400 3100
-Wire Wire Line
-	1900 3650 1900 3400
-Wire Wire Line
-	1900 3950 1900 4050
-Wire Wire Line
-	1900 4050 1700 4050
-Text GLabel 1100 4050 0    50   Input ~ 0
-+3.3V
-Wire Wire Line
-	1400 4050 1100 4050
 Wire Wire Line
 	4400 3600 4400 3500
 Wire Wire Line
@@ -208,10 +196,6 @@ Wire Wire Line
 Wire Wire Line
 	2000 3300 2900 3300
 Wire Wire Line
-	850  3400 850  2600
-Wire Wire Line
-	850  3400 1900 3400
-Wire Wire Line
 	2900 2350 2900 2450
 Wire Wire Line
 	2900 2450 3700 2450
@@ -223,6 +207,51 @@ Wire Wire Line
 	750  1700 750  2500
 Wire Wire Line
 	750  2500 1100 2500
+$Comp
+L Transistor_BJT:BC337 Q2
+U 1 1 61A12D52
+P 2550 4250
+F 0 "Q2" H 2741 4296 50  0000 L CNN
+F 1 "BC33740TA" H 2741 4205 50  0000 L CNN
+F 2 "Transistors:NPN_Transistor" H 2750 4175 50  0001 L CIN
+F 3 "http://www.nxp.com/documents/data_sheet/BC817_BC817W_BC337.pdf" H 2550 4250 50  0001 L CNN
+	1    2550 4250
+	1    0    0    -1  
+$EndComp
+Text GLabel 1350 3700 0    50   Input ~ 0
++5V
 Wire Wire Line
-	850  2600 1100 2600
+	1350 3700 1700 3700
+Wire Wire Line
+	2000 3700 2250 3700
+Wire Wire Line
+	2550 3700 2650 3700
+Wire Wire Line
+	2650 3700 2650 4050
+Wire Wire Line
+	2000 3300 850  3300
+Wire Wire Line
+	850  3300 850  4250
+Connection ~ 2000 3300
+Wire Wire Line
+	2650 4450 2650 4700
+Wire Wire Line
+	2650 4700 3050 4700
+Text GLabel 3050 4700 2    50   Input ~ 0
+GND
+$Comp
+L Device:R_US R3
+U 1 1 61A56F24
+P 1600 4250
+F 0 "R3" V 1395 4250 50  0000 C CNN
+F 1 "2K" V 1486 4250 50  0000 C CNN
+F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" V 1640 4240 50  0001 C CNN
+F 3 "~" H 1600 4250 50  0001 C CNN
+	1    1600 4250
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	1750 4250 2350 4250
+Wire Wire Line
+	1450 4250 850  4250
 $EndSCHEMATC

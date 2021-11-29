@@ -232,8 +232,6 @@ Wire Wire Line
 	2000 3300 850  3300
 Wire Wire Line
 	850  3300 850  4250
-Wire Wire Line
-	850  4250 2350 4250
 Connection ~ 2000 3300
 Wire Wire Line
 	2650 4450 2650 4700
@@ -241,4 +239,19 @@ Wire Wire Line
 	2650 4700 3050 4700
 Text GLabel 3050 4700 2    50   Input ~ 0
 GND
+$Comp
+L Device:R_US R4
+U 1 1 61A56F24
+P 1600 4250
+F 0 "R4" V 1395 4250 50  0000 C CNN
+F 1 "2K" V 1486 4250 50  0000 C CNN
+F 2 "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal" V 1640 4240 50  0001 C CNN
+F 3 "~" H 1600 4250 50  0001 C CNN
+	1    1600 4250
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	1750 4250 2350 4250
+Wire Wire Line
+	1450 4250 850  4250
 $EndSCHEMATC
