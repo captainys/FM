@@ -8,6 +8,7 @@
 
 
 const int LED_OUT_PIN=18;
+const int LED_STATUS_PIN=23;
 
 bool InitTransmitter(void)
 {
@@ -18,6 +19,8 @@ bool InitTransmitter(void)
 	if(0<=gpioInitialise())
    {
       gpioSetMode(LED_OUT_PIN,PI_OUTPUT);
+      gpioSetMode(LED_STATUS_PIN,PI_OUTPUT);
+      gpioWrite(LED_STATUS_PIN,1);
       return true;
    }
    return false;
@@ -134,6 +137,7 @@ bool Transmit30Bit(const char bits[30])
    auto waveForm=MakeWaveForm(nCycle,onOffCycle,LED_OUT_PIN);
 
    gpioWrite(LED_OUT_PIN,0);
+   gpioWrite(LED_STATUS_PIN,0);
 
    gpioWaveClear();
 
@@ -151,6 +155,7 @@ bool Transmit30Bit(const char bits[30])
 
 
    gpioWrite(LED_OUT_PIN,0);
+   gpioWrite(LED_STATUS_PIN,1);
 
    return true;
 }
