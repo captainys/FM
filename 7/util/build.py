@@ -17,7 +17,7 @@ import txt2cpp
 
 makeD77=True
 makeWAV=False
-
+makeFirstT77=True
 
 
 asmSource=[
@@ -98,6 +98,7 @@ def BuildForFM7(outDir):
 		os.makedirs(outDir)
 
 	d77Fn=os.path.join(outDir,"FM7_rs232c_util.D77");
+	firstT77Fn=os.path.join(outDir,"FM7_first_T77.T77");
 	shutil.copyfile("empty.D77",d77Fn)
 
 	for asm in asmSource:
@@ -195,6 +196,19 @@ def BuildForFM7(outDir):
 				srecFn,
 				wav[2]
 			]).wait()
+
+	if True==makeFirstT77:
+		subprocess.Popen([
+			"build64/exe/t77save.exe",
+			firstT77Fn,
+			"-new",
+			"-save",
+			"buildFM7/D7CLIENT.bas",
+			"D7CLIENT",
+			"-srecwrite",
+			"buildFM7/D7CLIENM.srec",
+			"D7CLIENM",
+		]).wait()
 
 
 
