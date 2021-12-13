@@ -294,6 +294,22 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 	{
 		Quit();
 	}
+
+	if(FsGetKeyState(FSKEY_T) && FsGetKeyState(FSKEY_R) && FsGetKeyState(FSKEY_A))
+	{
+		if(fm77avKeyboardEmu.GetMode()!=FM77AVKeyboardEmulator::MODE_TRANSLATION)
+		{
+			fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_TRANSLATION);
+		}
+	}
+	if(FsGetKeyState(FSKEY_D) && FsGetKeyState(FSKEY_I) && FsGetKeyState(FSKEY_R))
+	{
+		if(fm77avKeyboardEmu.GetMode()!=FM77AVKeyboardEmulator::MODE_DIRECT)
+		{
+			fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_DIRECT);
+		}
+	}
+
 	int lb,mb,rb,mx,my;
 	auto mouseEvt=FsGetMouseEvent(lb,mb,rb,mx,my);
 	if(FSMOUSEEVENT_LBUTTONUP==mouseEvt)
