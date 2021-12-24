@@ -76,8 +76,8 @@ void FM77AVKeyMap::MakeUS101KeyMap(void)
 	map[FSKEY_DEL]=             AVKEY_DEL;
 	map[FSKEY_HOME]=            AVKEY_HOME;
 	map[FSKEY_END]=             AVKEY_DUP;
-	map[FSKEY_PAGEUP]=          AVKEY_NULL;
-	map[FSKEY_PAGEDOWN]=        AVKEY_NULL;
+	map[FSKEY_PAGEUP]=          AVKEY_CLS;
+	map[FSKEY_PAGEDOWN]=        AVKEY_EL;
 	map[FSKEY_UP]=              AVKEY_UP;
 	map[FSKEY_DOWN]=            AVKEY_DOWN;
 	map[FSKEY_LEFT]=            AVKEY_LEFT;
