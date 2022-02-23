@@ -1029,6 +1029,8 @@ CDROM_BIOS_058H_GET_ELEVOL	ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CDROM_BIOS_READ_SECTOR_EX	PROC
+						PUSH	ECX
+						PUSH	EDI
 
 						; SI=PHYS_ADDR_HIGH
 						; DI=PHYS_ADDR_LOW
@@ -1095,13 +1097,17 @@ CDROM_BIOS_READ_SECTOR_EX	PROC
 
 						JB		@f
 
-						XOR		BX,BX
-						MOV		[BP+INCOMING_BX],BX
+						MOV		WORD PTR [BP+INCOMING_BX],0
 						MOV		AH,00H
+						POP		EDI
+						POP		ECX
 						RET
 @@:
 						MOV		AH,80H
-						MOV		CX,BIOSERR_DETAIL_HARDWARE
+						MOV		WORD PTR [BP+INCOMING_CX],BIOSERR_DETAIL_HARDWARE
+						POP		EDI
+						POP		ECX
+						MOV		CX,[BP+INCOMING_CX]
 						RET
 
 READ_SECTOR_EX_SCSI_CMD	DB		28H,0,0,0,0,0,0,0,0,0
