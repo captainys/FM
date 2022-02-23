@@ -199,19 +199,11 @@ FIRE_INT_93H			PROC
 						MOV		BP,SP
 						PUSH	AX	; [BP-2]
 						PUSH	BX	; [BP-4]
-						PUSH	CX	; [BP-6]
+						PUSH	ECX	; [BP-8]
 						PUSH	DX
 						PUSH	SI
-						PUSH	DI
+						PUSH	EDI
 						PUSH	DS
-
-						ROL		ECX,16
-						PUSH	CX
-						ROL		EDI,16
-						PUSH	DI
-
-						ROL		ECX,16
-						ROL		EDI,16
 
 			; Use SCSI I/O
 						; SCSI_COMMAND
@@ -246,19 +238,14 @@ FIRE_INT_93H			PROC
 						JE		FIRE_INT_93H_CHK_COND_OR_NOERR	; Jump if 0 or 2
 						MOV		AH,080H
 FIRE_INT_93H_CHK_COND_OR_NOERR:
-						MOV		[BP-6],CX
+						MOV		[BP-8],CX
 						MOV		[BP-2+1],AH
 
-						POP		DI
-						ROL		EDI,16
-						POP		CX
-						ROL		ECX,16
-
 						POP		DS
-						POP		DI
+						POP		EDI
 						POP		SI
 						POP		DX
-						POP		CX	; [BP-6]
+						POP		ECX	; [BP-8]
 						POP		BX	; [BP-4]
 						POP		AX	; [BP-2]
 						POP		BP
