@@ -173,17 +173,97 @@ ISSUE_SCSI_CMD			ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; FIRE_INT_93H			PROC
+; Using Disk BIOS Hidden Function
+;						PUSH	SI
+;						LEA		DI,[SCSI_DATABUF_PTR]
+;						; LEA		SI,[SCSI_DATA_BUF]	; Probably SI doesn't matter in this function.
+;						XOR		CX,CX			; CH LUN (Must be zero)
+;						MOV		AH,BIOS_DIRECT_COMMAND
+;						AND		AL,7
+;						OR		AL,10110000b	; SCSI devices.  Confirmed FM TOWNS Technical Guidebook.
+;						INT		93H
+;						POP		SI
+; Output  CH=2, AH=0  means nead sense
+;         CH=0, AH=0  no error
+;         CH!=0 && CH!=2  Unrecoverable error
+; FIRE_INT_93H			ENDP
+
+
+; Output
+;    CH   0:No Error   Non-Zero:Real Bad Error
+;    AH   SCSI Error Code, probably
+;    AL   Still no idea what it is.
 FIRE_INT_93H			PROC
+						PUSH	BP
+						MOV		BP,SP
+						PUSH	AX	; [BP-2]
+						PUSH	BX	; [BP-4]
+						PUSH	CX	; [BP-6]
+						PUSH	DX
 						PUSH	SI
-						LEA		DI,[SCSI_DATABUF_PTR]
-						; LEA		SI,[SCSI_DATA_BUF]	; Probably SI doesn't matter in this function.
-						XOR		CX,CX			; CH LUN (Must be zero)
-						MOV		AH,BIOS_DIRECT_COMMAND
-						AND		AL,7
-						OR		AL,10110000b	; SCSI devices.  Confirmed FM TOWNS Technical Guidebook.
-						INT		93H
+						PUSH	DI
+						PUSH	DS
+
+						ROL		ECX,16
+						PUSH	CX
+						ROL		EDI,16
+						PUSH	DI
+
+						ROL		ECX,16
+						ROL		EDI,16
+
+			; Use SCSI I/O
+						; SCSI_COMMAND
+						;Input
+						; CL		SCSI ID
+						; DS:[SI]   SCSI Command
+						; EDI       Data Return Buffer Physical Address
+						;Output
+						; AH		0       : No Error
+						;           80H     : Failed to talk to the SCSI device
+						;			Non-Zero: SCSI Status
+						; AL        SCSI Message
+						; Carry     0       : No Error
+						;           1       : Error
+
+						MOVZX	ECX,WORD PTR [SCSI_DATABUF_PTR]
+						MOVZX	EDI,WORD PTR [SCSI_DATABUF_PTR+2]
+						SHL		EDI,4
+						ADD		EDI,ECX
+
+						MOV		CL,AL
+						AND		CL,7
+
+						LEA		SI,[SCSI_CMD]
+						PUSH	CS
+						POP		DS
+
+						CALL	SCSI_COMMAND
+
+						MOV		CX,AX
+						AND		AH,0FDH		; 2 means CHECK_STATUS
+						JE		FIRE_INT_93H_CHK_COND_OR_NOERR	; Jump if 0 or 2
+						MOV		AH,080H
+FIRE_INT_93H_CHK_COND_OR_NOERR:
+						MOV		[BP-6],CX
+						MOV		[BP-2+1],AH
+
+						POP		DI
+						ROL		EDI,16
+						POP		CX
+						ROL		ECX,16
+
+						POP		DS
+						POP		DI
 						POP		SI
+						POP		DX
+						POP		CX	; [BP-6]
+						POP		BX	; [BP-4]
+						POP		AX	; [BP-2]
+						POP		BP
 						RET
+
 FIRE_INT_93H			ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
