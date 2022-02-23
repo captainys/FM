@@ -458,6 +458,55 @@ BUSY_WAIT_FFFFH			ENDP
 
 
 
+; Secondary Loader tells IO.SYS that memory B0000H to BFFFFH does not exist to protect YSSCSICD.SYS.
+; However, it will set DOS's ENEMEM to B0000H, and 64KB is blocked just for 7KB YSSCSICD.SYS.
+; To free up as much memory as possible, this procedure patches MSDOS.SYS so that ENDMEM will become YSSCSICD_SEGMENT (BA00H)
+; This procedure first searches for MSDOS.SYS copy in the RAM, and then:
+; (1) Writes YSSCSICD_SEGMENT to DOSSEG:[02F2H] (ENDMEM)
+; (2) MOV CS:[02F2H],DX -> MOV DX,YSSCSICD_SEGMENT / NOP / NOP in MSINIT.
+PATCH_MSDOS_SYS			PROC
+						MOV		DX,0100H
+
+PATCH_MSDOS_LOOP:
+						MOV		ES,DX
+						CMP		BYTE PTR ES:[0000h],0E9H	; JMP
+						JNE		PATCH_MSDOS_LOOP_NEXT
+						CMP		WORD PTR ES:[0001H],6A9EH	; 6AA1H
+						JNE		PATCH_MSDOS_LOOP_NEXT
+
+						CMP		BYTE PTR ES:[0006H],42H		; 'B'
+						JNE		PATCH_MSDOS_LOOP_NEXT
+						CMP		WORD PTR ES:[0007H],4755H	; 'UG'
+						JNE		PATCH_MSDOS_LOOP_NEXT
+
+						CMP		DWORD PTR ES:[6AA3H],0F216892EH	; MOV	CS:[02F2H],DX
+						JNE		PATCH_MSDOS_LOOP_NEXT
+						CMP		BYTE PTR ES:[6AA7H],02H
+						JE		PATCH_MSDOS_FOUND
+PATCH_MSDOS_LOOP_NEXT:
+						INC		DX
+						CMP		DX,6000H
+						JNE		PATCH_MSDOS_LOOP
+						CLC
+						RET
+
+PATCH_MSDOS_FOUND:
+						; Yes, it is MSDOS.SYS V3.1
+						MOV		WORD PTR ES:[02F2H],YSSCSICD_SEGMENT
+						MOV		BYTE PTR ES:[6AA3H],0BAH	; MOV DX,imm
+						MOV		WORD PTR ES:[6AA4H],YSSCSICD_SEGMENT
+						MOV		WORD PTR ES:[6AA6H],9090H	; NOP NOP
+						STC
+						RET
+
+PATCH_MSDOS_SYS			ENDP
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
 ; Intercept IO.SYS jump to MSDOS.SYS
 IOSYS_INTERCEPT			PROC
 						PUSHF
@@ -499,6 +548,15 @@ IOSYS_INTERCEPT			PROC
 						MOV		SI,OFFSET INSTALLED_HOOK_MSG
 						CALL	PRINT_TALL
 
+						CALL	PATCH_MSDOS_SYS
+						JAE		MSDOS_SYS_NOT_FOUND
+
+						MOV		AX,2802H
+						CALL	LOCATE
+						MOV		SI,OFFSET PATCHED_MSDOS_SYS
+						CALL	PRINT_TALL
+
+MSDOS_SYS_NOT_FOUND:
 						POP		BP
 						POP		DI
 						POP		SI
@@ -520,7 +578,7 @@ IOSYS_RESUME_CS			DW		0
 
 IOSYS_INTERCEPTED_MSG	DB		"INTERCEPTED IO.SYS.",0
 INSTALLED_HOOK_MSG		DB		"INSTALLED INT 93H HOOK.",0
-
+PATCHED_MSDOS_SYS		DB		"PATCHED MSDOS.SYS",0
 
 SCSI_ID_CDROM			DB		0
 
