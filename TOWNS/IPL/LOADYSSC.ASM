@@ -2,6 +2,12 @@
 ; Incoming BH:Unit Number
 
 LOAD_YSSCSICD			PROC
+						MOV		DX,0404H ; TOWNSIO_FMR_VRAM_OR_MAINRAM
+						IN		AL,DX
+						PUSH	AX
+						MOV		AL,80H
+						OUT		DX,AL
+
 						MOV		WORD PTR [LOAD_YSSCSICD_BUFFADDR],0
 						MOV		BX,CS:[INCOMING_BX]
 						CMP		BL,2
@@ -9,9 +15,13 @@ LOAD_YSSCSICD			PROC
 						CMP		BL,1
 						JE		LOAD_YSSCSICD_FROM_SCSI
 						; CMP		BL,1
-						; JNE		@f
+						; JNE		YSSCSICD_LOAD_DONE
 						; JMP		LOAD_YSSCSICD_HD
-@@:
+
+YSSCSICD_LOAD_DONE:
+						POP		AX
+						MOV		DX,0404H ; TOWNSIO_FMR_VRAM_OR_MAINRAM
+						OUT		DX,AL
 						RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -38,7 +48,7 @@ LOAD_YSSCSICD_FD:
 
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
 						DB		9AH		; CALLF FFFB:0014
-						DW		 0014H
+U						DW		 0014H
 						DW		0FFFBH
 
 						JB		@f
@@ -53,7 +63,7 @@ LOAD_YSSCSICD_FD:
 
 @@:
 						POP		DS
-						RET
+						JMP		YSSCSICD_LOAD_DONE
 
 
 LOAD_YSSCSICD_FROM_SCSI:
@@ -82,7 +92,8 @@ LOAD_YSSCSICD_FROM_SCSI:
 
 @@:
 						POP		DS
-						RET
+						JMP		YSSCSICD_LOAD_DONE
+
 
 LOAD_YSSCSICD			ENDP
 
