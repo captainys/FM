@@ -625,6 +625,11 @@ CHECK_V21L20_NO:
 CHECK_V21L20			ENDP
 
 
+; IO.SYS of Towns OS V2.1L20 is bugged and it crashes if an IC memory card is inserted.
+; It needs to bypass IC Memory-Card check on INT 93H AX=0240H, otherwise it won't
+; read from OS-ROM.  It tries to load from IC Memory Card.  (Was it intentional?)
+; To make it start TownsO OS V2.1L20, IO.SYS can be patched before loading MSDOS.SYS,
+; and restored after MSDOS.SYS is loaded.
 PATCH_V21L20			PROC
 						MOV		SI,0421H
 						MOV		DS,SI;
