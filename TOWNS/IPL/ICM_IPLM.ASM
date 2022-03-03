@@ -68,7 +68,7 @@ REALMAIN:
 						MOV		DX,WORD PTR CS:[LOADER_LBA]
 						XOR		CH,CH	; Just in case
 
-						MOV		BX,32	; 32 sectors
+						MOV		BX,32	; 32 sectors.  Looks like 1024 bytes/sec
 						XOR		DI,DI	; OFFSET 0
 
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
