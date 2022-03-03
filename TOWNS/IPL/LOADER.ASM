@@ -26,7 +26,7 @@ LOADER_BIOS_DEVICE_ID	DB		0
 YSSCSICD_LOADED			DB		0
 
 REALMAIN:
-; Incoming BL:Device Type   1:HD/CD  2:FD  8:CD
+; Incoming BL:Device Type   1:HD/CD  2:FD  4:ICM  8:CD
 ; Incoming BH:Unit Number
 						CLI
 						PUSH	CS
@@ -40,14 +40,20 @@ REALMAIN:
 						MOV		CS:[INCOMING_BX],BX
 						AND		BH,0FH
 						AND		BL,0FH
-						CMP		BL,1
+						CMP		BL,1		; HD/CD?
 						JNE		@f
 						OR		BH,0B0H
 						JMP		DEVICE_ID_SET
 @@:
-						CMP		BL,2
+						CMP		BL,2		; FD?
 						JNE		@f
 						OR		BH,020H
+						JMP		DEVICE_ID_SET
+
+@@:
+						CMP		BL,4		; ICM?
+						JNE		@f
+						MOV		BH,4AH
 						JMP		DEVICE_ID_SET
 
 @@:

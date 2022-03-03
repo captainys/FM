@@ -5,8 +5,8 @@
 
 
 
-DEFAULT_LOADER_LBA		EQU		32 	; OFFSET 16384
-DEFAULT_YSSCSICD_LBA	EQU		128	; OFFSET 65536
+DEFAULT_LOADER_LBA		EQU		16 	; OFFSET 16384   Apparently 1024 bytes per sector
+DEFAULT_YSSCSICD_LBA	EQU		64	; OFFSET 65536
 
 
 
@@ -16,7 +16,7 @@ CODE					SEGMENT	USE16
 						INCLUDE		DEF.ASM
 
 ; From SYSROM
-; BL:Device Type   1:SCSI  2:FD  8:CD
+; BL:Device Type   1:SCSI  2:FD  4:ICM  8:CD
 ; BH:Unit Number
 
 MAIN					PROC
@@ -34,7 +34,7 @@ YSSCSICD_LBA			DD		DEFAULT_YSSCSICD_LBA
 
 
 REALMAIN:
-						CMP		BL,1	; Need to be from SCSI
+						CMP		BL,4	; Need to be from IC Memory Card
 						JE		@f
 						RETF
 @@:
@@ -53,30 +53,6 @@ REALMAIN:
 						CALL		PRINT_TALL
 
 
-						; Find which partition it is booting from and
-						; add displacement to LOADER_LBA and YSSCSICD_LBA
-						MOV		AX,CS
-						ADD		AX,0100H	; Partition Table is written in B100:0000
-						MOV		FS,AX
-						MOV		SI,0020H
-@@:
-						; Master Boot Sector or REIPL.COM marks the starting-partition with 0FFH.
-						; Valid boot partition must start with FF 01
-						MOV		EAX,FS:[SI+2]	; Tentative
-						CMP		BYTE PTR FS:[SI],0FFH
-						JE		@f
-						ADD		SI,030H
-						CMP		SI,0200H
-						JL		@b
-
-						; If not found, this is not read from MBS or REIPL.COM.  This probably is the MBS.
-						; In which case, the displacement should be 3 sectors (first partition)
-						MOV		EAX,FIRST_PARTITION_LBA
-@@:
-						ADD		DWORD PTR DS:[LOADER_LBA],EAX
-						ADD		DWORD PTR DS:[YSSCSICD_LBA],EAX
-
-
 						POP			BX
 						PUSH		BX
 
@@ -86,7 +62,7 @@ REALMAIN:
 
 						MOV		AH,05H	; Read Sector
 
-						MOV		AL,50H	; Device ID IC Memory Card
+						MOV		AL,4AH	; Device ID IC Memory Card
 
 						MOV		CX,WORD PTR CS:[LOADER_LBA+2]
 						MOV		DX,WORD PTR CS:[LOADER_LBA]
@@ -256,7 +232,7 @@ PRINT_TALL				ENDP
 
 						INCLUDE		MEMBANK.ASM
 
-MESSAGE					DB	"SCSI-HD BOOT",0
+MESSAGE					DB	"IC MEMORY CARD BOOT",0
 ERROR_MESSAGE			DB	"SOMETHING WENT WRONG.",0
 
 CODE					ENDS
