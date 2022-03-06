@@ -94,7 +94,7 @@ REALMAIN:
 						MOV		DX,WORD PTR CS:[LOADER_LBA]
 						XOR		CH,CH	; Just in case
 
-						MOV		BX,32	; 32 sectors
+						MOV		BX,96	; 96 sectors 48K
 						XOR		DI,DI	; OFFSET 0
 
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
