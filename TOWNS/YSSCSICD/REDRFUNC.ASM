@@ -895,7 +895,9 @@ CDROM_BIOS_055H_PAUSE	PROC
 
 						CMP		AL,11H
 						JE		@f
-						MOV		AH,BIOSERR_ALREADY_PAUSED	; ? Is there Not Playing Error ?
+
+						; Towns OS installer expects AH=0 if this command is called when CDDA has not started.
+						XOR		AH,AH
 						RET
 @@:
 
