@@ -466,7 +466,7 @@ BUSY_WAIT_FFFFH			ENDP
 
 ; Secondary Loader tells IO.SYS that memory B0000H to BFFFFH does not exist to protect YSSCSICD.SYS.
 ; However, it will set DOS's ENEMEM to B0000H, and 64KB is blocked just for 7KB YSSCSICD.SYS.
-; To free up as much memory as possible, this procedure patches MSDOS.SYS so that ENDMEM will become YSSCSICD_SEGMENT (BA00H)
+; To free up as much memory as possible, this procedure patches MSDOS.SYS so that ENDMEM will become YSSCSICD_SEGMENT (BC00H) (Probably I can push it to BE00H)
 ; This procedure first searches for MSDOS.SYS copy in the RAM, and then:
 ; (1) Writes YSSCSICD_SEGMENT to DOSSEG:[02F2H] (ENDMEM)
 ; (2) MOV CS:[02F2H],DX -> MOV DX,YSSCSICD_SEGMENT / NOP / NOP in MSINIT.

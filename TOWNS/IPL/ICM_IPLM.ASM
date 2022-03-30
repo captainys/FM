@@ -4,9 +4,9 @@
 						.386p
 
 
-
-DEFAULT_LOADER_LBA		EQU		16 	; OFFSET 16384   Apparently 1024 bytes per sector
-DEFAULT_YSSCSICD_LBA	EQU		64	; OFFSET 65536
+						; Fit it within 32KB
+DEFAULT_LOADER_LBA		EQU		1 	; OFFSET 1024   Apparently 1024 bytes per sector
+DEFAULT_YSSCSICD_LBA	EQU		24	; OFFSET 24576
 
 
 

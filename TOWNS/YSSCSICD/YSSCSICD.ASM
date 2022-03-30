@@ -430,7 +430,7 @@ RECOGNIZE_COMMAND_PARAMETER	ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 MSG_INTRO				DB		"YS SCSI BIOS REDIRECTOR",0DH,0AH
-						DB		"Ver 0.94 2022/02/01",0DH,0AH
+						DB		"Ver 0.95 2022/03/29",0DH,0AH
 						DB		"By CaptainYS (http://www.ysflight.com)",0DH,0AH,0
 MSG_ERR_PARAM			DB		"UNRECOGNIZED COMMAND OPTION:",0
 ;MSG_DEBUG_OUT_CON		DB		"DEBUG MESSAGE TO CONSOLE",0DH,0AH,0
