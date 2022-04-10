@@ -552,10 +552,13 @@ TRYBOOT_FROMDEVICE		PROC
 
 						MOV		AX,0FFFFH
 
+						; Uncomment following DB and DWs and comment CALL SETUP_INTERCEPT_AND_GO
+						; for simple boot without patching IPL.
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
-						DB		9AH		; CALLF B000:0004
-						DW		 0004H
-						DW		0B000H
+						;DB		9AH		; CALLF B000:0004
+						;DW		 0004H
+						;DW		0B000H
+						CALL	SETUP_INTERCEPT_AND_GO
 
 						PUSH	CS
 						POP		DS

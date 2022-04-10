@@ -1,0 +1,127 @@
+
+
+
+; Needs to patch
+; B200:000000F3 BF1201                    MOV     DI,0112H
+; B200:000000F6 2EFF1D                    CALLF   WORD PTR CS:[DI]
+;
+;                                         CALLF   8000:HDIPLINTERCEPT
+;                                         NOP
+
+
+HDIPL_FROM_PATTERN		DB		0BFh,012h,001h,02Eh,0FFh,01Dh
+HDIPL_TO_PATTERN		DB		9AH		; CALLF FFFB:0014
+						DW		OFFSET HDIPLINTERCEPT
+						DW		08000H
+						DB		90H		; NOP
+
+
+
+;B000:000000B6 52                        PUSH    DX
+;B000:000000B7 33D2                      XOR     DX,DX
+;B000:000000B9 52                        PUSH    DX
+;B000:000000BA CB                        RETF
+GENERALIPL_FROM_PATTERN	DB		052h,033h,0D2h,052h,0CBh
+GENERALIPL_TO_PATTERN	DB		0EAH		; JMPF
+						DW		OFFSET GENERALIPL_INTERCEPT
+						DW		08000H
+
+
+
+SETUP_INTERCEPT_AND_GO	PROC
+						PUSH	DS
+						PUSH	ES
+						PUSHA
+
+						MOV		SI,0B000h
+						MOV		DS,SI
+						XOR		SI,SI	; B000:0000 is the HD IPL location
+						MOV		DX,2048 ; Length 2048 bytes maximum
+						MOV		CX,6	; Pattern Length=6
+
+						PUSH	CS
+						POP		ES
+						MOV		DI,OFFSET HDIPL_FROM_PATTERN	; ES:DI=Source Pattern
+						MOV		BX,OFFSET HDIPL_TO_PATTERN   ; ES:BX=Write Pattern
+						CALL	APPLY_PATCH
+
+
+						MOV		SI,0B000h
+						MOV		DS,SI
+						XOR		SI,SI	; B000:0000 is the HD IPL location
+						MOV		DX,2048 ; Length 2048 bytes maximum
+						MOV		CX,5	; Pattern Length=5
+
+						PUSH	CS
+						POP		ES
+						MOV		DI,OFFSET GENERALIPL_FROM_PATTERN	; ES:DI=Source Pattern
+						MOV		BX,OFFSET GENERALIPL_TO_PATTERN   ; ES:BX=Write Pattern
+						CALL	APPLY_PATCH
+
+						POPA
+						POP		ES
+						POP		DS
+
+						; This calls HD IPL.
+						DB		9AH		; CALLF B000:0004
+						DW		 0004H
+						DW		0B000H
+
+						RET
+
+
+SETUP_INTERCEPT_AND_GO	ENDP
+
+
+
+HDIPLINTERCEPT:
+						; This is called after HD IPL reads partition IPL to B000:0000
+						; Called as CALLF 8000:HDIPLINTERCEPT
+						CALL	SETUP_INTERCEPT_AND_GO
+						RETF
+
+
+GENERALIPL_INTERCEPT:
+						; This is called after IO.SYS is loaded and no return.
+						PUSH    DX
+						XOR		DX,DX
+						PUSH	DX
+						RETF
+
+
+
+; DS:SI					Target Location
+; DX					Target Length
+; CX					Pattern Length
+; ES:DI					Source Pattern
+; ES:BX					Write Pattern
+APPLY_PATCH				PROC
+
+APPLY_PATCH_LOOP:
+						PUSH	CX
+						PUSH	SI
+						PUSH	DI
+						REPE	CMPSB
+						POP		DI
+						POP		SI
+						POP		CX
+						JE		APPLY_PATCH_FOUND
+
+						INC		SI
+						DEC		DX
+						JNE		APPLY_PATCH_LOOP
+						RET
+
+APPLY_PATCH_FOUND:
+						PUSH	DS
+						PUSH	ES
+						POP		DS
+						POP		ES
+
+						MOV		DI,SI  ; DS:SI becomes destination ES:DI
+						MOV		SI,BX  ; ES:BX becomes source DS:SI
+
+						REP		MOVSB
+						RET
+
+APPLY_PATCH				ENDP
