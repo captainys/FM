@@ -26,11 +26,7 @@ BOOT_FROM_SCSI_CD		PROC
 						CALL	SCSI_READ_SECTOR
 						JB		@f
 
-						PUSH	DS
-						PUSH	SI
 						CALL	PATCH_V21L20
-						POP		SI
-						POP		DS
 
 						MOV		AX,0050H
 						MOV		FS,AX
@@ -532,11 +528,7 @@ IOSYS_INTERCEPT			PROC
 						CLD
 
 
-						PUSH	DS
-						PUSH	SI
 						CALL	UNPATCH_V21L20
-						POP		SI
-						POP		DS
 
 
 						MOV		AX,2800H
@@ -598,81 +590,3 @@ SCSI_ID_CDROM			DB		0
 
 
 IOSYS_INTERCEPT			ENDP
-
-
-
-; IO.SYS of Towns OS V2.1L20 is bugged and it crashes if an IC memory card is inserted.
-; It needs to bypass IC Memory-Card check on INT 93H AX=0240H, otherwise it won't
-; read from OS-ROM.  It tries to load from IC Memory Card.  (Was it intentional?)
-; To make it start TownsO OS V2.1L20, IO.SYS can be patched before loading MSDOS.SYS,
-; and restored after MSDOS.SYS is loaded.
-; Turned out V1.1L30 as well.  Then probably V2.1L10, too.
-PATCH_V21L20			PROC
-
-						MOV		SI,0040H	; Beginning IO.SYS
-						MOV		DS,SI
-
-PATCH_V21L20_OUTER_LOOP:
-						XOR		SI,SI
-
-PATCH_V21L20_INNER_LOOP:
-						CMP		DWORD PTR DS:[SI  ],0EC048ABAh
-						JNE		PATCH_V21L20_INNER_LOOP_NEXT
-						CMP		DWORD PTR DS:[SI+4],0447506A8h
-						JNE		PATCH_V21L20_INNER_LOOP_NEXT
-						CMP		DWORD PTR DS:[SI+8],0C000BB60h
-						JNE		PATCH_V21L20_INNER_LOOP_NEXT
-
-						; Found
-						MOV		BYTE PTR DS:[SI+6],0EBh	; JNE -> JMP
-						RET
-
-PATCH_V21L20_INNER_LOOP_NEXT:
-						INC		SI
-						CMP		SI,16
-						JNE		PATCH_V21L20_INNER_LOOP
-
-						MOV		SI,DS
-						INC		SI
-						MOV		DS,SI
-						CMP		SI,1000h	; Scan first 64KB.
-						JNE		PATCH_V21L20_OUTER_LOOP
-
-						RET
-
-PATCH_V21L20			ENDP
-
-
-UNPATCH_V21L20			PROC
-						MOV		SI,0040H	; Beginning IO.SYS
-						MOV		DS,SI
-
-UNPATCH_V21L20_OUTER_LOOP:
-						XOR		SI,SI
-
-UNPATCH_V21L20_INNER_LOOP:
-						CMP		DWORD PTR DS:[SI  ],0EC048ABAh
-						JNE		UNPATCH_V21L20_INNER_LOOP_NEXT
-						CMP		DWORD PTR DS:[SI+4],044EB06A8h
-						JNE		UNPATCH_V21L20_INNER_LOOP_NEXT
-						CMP		DWORD PTR DS:[SI+8],0C000BB60h
-						JNE		UNPATCH_V21L20_INNER_LOOP_NEXT
-
-						; Found
-						MOV		BYTE PTR DS:[SI+6],075h	; JMP -> JNE
-						RET
-
-UNPATCH_V21L20_INNER_LOOP_NEXT:
-						INC		SI
-						CMP		SI,16
-						JNE		UNPATCH_V21L20_INNER_LOOP
-
-						MOV		SI,DS
-						INC		SI
-						MOV		DS,SI
-						CMP		SI,1000h	; Scan first 64KB.
-						JNE		UNPATCH_V21L20_OUTER_LOOP
-
-						RET
-
-UNPATCH_V21L20			ENDP

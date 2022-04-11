@@ -36,7 +36,7 @@ SETUP_INTERCEPT_AND_GO	PROC
 						MOV		SI,0B000h
 						MOV		DS,SI
 						XOR		SI,SI	; B000:0000 is the HD IPL location
-						MOV		DX,2048 ; Length 2048 bytes maximum
+						MOV		DX,2048/16 ; Length 2048 bytes maximum, divide by 16 to make it pages
 						MOV		CX,6	; Pattern Length=6
 
 						PUSH	CS
@@ -49,7 +49,7 @@ SETUP_INTERCEPT_AND_GO	PROC
 						MOV		SI,0B000h
 						MOV		DS,SI
 						XOR		SI,SI	; B000:0000 is the HD IPL location
-						MOV		DX,2048 ; Length 2048 bytes maximum
+						MOV		DX,2048/16 ; Length 2048 bytes maximum divide by 16 to make it pages
 						MOV		CX,5	; Pattern Length=5
 
 						PUSH	CS
@@ -83,6 +83,7 @@ HDIPLINTERCEPT:
 
 GENERALIPL_INTERCEPT:
 						; This is called after IO.SYS is loaded and no return.
+						CALL	PATCH_V21L20
 						PUSH    DX
 						XOR		DX,DX
 						PUSH	DX
