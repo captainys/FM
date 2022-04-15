@@ -88,7 +88,7 @@ END_OF_DECODER
 LOADER_START
 
 					ORCC	#$50
-					LDU		#$FD00
+					LDU		#IO_RS232C_DATA
 
 
 
@@ -96,7 +96,7 @@ LOADER_START
 RS232C_RESET_LOOP	MUL
 					LDA		,X+
 					COMA
-					STA		7,U
+					STA		1,U
 					BPL		RS232C_RESET_LOOP
 
 
@@ -109,10 +109,10 @@ SEND_REQ_CMD_LOOP	INCA
 					LDA		,X+
 					BMI		SEND_REQ_CMD_END
 
-WAIT_TXRDY			LDB		7,U
+WAIT_TXRDY			LDB		1,U
 					LSRB
 					BCC		WAIT_TXRDY
-					STA		6,U
+					STA		,U
 					BRA		SEND_REQ_CMD_LOOP
 SEND_REQ_CMD_END
 
@@ -121,9 +121,9 @@ SEND_REQ_CMD_END
 
 					CLRB
 LOAD_LOOP			LDA		#2
-					ANDA	7,U
+					ANDA	1,U
 					BEQ		LOAD_LOOP
-					LDA		6,U				; 1 byte shorter than "LDA IO_RS232C_DATA"
+					LDA		,U				; 1 byte shorter than "LDA IO_RS232C_DATA"
 					STA		,X+
 					DECB
 					BNE		LOAD_LOOP

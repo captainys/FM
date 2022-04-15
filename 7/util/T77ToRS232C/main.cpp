@@ -16,6 +16,7 @@
 #include "bioshook_small.h"
 #include "bioshook_buffered.h"
 #include "strloader.h"
+#include "strloaderCOM1.h"
 
 
 // This value must match the value in bioshook_buffered.asm 
@@ -1109,7 +1110,7 @@ void SubCPU(void)
 			fc80.installBinaryLoader=false;
 
 			FM7BinaryFile binFile;
-			binFile.DecodeSREC(strLoader);
+			binFile.DecodeSREC(strLoaderCOM0);
 
 			std::vector <unsigned char> toSend;
 			for(auto c : binFile.dat)

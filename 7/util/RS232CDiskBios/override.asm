@@ -165,12 +165,12 @@ RS232C_WRITE_MULTI_GET_RES
 						; It failed to send third byte and the rest of BIOS command sequence
 						; without the post-write wait.
 
-RS232C_WRITE_IOWAIT		LDA		<$07 ; IO_RS232C_COMMAND
+RS232C_WRITE_IOWAIT		LDA		<IO_RS232C_COMMAND_LO
 						LSRA
 						BCC		RS232C_WRITE_IOWAIT
 						; Carry=1
 						LDA		,U+
-						STA		<$06 ; IO_RS232C_DATA
+						STA		<IO_RS232C_DATA_LO
 
 						LEAY	-2,Y
 						BNE		RS232C_WRITE_MULTI_GET_RES
@@ -181,9 +181,9 @@ RS232C_WRITE_IOWAIT		LDA		<$07 ; IO_RS232C_COMMAND
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 RS232C_READ				LDA		#2
-						ANDA	<$07 ; IO_RS232C_COMMAND
+						ANDA	<IO_RS232C_COMMAND_LO
 						BEQ		RS232C_READ
-						LDA		<$06 ; IO_RS232C_DATA
+						LDA		<IO_RS232C_DATA_LO
 						RTS			; No change in Carry
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
