@@ -309,6 +309,39 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 			fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_DIRECT);
 		}
 	}
+	if(FsGetKeyState(FSKEY_SHIFT) &&
+	   FsGetKeyState(FSKEY_DEL) &&
+	   true!=fm77avKeyboardEmu.IsAutoTyping())
+	{
+		const char *prog=nullptr;
+		if(FSKEY_0==key)
+		{
+			prog="10 OPEN \"I\",#1,\"COM0:(F8N1)\"\r\n"
+				"20 LINE INPUT #1,A$\r\n"
+				"30 CLOSE\r\n"
+				"40 EXEC VARPTR(A$)\r\n"
+				"RUN\r\n";
+		}
+		else if(FSKEY_1==key)
+		{
+			prog="10 OPEN \"I\",#1,\"COM1:(F8N1)\"\r\n"
+				"20 LINE INPUT #1,A$\r\n"
+				"30 CLOSE\r\n"
+				"40 EXEC VARPTR(A$)\r\n"
+				"RUN\r\n";
+		}
+		if(nullptr!=prog)
+		{
+			key=FSKEY_NULL;
+			while(0!=FsInkeyChar());
+			std::vector <char> toSend;
+			for(int i=0; 0!=prog[i]; ++i)
+			{
+				toSend.push_back(prog[i]);
+			}
+			fm77avKeyboardEmu.StartAutoTyping(toSend,500);
+		}
+	}
 
 	int lb,mb,rb,mx,my;
 	auto mouseEvt=FsGetMouseEvent(lb,mb,rb,mx,my);
