@@ -1,6 +1,17 @@
-set(TARGET_NAME t77Server)
+set(TARGET_NAME RS232CTapeBIOS)
 
-add_executable(${TARGET_NAME} main.cpp bioshook_small.cpp bioshook_small.h bioshook_buffered.cpp bioshook_buffered.h ../rs232cLoader/strloader.h ../rs232cLoader/strloader.cpp)
+add_executable(${TARGET_NAME} 
+	main.cpp
+	bioshook_small.cpp
+	bioshook_small.h
+	bioshook_buffered.cpp
+	bioshook_buffered.h
+	bioshook_smallCOM1.cpp
+	bioshook_smallCOM1.h
+	bioshook_bufferedCOM1.cpp
+	bioshook_bufferedCOM1.h
+	../rs232cLoader/strloader.h
+	../rs232cLoader/strloader.cpp)
 target_link_libraries(${TARGET_NAME} t77lib comportlib)
 
 foreach(TARGET ${TARGET_NAME})

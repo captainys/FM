@@ -32,11 +32,23 @@ asmSource=[
 		 "6809lib/rs232c_recv.asm",
 		 "6809lib/rs232c_send.asm"]],
 	["CAS0COM0",
-		["T77ToRS232C/bioshook_install.asm",
-		 "T77ToRS232C/bioshook_small.asm"]],
+		["6809lib/com0io.asm",
+		 "RS232CTapeBIOS/bioshook_install.asm",
+		 "RS232CTapeBIOS/bioshook_small.asm"]],
 	["CAS0COMF",
-		["T77ToRS232C/bioshook_install.asm",
-		 "T77ToRS232C/bioshook_buffered.asm"]],
+		["6809lib/com0io.asm",
+		 "RS232CTapeBIOS/bioshook_install.asm",
+		 "RS232CTapeBIOS/bioshook_buffered.asm"]],
+
+	["CAS0COM1",
+		["6809lib/com1io.asm",
+		 "RS232CTapeBIOS/bioshook_install.asm",
+		 "RS232CTapeBIOS/bioshook_small.asm"]],
+	["CAS0CM1F",
+		["6809lib/com1io.asm",
+		 "RS232CTapeBIOS/bioshook_install.asm",
+		 "RS232CTapeBIOS/bioshook_buffered.asm"]],
+
 	["232CFILM",
 		["rs232cTfr/org.asm",
 		 "rs232cTfr/rs232ctfr.asm",
@@ -265,10 +277,27 @@ def RunCMakeAndDeleteExe():
 
 
 
-def BuildForWin():
+def BuildForWinPre():
 	os.chdir("build32")
 
-	build32proc=subprocess.Popen(["msbuild","Project.sln","/p:Configuration=Release","/p:Platform=Win32","/m"])
+	build32proc=subprocess.Popen([
+		"cmake",
+		"--build",
+		".",
+		"--config",
+		"Release",
+		"--parallel",
+		"--target",
+		"rs232ctfr",
+		"--target",
+		"srecdump",
+		"--target",
+		"77avtyper",
+		"--target",
+		"d77fileutil",
+		"--target",
+		"t77save",
+	])
 	build32proc.communicate()
 	if 0!=build32proc.returncode:
 		print("MSBuild returned an error.")
@@ -279,7 +308,62 @@ def BuildForWin():
 
 	os.chdir("build64")
 
-	build64proc=subprocess.Popen(["msbuild","Project.sln","/m"])
+	build64proc=subprocess.Popen([
+		"cmake",
+		"--build",
+		".",
+		"--config",
+		"Release",
+		"--parallel",
+		"--target",
+		"rs232ctfr",
+		"--target",
+		"srecdump",
+		"--target",
+		"77avtyper",
+		"--target",
+		"d77fileutil",
+		"--target",
+		"t77save",
+	])
+	build64proc.communicate()
+	if 0!=build64proc.returncode:
+		print("MSBuild returned an error.")
+		raise
+
+	os.chdir("..")
+
+
+
+def BuildForWinAll():
+	os.chdir("build32")
+
+	build32proc=subprocess.Popen([
+		"cmake",
+		"--build",
+		".",
+		"--config",
+		"Release",
+		"--parallel",
+	])
+	build32proc.communicate()
+	if 0!=build32proc.returncode:
+		print("MSBuild returned an error.")
+		raise
+
+	os.chdir("..")
+
+
+	os.chdir("build64")
+
+	build64proc=subprocess.Popen([
+		"cmake",
+		"--build",
+		".",
+		"--config",
+		"Release",
+		"--parallel",
+	])
 	build64proc.communicate()
 	if 0!=build64proc.returncode:
 		print("MSBuild returned an error.")
@@ -303,18 +387,23 @@ def UpdateWinSource():
 
 	bin2cpp.BinaryFileToCpp("D77ToRS232C/diskimg.cpp","D77ToRS232C/diskimg.h","utilDiskImg","buildFM7/FM7_rs232c_util.d77")
 	txt2cpp.TextFileToCpp("D77ToRS232C/clientbin.cpp","D77ToRS232C/clientbin.h","clientBinary","buildFM7/D7CLIENM.srec")
-	txt2cpp.TextFileToCpp("T77ToRS232C/bioshook_small.cpp","T77ToRS232C/bioshook_small.h","clientBinary_small","buildFM7/CAS0COM0.srec")
-	txt2cpp.TextFileToCpp("T77ToRS232C/bioshook_buffered.cpp","T77ToRS232C/bioshook_buffered.h","clientBinary_buffered","buildFM7/CAS0COMF.srec")
+
+	txt2cpp.TextFileToCpp("RS232CTapeBIOS/bioshook_small.cpp","RS232CTapeBIOS/bioshook_small.h","clientBinary_small","buildFM7/CAS0COM0.srec")
+	txt2cpp.TextFileToCpp("RS232CTapeBIOS/bioshook_buffered.cpp","RS232CTapeBIOS/bioshook_buffered.h","clientBinary_buffered","buildFM7/CAS0COMF.srec")
+
+	txt2cpp.TextFileToCpp("RS232CTapeBIOS/bioshook_smallCOM1.cpp","RS232CTapeBIOS/bioshook_smallCOM1.h","clientBinary_smallCOM1","buildFM7/CAS0COM1.srec")
+	txt2cpp.TextFileToCpp("RS232CTapeBIOS/bioshook_bufferedCOM1.cpp","RS232CTapeBIOS/bioshook_bufferedCOM1.h","clientBinary_bufferedCOM1","buildFM7/CAS0CM1F.srec")
+
 
 	txt2cpp.TextFileToCpp("RS232CDiskBios/disk_bios_hook_client.cpp","RS232CDiskBios/disk_bios_hook_client.h","clientBinaryCOM0","buildFM7/232CDISK.srec")
 	txt2cpp.TextFileToCpp("RS232CDiskBios/disk_bios_hook_clientCOM1.cpp","RS232CDiskBios/disk_bios_hook_clientCOM1.h","clientBinaryCOM1","buildFM7/232CDSK1.srec")
 
-	txt2cpp.TextFileToCpp("rs232cLoader/strloader.cpp","rs232cLoader/strloader.h","strLoaderCOM0","buildFM7/STRLOADR.srec")
+	txt2cpp.TextFileToCpp("rs232cLoader/strloader.cpp","rs232cLoader/strloader.h","strLoader","buildFM7/STRLOADR.srec")
 
 
 if __name__=="__main__":
 	RunCMakeAndDeleteExe()
-	BuildForWin()				# Requires some files from FM7 build.
+	BuildForWinPre()			# Requires some files from FM7 build.
 	BuildForFM7("buildFM7")		# Requires some executables.
 	UpdateWinSource()
-	BuildForWin()				# Not super clean, but build again after updating sources.
+	BuildForWinAll()			# Build again after updating sources.

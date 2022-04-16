@@ -15,6 +15,8 @@
 
 #include "bioshook_small.h"
 #include "bioshook_buffered.h"
+#include "bioshook_smallCOM1.h"
+#include "bioshook_bufferedCOM1.h"
 #include "strloader.h"
 
 
@@ -45,7 +47,7 @@ enum T77CLIENT_TYPE
 void ShowOptionHelp(void)
 {
 	printf("Usage:\n");
-	printf("  T77Server d77file.d77 comPort\n");
+	printf("  RS232CTapeBIOS t77file.t77 comPort\n");
 	printf("\n");
 	printf("-h, -help, -?\n");
 	printf("\tShow this help.\n");
@@ -130,32 +132,56 @@ void ShowPrompt(T77CLIENT_TYPE cli)
 
 unsigned int GetDefaultInstallAddress(T77CLIENT_TYPE cli)
 {
-	FM7BinaryFile binFile;
+	FM7BinaryFile binFileCOM0,binFileCOM1;
 	switch(cli)
 	{
 	case T77CLI_SMALL:
-		binFile.DecodeSREC(clientBinary_small);
+		binFileCOM0.DecodeSREC(clientBinary_small);
+		binFileCOM1.DecodeSREC(clientBinary_smallCOM1);
 		break;
 	case T77CLI_BUFFERED:
-		binFile.DecodeSREC(clientBinary_buffered);
+		binFileCOM0.DecodeSREC(clientBinary_buffered);
+		binFileCOM1.DecodeSREC(clientBinary_bufferedCOM1);
 		break;
 	}
-	return 0x100*binFile.dat[2]+binFile.dat[3];
+
+	unsigned int addrCOM0=0x100*binFileCOM0.dat[2]+binFileCOM0.dat[3];
+	unsigned int addrCOM1=0x100*binFileCOM1.dat[2]+binFileCOM1.dat[3];
+
+	if(addrCOM0!=addrCOM1)
+	{
+		printf("Binary sizes for COM0 and COM1 are different!\n");
+		exit(1);
+	}
+
+	return addrCOM0;
 }
 
 unsigned int GetDefaultBridgeAddress(T77CLIENT_TYPE cli)
 {
-	FM7BinaryFile binFile;
+	FM7BinaryFile binFileCOM0,binFileCOM1;
 	switch(cli)
 	{
 	case T77CLI_SMALL:
-		binFile.DecodeSREC(clientBinary_small);
+		binFileCOM0.DecodeSREC(clientBinary_small);
+		binFileCOM1.DecodeSREC(clientBinary_smallCOM1);
 		break;
 	case T77CLI_BUFFERED:
-		binFile.DecodeSREC(clientBinary_buffered);
+		binFileCOM0.DecodeSREC(clientBinary_buffered);
+		binFileCOM1.DecodeSREC(clientBinary_bufferedCOM1);
 		break;
 	}
-	return 0x100*binFile.dat[4]+binFile.dat[5];
+
+	unsigned int addrCOM0=0x100*binFileCOM0.dat[4]+binFileCOM0.dat[5];
+	unsigned int addrCOM1=0x100*binFileCOM1.dat[4]+binFileCOM1.dat[5];
+
+	if(addrCOM0!=addrCOM1)
+	{
+		printf("Binary sizes for COM0 and COM1 are different!\n");
+		exit(1);
+	}
+
+	return addrCOM0;
 }
 
 
@@ -595,6 +621,7 @@ public:
 	T77Encoder saveTape;
 	std::chrono::time_point<std::chrono::system_clock> lastByteReceivedClock;
 	bool tapeSaved;
+	unsigned int FM7COMPort=0;
 
 	T77ServerCommandParameterInfo cpi;
 
@@ -1040,14 +1067,29 @@ void SubCPU(void)
 		if(true==fc80.installASCII || true==fc80.installBinary)
 		{
 			FM7BinaryFile binFile;
-			switch(fc80.cpi.cliType)
+			if(0==fc80.FM7COMPort)
 			{
-			case T77CLI_SMALL:
-				binFile.DecodeSREC(clientBinary_small);
-				break;
-			case T77CLI_BUFFERED:
-				binFile.DecodeSREC(clientBinary_buffered);
-				break;
+				switch(fc80.cpi.cliType)
+				{
+				case T77CLI_SMALL:
+					binFile.DecodeSREC(clientBinary_small);
+					break;
+				case T77CLI_BUFFERED:
+					binFile.DecodeSREC(clientBinary_buffered);
+					break;
+				}
+			}
+			else
+			{
+				switch(fc80.cpi.cliType)
+				{
+				case T77CLI_SMALL:
+					binFile.DecodeSREC(clientBinary_smallCOM1);
+					break;
+				case T77CLI_BUFFERED:
+					binFile.DecodeSREC(clientBinary_bufferedCOM1);
+					break;
+				}
 			}
 
 			binFile.dat[2]=((fc80.cpi.instAddr>>8)&255);
@@ -1109,7 +1151,7 @@ void SubCPU(void)
 			fc80.installBinaryLoader=false;
 
 			FM7BinaryFile binFile;
-			binFile.DecodeSREC(strLoaderCOM0);
+			binFile.DecodeSREC(strLoader);
 
 			std::vector <unsigned char> toSend;
 			for(auto c : binFile.dat)
@@ -1184,13 +1226,16 @@ void SubCPU(void)
 					++yamakawaCount;
 					if(8==yamakawaCount && 'A'==c)
 					{
+						printf("FM-7 COM Port 0\n");
 						fc80.installBinary=true;
+						fc80.FM7COMPort=0;
 						yamakawaCount=0;
 					}
 					else if(8==yamakawaCount && 'a'==c)
 					{
-						// fc80.installBinary=true;
-						printf("COM1 not supported yet.\n");
+						printf("FM-7 COM Port 1\n");
+						fc80.installBinary=true;
+						fc80.FM7COMPort=1;
 						yamakawaCount=0;
 					}
 				}

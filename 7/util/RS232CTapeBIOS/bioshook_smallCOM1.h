@@ -1,0 +1,6 @@
+#ifndef RS232CTAPEBIOS_BIOSHOOK_SMALLCOM1_H_IS_INCLUDED
+#define RS232CTAPEBIOS_BIOSHOOK_SMALLCOM1_H_IS_INCLUDED
+
+extern const char * const clientBinary_smallCOM1[];
+
+#endif

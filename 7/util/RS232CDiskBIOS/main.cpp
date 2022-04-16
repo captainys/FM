@@ -1621,7 +1621,7 @@ void SubCPU(void)
 			fc80.installBinaryLoader=false;
 
 			FM7BinaryFile binFile;
-			binFile.DecodeSREC(strLoaderCOM0);
+			binFile.DecodeSREC(strLoader);
 
 			std::vector <unsigned char> toSend;
 			for(auto c : binFile.dat)

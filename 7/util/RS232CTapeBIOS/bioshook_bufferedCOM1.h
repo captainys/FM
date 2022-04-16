@@ -1,0 +1,6 @@
+#ifndef RS232CTAPEBIOS_BIOSHOOK_BUFFEREDCOM1_H_IS_INCLUDED
+#define RS232CTAPEBIOS_BIOSHOOK_BUFFEREDCOM1_H_IS_INCLUDED
+
+extern const char * const clientBinary_bufferedCOM1[];
+
+#endif

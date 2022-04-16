@@ -43,7 +43,7 @@ BIOS_MOTOR_ON			LEAX	RS232C_RESET_CMD,PCR
 MOTOR_RS232C_RESET_LOOP
 						CLRA								; 2 clocks
 						LDA		,X+							; 5 clocks
-						STA		7,U ; IO_RS232C_COMMAND
+						STA		IO_RS232C_COMMAND_LO,U
 						BPL		MOTOR_RS232C_RESET_LOOP	; Only last command is negative ; 3 clocks
 
 						; CLRA clears carry flag.
@@ -75,7 +75,7 @@ BIOS_MOTOR_OFF
 						STA		,U
 
 						CLR		2,U ; Re-clear IRQ
-						CLR		7,U ; IO_RS232C_COMMAND
+						CLR		IO_RS232C_COMMAND_LO,U
 						RTS		; Previous CLR 7,U also clears carry
 
 
@@ -86,15 +86,15 @@ BIOS_MOTOR_OFF
 						; Recovery time between writes for asynchronous mode is 8 tCY
 						; Probably it is recovery time between sends.
 						; May not need wait after setting the status bits.
-BIOS_CTBWRT				STA		7,U ; IO_RS232C_COMMAND
+BIOS_CTBWRT				STA		IO_RS232C_COMMAND_LO,U
 						; A=#$B7=WRITE_REQUEST
 						BSR		RS232C_WRITE	; 7 clocks
 						LDA		2,X
 
-RS232C_WRITE			LDB		7,U ; IO_RS232C_COMMAND
+RS232C_WRITE			LDB		IO_RS232C_COMMAND_LO,U
 						LSRB
 						BCC		RS232C_WRITE
-						STA		6,U ; IO_RS232C_DATA
+						STA		IO_RS232C_DATA_LO,U
 
 						CLRA
 						RTS
@@ -103,15 +103,15 @@ RS232C_WRITE			LDB		7,U ; IO_RS232C_COMMAND
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-BIOS_CTBRED				STA		7,U ; IO_RS232C_COMMAND
+BIOS_CTBRED				STA		IO_RS232C_COMMAND_LO,U
 						DECA					; A=#$B7 -> #$B6
 						; A=#$B6=READ_REQUEST
 						BSR		RS232C_WRITE	; 7 clocks
 
 RS232C_READ				LDA		#2
-						ANDA	7,U ; IO_RS232C_COMMAND
+						ANDA	IO_RS232C_COMMAND_LO,U
 						BEQ		RS232C_READ
-						LDA		6,U	; IO_RS232C_DATA
+						LDA		IO_RS232C_DATA_LO,U
 
 BIOS_CTBRED_EXIT		STA		2,X
 						CLRA
