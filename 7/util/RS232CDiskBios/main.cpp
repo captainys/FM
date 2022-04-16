@@ -20,7 +20,6 @@
 #include "cpplib.h"
 #include "fm7lib.h"
 #include "strloader.h"
-#include "strloaderCOM1.h"
 
 
 
@@ -474,13 +473,6 @@ void ShowOptionHelp(void)
 	printf("\tFM77AV20/40 and later models cannot configure to faster than 19200bps.\n");
 	printf("\tUse this option only if you have an RS232C card that is capable of\n");
 	printf("\t38400bps.\n");
-
-	printf("-COM0 / -COM1\n");
-	printf("\tSelect COM port on the FM-7 side.  -COM0 option (default) will let\n");
-	printf("\tFM-7/77 use COM0 (I/O $FD06,$FD07), or -COM1 option let FM-7/77 use\n");
-	printf("\tCOM1 (I/O $FD24,$FD25).  If RS232C card on FM-7/77 is configured as\n");
-	printf("COM1, -COM1 option needs to be used.\n");
-	printf("If you use on-board RS232C of FM77AV40 and later models, do not use -COM1.\n");
 }
 
 void ShowCommandHelp(void)
@@ -1163,14 +1155,6 @@ bool D77ServerCommandParameterInfo::Recognize(int ac,char *av[])
 		{
 			bps=38400;
 		}
-		else if("-COM0"==arg)
-		{
-			FM7COMPort=0;
-		}
-		else if("-COM1"==arg)
-		{
-			FM7COMPort=1;
-		}
 		else if('-'==arg[0])
 		{
 			printf("Unknown option: %s\n",arg.c_str());
@@ -1637,14 +1621,7 @@ void SubCPU(void)
 			fc80.installBinaryLoader=false;
 
 			FM7BinaryFile binFile;
-			if(0==fc80.cpi.FM7COMPort)
-			{
-				binFile.DecodeSREC(strLoaderCOM0);
-			}
-			else
-			{
-				binFile.DecodeSREC(strLoaderCOM1);
-			}
+			binFile.DecodeSREC(strLoaderCOM0);
 
 			std::vector <unsigned char> toSend;
 			for(auto c : binFile.dat)
@@ -1661,14 +1638,15 @@ void SubCPU(void)
 			}
 			printf("String size=0x%02x\n",(int)toSend.size());
 
-			while(toSend.size()<0x7E)
+			const int JSR=0xBD;
+			while(toSend.size()<JSR) // Use JSR ($BD) instead of JMP ($7E)
 			{
 				toSend.push_back('0');
 			}
 
-			if(0x7E<toSend.size())
+			if(JSR<toSend.size())
 			{
-				fprintf(stderr,"Error.  The code needs to be shorter than 0x7E.\n");
+				fprintf(stderr,"Error.  The code needs to be shorter than 0x%02x.\n",JSR);
 			}
 			else
 			{
@@ -1704,6 +1682,14 @@ void SubCPU(void)
 				{
 					if(0==strncmp((const char *)biosCmdBuf,"YAMAKAWA",8))
 					{
+						printf("COM0 on FM-7 side.\n");
+						fc80.cpi.FM7COMPort=0;
+						fc80.installBinary=true;
+					}
+					else if(0==strncmp((const char *)biosCmdBuf,"YAMAKAWa",8)) // Last letter small indicates COM1
+					{
+						printf("COM1 on FM-7 side.\n");
+						fc80.cpi.FM7COMPort=1;
 						fc80.installBinary=true;
 					}
 					else if(0x09==biosCmdBuf[0]) // Disk Write

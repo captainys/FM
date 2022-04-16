@@ -88,19 +88,32 @@ END_OF_DECODER
 LOADER_START
 
 					ORCC	#$50
-					LDU		#IO_RS232C_DATA
+
+					PULS	U	; Now EXEC VARPTR(A$) relies on JSR ($BD) instead of JMP ($7E).  Need to forget one PC.
+
+					LDU		#IO_RS232C_COM0_DATA
+					BSR		RESET_RS232C
+					LDU		#IO_RS232C_COM1_DATA
+					BSR		RESET_RS232C
+
+					; F-BASIC ROM does RS232C presence check by:
+					;   Writing command $10 (Error Reset), and then
+					;   Reading status word to see if it $FF.
+					; Presumably, if RS232C is not present, I/O read will return $FF
+					; RESET_RS232C will send Error Reset command in the end.
+					LDA		1,U
+					INCA		; Zero if I/O Read returns $FF
+					BEQ		USE_COM0
+USE_COM1			; U is already #IO_RS232C_COM1_DATA
+					LDA		#'a'
+					STA		YAMAKAWA+7,PCR
+					BRA		SEND_REQUEST
+
+USE_COM0			LDU		#IO_RS232C_COM0_DATA
 
 
 
-					LEAX	RS232C_RESET_CMD,PCR
-RS232C_RESET_LOOP	MUL
-					LDA		,X+
-					COMA
-					STA		1,U
-					BPL		RS232C_RESET_LOOP
-
-
-
+SEND_REQUEST
 					LEAX	YAMAKAWA,PCR
 
 SEND_REQ_CMD_LOOP	INCA
@@ -130,11 +143,24 @@ LOAD_LOOP			LDA		#2
 
 					JMP		INSTALLER_ADDR
 
+
+
+RESET_RS232C
+					LEAX	RS232C_RESET_CMD,PCR
+RS232C_RESET_LOOP	MUL
+					LDA		,X+
+					COMA
+					STA		1,U
+					BPL		RS232C_RESET_LOOP
+					RTS
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Keep "YAMAKAWA" immediately before RS232C_RESET_CMD.
 YAMAKAWA			FCB 	"YAMAKAWA"				 ; Subsequent $FF will be a stopper.
 RS232C_RESET_CMD	FCB		$FF,$FF,$FF,$BF,$B1,$48  ; COM and write to FD07
+; Last byte $48 -> Complement = 0b10110111 -> Bit 4 Error Reset is on
+; After RESET, error must be clear.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
