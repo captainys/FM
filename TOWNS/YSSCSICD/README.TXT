@@ -4,7 +4,18 @@ http://www.ysflight.com
 
 
 
-[Revision]
+[Revisions]
+V0.95 2022/03/29
+  Added function 73C0H
+    INT 93H
+    AX=73C0H
+    Return SCSI ID of the redirected CD-ROM drive in AL.  AL=0FFH means no redirection.  FLAGS unchanged.
+
+
+V0.93 2022/02/02
+  INT 93H AX=01C0H was not returning drive mode in DL.  Ms. Detective #1 was crashing due to this problem.
+  The problem has been fixed.  I don't know if there were more of the 
+
 V0.91 2020/01/04
   Now supports Operation Wolf.
 

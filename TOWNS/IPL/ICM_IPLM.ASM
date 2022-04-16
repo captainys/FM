@@ -4,9 +4,9 @@
 						.386p
 
 
-
-DEFAULT_LOADER_LBA		EQU		33
-FIRST_PARTITION_LBA		EQU		3
+						; Fit it within 32KB
+DEFAULT_LOADER_LBA		EQU		1 	; OFFSET 1024   Apparently 1024 bytes per sector
+DEFAULT_YSSCSICD_LBA	EQU		24	; OFFSET 24576
 
 
 
@@ -16,7 +16,7 @@ CODE					SEGMENT	USE16
 						INCLUDE		DEF.ASM
 
 ; From SYSROM
-; BL:Device Type   1:SCSI  2:FD  8:CD
+; BL:Device Type   1:SCSI  2:FD  4:ICM  8:CD
 ; BH:Unit Number
 
 MAIN					PROC
@@ -29,12 +29,12 @@ MAIN					PROC
 						DB		"FM TOWNS RESCUE BOOT LOADER BY CAPTAINYS"	; 40 chars
 						DB		54 dup (0)									; 40+54=0x5E (Why 0x5E?  I don't know Fujitsu's IPL leaves this many bytes.)
 
-LOADER_LBA				DD		DEFAULT_LOADER_LBA-FIRST_PARTITION_LBA
-YSSCSICD_LBA			DD		(DEFAULT_LOADER_LBA+128-FIRST_PARTITION_LBA)
+LOADER_LBA				DD		DEFAULT_LOADER_LBA
+YSSCSICD_LBA			DD		DEFAULT_YSSCSICD_LBA
 
 
 REALMAIN:
-						CMP		BL,1	; Need to be from SCSI
+						CMP		BL,4	; Need to be from IC Memory Card
 						JE		@f
 						RETF
 @@:
@@ -53,30 +53,6 @@ REALMAIN:
 						CALL		PRINT_TALL
 
 
-						; Find which partition it is booting from and
-						; add displacement to LOADER_LBA and YSSCSICD_LBA
-						MOV		AX,CS
-						ADD		AX,0100H	; Partition Table is written in B100:0000
-						MOV		FS,AX
-						MOV		SI,0020H
-@@:
-						; Master Boot Sector or REIPL.COM marks the starting-partition with 0FFH.
-						; Valid boot partition must start with FF 01
-						MOV		EAX,FS:[SI+2]	; Tentative
-						CMP		BYTE PTR FS:[SI],0FFH
-						JE		@f
-						ADD		SI,030H
-						CMP		SI,0200H
-						JL		@b
-
-						; If not found, this is not read from MBS or REIPL.COM.  This probably is the MBS.
-						; In which case, the displacement should be 3 sectors (first partition)
-						MOV		EAX,FIRST_PARTITION_LBA
-@@:
-						ADD		DWORD PTR DS:[LOADER_LBA],EAX
-						ADD		DWORD PTR DS:[YSSCSICD_LBA],EAX
-
-
 						POP			BX
 						PUSH		BX
 
@@ -86,15 +62,13 @@ REALMAIN:
 
 						MOV		AH,05H	; Read Sector
 
-						MOV		AL,BH	; Device ID
-						AND		AL, 07H
-						OR		AL,0B0H
+						MOV		AL,4AH	; Device ID IC Memory Card
 
 						MOV		CX,WORD PTR CS:[LOADER_LBA+2]
 						MOV		DX,WORD PTR CS:[LOADER_LBA]
 						XOR		CH,CH	; Just in case
 
-						MOV		BX,96	; 96 sectors 48K
+						MOV		BX,32	; 32 sectors.  Looks like 1024 bytes/sec
 						XOR		DI,DI	; OFFSET 0
 
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
@@ -258,7 +232,7 @@ PRINT_TALL				ENDP
 
 						INCLUDE		MEMBANK.ASM
 
-MESSAGE					DB	"SCSI-HD BOOT",0
+MESSAGE					DB	"IC MEMORY CARD BOOT",0
 ERROR_MESSAGE			DB	"SOMETHING WENT WRONG.",0
 
 CODE					ENDS

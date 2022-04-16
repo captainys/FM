@@ -64,11 +64,23 @@ asmSource=[
 		 "6809lib/rs232c_send.asm",
 		 "tapeToRS232C/tapedump_end.asm",]],
 	["232CDISK",
-		["RS232CDiskBios/install_and_reset.asm",
+		["6809lib/com0io.asm",
+		 "RS232CDiskBios/install_and_reset.asm",
+		 "RS232CDiskBios/override.asm",
+		 "RS232CDiskBios/sizes.asm",]],
+	["232CDSK1",
+		["6809lib/com1io.asm",
+		 "RS232CDiskBios/install_and_reset.asm",
 		 "RS232CDiskBios/override.asm",
 		 "RS232CDiskBios/sizes.asm",]],
 	["STRLOADR",
-		["rs232CLoader/strloader.asm",]],
+		["6809lib/com0io.asm",
+		 "6809lib/comio.asm",
+		 "rs232CLoader/strloader.asm",]],
+	["STRLOAD1",
+		["6809lib/com1io.asm",
+		 "6809lib/comio.asm",
+		 "rs232CLoader/strloader.asm",]],
 	["FBtestM",
 		["ym2612/FBtest.asm"]],
 	["TONEM",
@@ -104,8 +116,9 @@ def BuildForFM7(outDir):
 	for asm in asmSource:
 		symFn=asm[0]+".sym"
 		srecFn=asm[0]+".srec"
+		lstFN=asm[0]+".lst"
 
-		allcmd=["asm6809.exe","-v"]+asm[1]+["-S","-o",os.path.join(outDir,srecFn),"-s",os.path.join(outDir,symFn)]
+		allcmd=["asm6809.exe","-v"]+asm[1]+["-S","-o",os.path.join(outDir,srecFn),"-s",os.path.join(outDir,symFn),"-l",os.path.join(outDir,lstFN)]
 		print(allcmd)
 		proc=subprocess.Popen(allcmd)
 		proc.communicate()
@@ -285,29 +298,23 @@ def UpdateWinSource():
 		print("FM7_rs232c_util.d77 does not exist.")
 		print("This file must be created during FM-7 build.")
 		quit(1)
-	if not os.path.isfile("buildFM7/232CDISK.srec"):
-		print("232CDISK.srec does not exist.")
-		print("This file must be created during FM-7 build.")
-		quit(1)
-	if not os.path.isfile("buildFM7/D7CLIENM.srec"):
-		print("D7CLIENM.srec does not exist.")
-		print("This file must be created during FM-7 build.")
-		quit(1)
-	if not os.path.isfile("buildFM7/CAS0COM0.srec"):
-		print("CAS0COM0.srec does not exist.")
-		print("This file must be created during FM-7 build.")
-		quit(1)
-	if not os.path.isfile("buildFM7/CAS0COMF.srec"):
-		print("CAS0COMF.srec does not exist.")
-		print("This file must be created during FM-7 build.")
-		quit(1)
+	for asm in asmSource:
+		outFN=os.path.join("buildFM7",asm[0]+".srec")
+		if not os.path.isfile(outFN):
+			print(asm[0]+".srec does not exist.")
+			print("This file must be created during FM-7 build.")
+			quit(1)
 
 	bin2cpp.BinaryFileToCpp("D77ToRS232C/diskimg.cpp","D77ToRS232C/diskimg.h","utilDiskImg","buildFM7/FM7_rs232c_util.d77")
 	txt2cpp.TextFileToCpp("D77ToRS232C/clientbin.cpp","D77ToRS232C/clientbin.h","clientBinary","buildFM7/D7CLIENM.srec")
 	txt2cpp.TextFileToCpp("T77ToRS232C/bioshook_small.cpp","T77ToRS232C/bioshook_small.h","clientBinary_small","buildFM7/CAS0COM0.srec")
 	txt2cpp.TextFileToCpp("T77ToRS232C/bioshook_buffered.cpp","T77ToRS232C/bioshook_buffered.h","clientBinary_buffered","buildFM7/CAS0COMF.srec")
-	txt2cpp.TextFileToCpp("RS232CDiskBios/disk_bios_hook_client.cpp","RS232CDiskBios/disk_bios_hook_client.h","clientBinary","buildFM7/232CDISK.srec")
-	txt2cpp.TextFileToCpp("rs232cLoader/strloader.cpp","rs232cLoader/strloader.h","strLoader","buildFM7/STRLOADR.srec")
+
+	txt2cpp.TextFileToCpp("RS232CDiskBios/disk_bios_hook_client.cpp","RS232CDiskBios/disk_bios_hook_client.h","clientBinaryCOM0","buildFM7/232CDISK.srec")
+	txt2cpp.TextFileToCpp("RS232CDiskBios/disk_bios_hook_clientCOM1.cpp","RS232CDiskBios/disk_bios_hook_clientCOM1.h","clientBinaryCOM1","buildFM7/232CDSK1.srec")
+
+	txt2cpp.TextFileToCpp("rs232cLoader/strloader.cpp","rs232cLoader/strloader.h","strLoaderCOM0","buildFM7/STRLOADR.srec")
+	txt2cpp.TextFileToCpp("rs232cLoader/strloaderCOM1.cpp","rs232cLoader/strloaderCOM1.h","strLoaderCOM1","buildFM7/STRLOAD1.srec")
 
 
 if __name__=="__main__":

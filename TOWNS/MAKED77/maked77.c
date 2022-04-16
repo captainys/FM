@@ -8,10 +8,12 @@ extern void XModemSend(unsigned int dataLength,const unsigned char data[],int ba
 
 
 #define BUFFERSIZE 3200*1024
-#define NUM_SECTOR_BUF 64
+#define NUM_SECTOR_BUF 160
 
 #define BIOSERR_FLAG_DDM   4
 #define BIOSERR_FLAG_CRC   0x10
+
+static int sortSectors=1;
 
 struct D77Header
 {
@@ -245,6 +247,25 @@ unsigned int ReadTrack(
 		}
 	}
 	// Remove Duplicates <<
+
+
+	// Sort sectors >>
+	if(sortSectors)
+	{
+		for(int i=0; i<nTrackSector; ++i)
+		{
+			for(int j=i+1; j<nTrackSector; ++j)
+			{
+				if(sector[i].secno>sector[j].secno)
+				{
+					DKB_SEC tmp=sector[i];
+					sector[i]=sector[j];
+					sector[j]=tmp;
+				}
+			}
+		}
+	}
+	// Sort sectors <<
 
 
 	trackTable[track*2+side]=(nextTrackData-d77Image);
@@ -555,6 +576,10 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 		{
 			hdr->writeProtected=1;
 		}
+		else if(0==strcmp(av[i],"-dontsort") || 0==strcmp(av[i],"-DONTSORT"))
+		{
+			sortSectors=0;
+		}
 		else
 		{
 			fprintf(stderr,"Unknown option %s\n",av[i]);
@@ -602,6 +627,7 @@ int main(int ac,char *av[])
 		printf("    -38400bps           Transmit the image at 38400bps\n");
 		printf("    -name diskName      Specify disk name up to 16 chars.\n");
 		printf("    -writeprotect       Write protect the disk image.\n");
+		printf("    -dontsort           Don't sort sectors (preserve interleave).\n");
 		return 1;
 	}
 

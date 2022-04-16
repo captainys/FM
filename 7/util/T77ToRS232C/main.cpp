@@ -16,6 +16,7 @@
 #include "bioshook_small.h"
 #include "bioshook_buffered.h"
 #include "strloader.h"
+#include "strloaderCOM1.h"
 
 
 // This value must match the value in bioshook_buffered.asm 
@@ -1109,7 +1110,7 @@ void SubCPU(void)
 			fc80.installBinaryLoader=false;
 
 			FM7BinaryFile binFile;
-			binFile.DecodeSREC(strLoader);
+			binFile.DecodeSREC(strLoaderCOM0);
 
 			std::vector <unsigned char> toSend;
 			for(auto c : binFile.dat)
@@ -1126,14 +1127,15 @@ void SubCPU(void)
 			}
 			printf("String size=0x%02x\n",(int)toSend.size());
 
-			while(toSend.size()<0x7E)
+			const unsigned int JSR=0xBD;
+			while(toSend.size()<JSR)
 			{
 				toSend.push_back('0');
 			}
 
-			if(0x7E<toSend.size())
+			if(JSR<toSend.size())
 			{
-				fprintf(stderr,"Error.  The code needs to be shorter than 0x7E.\n");
+				fprintf(stderr,"Error.  The code needs to be shorter than 0x%02x.\n",JSR);
 			}
 			else
 			{
@@ -1177,13 +1179,19 @@ void SubCPU(void)
 					state=STATE_WAIT_WRITE_BYTE;
 					yamakawaCount=0;
 				}
-				else if("YAMAKAWA"[yamakawaCount]==c)
+				else if("YAMAKAWA"[yamakawaCount]==c || "YAMAKAWa"[yamakawaCount]==c)
 				{
 					printf("[%02x](%c)\n",c,c);
 					++yamakawaCount;
-					if(8==yamakawaCount)
+					if(8==yamakawaCount && 'A'==c)
 					{
 						fc80.installBinary=true;
+						yamakawaCount=0;
+					}
+					else if(8==yamakawaCount && 'a'==c)
+					{
+						// fc80.installBinary=true;
+						printf("COM1 not supported yet.\n");
 						yamakawaCount=0;
 					}
 				}

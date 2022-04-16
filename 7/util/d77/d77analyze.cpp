@@ -162,7 +162,7 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 				if('#'==argv[3][0])
 				{
 					sec=FM7Lib::Atoi(argv[3].data()+1);
-					auto secPtr=diskPtr->GetSectorByIndex(cyl,side,sec);
+					auto secPtr=diskPtr->GetSectorByIndex(cyl,side,sec-1);
 					if(nullptr!=secPtr)
 					{
 						DumpSectorToFile(*secPtr,argv[4]);
@@ -174,7 +174,7 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 				}
 				else
 				{
-					auto secPtr=diskPtr->GetSector(cyl,side,sec-1);
+					auto secPtr=diskPtr->GetSector(cyl,side,sec);
 					if(nullptr!=secPtr)
 					{
 						DumpSectorToFile(*secPtr,argv[4]);
@@ -400,7 +400,7 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 				else
 				{
 					sec=FM7Lib::Atoi(argv[4].c_str());
-					DeleteSectorByNumber(diskId,trk,sid,sec-1);
+					DeleteSectorByNumber(diskId,trk,sid,sec);
 				}
 			}
 			else

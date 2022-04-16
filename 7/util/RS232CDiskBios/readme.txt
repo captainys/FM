@@ -233,6 +233,9 @@ VƒRƒ}ƒ“ƒh‚ÅVerboseƒ‚[ƒh‚ðƒgƒOƒ‹‚Å‚«‚éBVerbose Mode=On‚Å‚ÍŽóMƒoƒCƒg‚ð‘S•”•\Ž¦‚
     ‚ð‚Â‚¯‚Ä‚â‚é‚ÆDisk BASIC‚ÌƒGƒ‰[ƒƒbƒZ[ƒW—Ìˆæ‚Éí’“‚·‚é‚Ì‚Å“®ì‚·‚é‚©‚à‚µ‚ê‚È‚¢B
     ƒGƒ‰[‚ªo‚é‚ÆƒNƒ‰ƒbƒVƒ…‚·‚é‚©‚à‚µ‚ê‚È‚¢B
 
+    Disk BASIC 3.0 Level 10 (FM-77ˆÈ~‚É•t‘®‚ÌDisk BASIC V3.0)‚Í -install2 7F25 •K{B
+    ‚½‚¾‚µƒfƒBƒXƒN‚ÉƒGƒ‰[‚ªo‚é‚ÆƒƒbƒZ[ƒW‚ª•ö‚ê‚éB
+
     F-BASIC‚©‚ç‹N“®Šm”F‚µ‚½‚Ì‚ÍA
       FM-7 DEMO1 [ŽÀ‹@FM-7,ŽÀ‹@FM77AV40]
       FM-7 DEMO2 [ŽÀ‹@FM-7,ŽÀ‹@FM77AV40]
@@ -257,7 +260,7 @@ VƒRƒ}ƒ“ƒh‚ÅVerboseƒ‚[ƒh‚ðƒgƒOƒ‹‚Å‚«‚éBVerbose Mode=On‚Å‚ÍŽóMƒoƒCƒg‚ð‘S•”•\Ž¦‚
       RS232CDiskBios.exe comrade5b.d77 2 -jsrff63 -jsrfef0
     •s–¾‚ÌDisk BASICŽg—pƒo[ƒWƒ‡ƒ“‚ÍA
       RS232CDiskBios.exe comrade5a.d77 2 -install2 7F25 -jsrff63 -jsrfef0
-    ‚ÌƒRƒ}ƒ“ƒh‚Å‹N“®‚Å‚«‚½B
+    ‚ÌƒRƒ}ƒ“ƒh‚Å‹N“®‚Å‚«‚½B¨‚Ç‚¤‚â‚çF-BASIC V3.0 Level 10 (FM-77•t‘®‚ÌF-BASIC 3.0)‚ç‚µ‚¢B
 
   Comrade 6,7,8,9,10,11,12,13A,13B,14 (Music disk) [ŽÀ‹@FM77AV40]
     •s–¾Disk BASIC, •’Ê‚ÌDisk BASIC‚ðŽg‚Á‚Ä‚¢‚é–Í—lB‚½‚¾A$FC00`‚ÍŽg‚í‚ê‚Ä‚µ‚Ü‚Á‚ÄA

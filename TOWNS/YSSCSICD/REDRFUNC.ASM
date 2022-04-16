@@ -284,6 +284,7 @@ CDROM_BIOS_00H_SET_DRIVE_MODE	ENDP
 
 CDROM_BIOS_01H_GET_DRIVE_MODE	PROC
 						MOV		DL,BYTE PTR [BIOSCACHE_DRIVEMODE]
+						MOV		BYTE PTR [BP+INCOMING_DX],DL
 						XOR		AH,AH
 						RET
 CDROM_BIOS_01H_GET_DRIVE_MODE	ENDP
@@ -894,7 +895,9 @@ CDROM_BIOS_055H_PAUSE	PROC
 
 						CMP		AL,11H
 						JE		@f
-						MOV		AH,BIOSERR_ALREADY_PAUSED	; ? Is there Not Playing Error ?
+
+						; Towns OS installer expects AH=0 if this command is called when CDDA has not started.
+						XOR		AH,AH
 						RET
 @@:
 
@@ -1028,6 +1031,8 @@ CDROM_BIOS_058H_GET_ELEVOL	ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CDROM_BIOS_READ_SECTOR_EX	PROC
+						PUSH	ECX
+						PUSH	EDI
 
 						; SI=PHYS_ADDR_HIGH
 						; DI=PHYS_ADDR_LOW
@@ -1094,13 +1099,17 @@ CDROM_BIOS_READ_SECTOR_EX	PROC
 
 						JB		@f
 
-						XOR		BX,BX
-						MOV		[BP+INCOMING_BX],BX
+						MOV		WORD PTR [BP+INCOMING_BX],0
 						MOV		AH,00H
+						POP		EDI
+						POP		ECX
 						RET
 @@:
 						MOV		AH,80H
-						MOV		CX,BIOSERR_DETAIL_HARDWARE
+						MOV		WORD PTR [BP+INCOMING_CX],BIOSERR_DETAIL_HARDWARE
+						POP		EDI
+						POP		ECX
+						MOV		CX,[BP+INCOMING_CX]
 						RET
 
 READ_SECTOR_EX_SCSI_CMD	DB		28H,0,0,0,0,0,0,0,0,0

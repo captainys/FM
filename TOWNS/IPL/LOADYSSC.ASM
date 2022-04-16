@@ -1,7 +1,13 @@
-; Incoming BL:Device Type   1:HD/CD  2:FD  8:CD
+; Incoming BL:Device Type   1:HD/CD  2:FD  4:ICM  8:CD
 ; Incoming BH:Unit Number
 
 LOAD_YSSCSICD			PROC
+						MOV		DX,0404H ; TOWNSIO_FMR_VRAM_OR_MAINRAM
+						IN		AL,DX
+						PUSH	AX
+						MOV		AL,80H
+						OUT		DX,AL
+
 						MOV		WORD PTR [LOAD_YSSCSICD_BUFFADDR],0
 						MOV		BX,CS:[INCOMING_BX]
 						CMP		BL,2
@@ -9,9 +15,15 @@ LOAD_YSSCSICD			PROC
 						CMP		BL,1
 						JE		LOAD_YSSCSICD_FROM_SCSI
 						; CMP		BL,1
-						; JNE		@f
+						; JNE		YSSCSICD_LOAD_DONE
 						; JMP		LOAD_YSSCSICD_HD
-@@:
+						CMP		BL,4
+						JE		LOAD_YSSCSICD_FROM_ICM
+
+YSSCSICD_LOAD_DONE:
+						POP		AX
+						MOV		DX,0404H ; TOWNSIO_FMR_VRAM_OR_MAINRAM
+						OUT		DX,AL
 						RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -53,7 +65,7 @@ LOAD_YSSCSICD_FD:
 
 @@:
 						POP		DS
-						RET
+						JMP		YSSCSICD_LOAD_DONE
 
 
 LOAD_YSSCSICD_FROM_SCSI:
@@ -82,9 +94,43 @@ LOAD_YSSCSICD_FROM_SCSI:
 
 @@:
 						POP		DS
-						RET
+						JMP		YSSCSICD_LOAD_DONE
+
+
+LOAD_YSSCSICD_FROM_ICM:
+						PUSH	DS
+
+						MOV		AX,YSSCSICD_SEGMENT
+						MOV		DS,AX
+						MOV		DI,CS:[LOAD_YSSCSICD_BUFFADDR]
+
+						MOV		AH,05H	 ; Read Sector
+						MOV		AL,CS:[LOADER_BIOS_DEVICE_ID]
+
+						MOV		CX,WORD PTR CS:[YSSCSICD_LBA+2]
+						MOV		DX,WORD PTR CS:[YSSCSICD_LBA]
+						XOR		CH,CH	; Just in case
+
+						MOV		BX,8	; 8 sectors
+
+						; How can I write CALL 		FAR PTR 0FFFBH:0014H
+						DB		9AH		; CALLF FFFB:0014
+						DW		 0014H
+						DW		0FFFBH
+
+						JB		@f
+
+						MOV		BYTE PTR CS:[YSSCSICD_LOADED],1
+@@:
+						POP		DS
+						JMP		YSSCSICD_LOAD_DONE
+
 
 LOAD_YSSCSICD			ENDP
+
+
+
+
 
 LOAD_YSSCSICD_TRK_SIDE	DW	0
 LOAD_YSSCSICD_BUFFADDR	DW	0

@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "disk_bios_hook_client.h"
+#include "disk_bios_hook_clientCOM1.h"
 
 
 
@@ -505,7 +506,7 @@ void ShowPrompt(void)
 unsigned int GetDefaultInstallAddress(void)
 {
 	FM7BinaryFile binFile;
-	binFile.DecodeSREC(clientBinary);
+	binFile.DecodeSREC(clientBinaryCOM0);
 	return 0x100*binFile.dat[2]+binFile.dat[3];
 }
 
@@ -957,6 +958,7 @@ public:
 	std::string d77FName[2];
 
 	int bps;
+	int FM7COMPort=0;
 
 	bool instAddrSpecified;
 	unsigned int instAddr;
@@ -1223,7 +1225,6 @@ public:
 	bool installBinaryLoader;
 	bool installBinary;
 
-
 	int systemType;
 	DiskSet diskSet;
 
@@ -1329,6 +1330,7 @@ public:
 	}
 
 	void IdentifySystemType(D77File::D77Disk *bootDiskPtr);
+	void SetUpClientCode(FM7BinaryFile &clientCode,const char * const srec[]) const;
 };
 
 void FC80::IdentifySystemType(D77File::D77Disk *bootDiskPtr)
@@ -1378,6 +1380,17 @@ void FC80::IdentifySystemType(D77File::D77Disk *bootDiskPtr)
 			systemType=SYSTYPE_UNKNOWN_F_BASIC;
 		}
 	}
+}
+
+void FC80::SetUpClientCode(FM7BinaryFile &clientCode,const char * const srec[]) const
+{
+	clientCode.DecodeSREC(srec);
+	if(nullptr!=diskSet.fm7Disk[0].diskPtr)
+	{
+		SetUpClientSecondInstallation(clientCode.dat,*diskSet.fm7Disk[0].diskPtr);
+	}
+	SetUpClientInstallAddress(clientCode.dat,cpi.instAddr,cpi.instAddr2);
+	SetUpClientDosMode(clientCode.dat,cpi.dosMode);
 }
 
 static FC80 fc80;
@@ -1530,14 +1543,10 @@ void SubCPU(void)
 	unsigned char sectorDataBuf[1024];
 
 
-	FM7BinaryFile clientCode;
-	clientCode.DecodeSREC(clientBinary);
-	if(nullptr!=fc80.diskSet.fm7Disk[0].diskPtr)
-	{
-		SetUpClientSecondInstallation(clientCode.dat,*fc80.diskSet.fm7Disk[0].diskPtr);
-	}
-	SetUpClientInstallAddress(clientCode.dat,fc80.cpi.instAddr,fc80.cpi.instAddr2);
-	SetUpClientDosMode(clientCode.dat,fc80.cpi.dosMode);
+	FM7BinaryFile clientCodeCOM0,clientCodeCOM1;
+	fc80.SetUpClientCode(clientCodeCOM0,clientBinaryCOM0);
+	fc80.SetUpClientCode(clientCodeCOM1,clientBinaryCOM1);
+
 
 
 	fc80.Halt();
@@ -1555,6 +1564,8 @@ void SubCPU(void)
 
 		if(true==fc80.installASCII || true==fc80.installBinary)
 		{
+			FM7BinaryFile &clientCode=(0==fc80.cpi.FM7COMPort ? clientCodeCOM0 : clientCodeCOM1);
+
 			printf("Install Addr=%04x\n",fc80.cpi.instAddr);
 			if(fc80.cpi.instAddr!=fc80.cpi.instAddr2)
 			{
@@ -1610,7 +1621,7 @@ void SubCPU(void)
 			fc80.installBinaryLoader=false;
 
 			FM7BinaryFile binFile;
-			binFile.DecodeSREC(strLoader);
+			binFile.DecodeSREC(strLoaderCOM0);
 
 			std::vector <unsigned char> toSend;
 			for(auto c : binFile.dat)
@@ -1627,14 +1638,15 @@ void SubCPU(void)
 			}
 			printf("String size=0x%02x\n",(int)toSend.size());
 
-			while(toSend.size()<0x7E)
+			const int JSR=0xBD;
+			while(toSend.size()<JSR) // Use JSR ($BD) instead of JMP ($7E)
 			{
 				toSend.push_back('0');
 			}
 
-			if(0x7E<toSend.size())
+			if(JSR<toSend.size())
 			{
-				fprintf(stderr,"Error.  The code needs to be shorter than 0x7E.\n");
+				fprintf(stderr,"Error.  The code needs to be shorter than 0x%02x.\n",JSR);
 			}
 			else
 			{
@@ -1670,6 +1682,14 @@ void SubCPU(void)
 				{
 					if(0==strncmp((const char *)biosCmdBuf,"YAMAKAWA",8))
 					{
+						printf("COM0 on FM-7 side.\n");
+						fc80.cpi.FM7COMPort=0;
+						fc80.installBinary=true;
+					}
+					else if(0==strncmp((const char *)biosCmdBuf,"YAMAKAWa",8)) // Last letter small indicates COM1
+					{
+						printf("COM1 on FM-7 side.\n");
+						fc80.cpi.FM7COMPort=1;
 						fc80.installBinary=true;
 					}
 					else if(0x09==biosCmdBuf[0]) // Disk Write
@@ -1751,6 +1771,8 @@ void SubCPU(void)
 							}
 							for(auto encoder : fc80.cpi.encoder)
 							{
+								FM7BinaryFile &clientCode=(0==fc80.cpi.FM7COMPort ? clientCodeCOM0 : clientCodeCOM1);
+
 								encoder.Decode(sectorData);
 
 								AlterSectorData(

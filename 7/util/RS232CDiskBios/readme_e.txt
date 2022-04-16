@@ -223,6 +223,9 @@ F-BASIC 3.0 (Fujitsu) [FM-7,FM77AV40]
 Starts no problem.
 If the program you want to run crashes, you may salvage it by adding the option:
     -install2 7F25
+
+F-BASIC V3.0 Level 10 (The version comes with FM-77 and later models) requires this option.
+
 This will install the BIOS redirector in the error-message area.  No problem as long as your program won't run into an error.
 From Disk BASIC I confirmed:
     FM-7 DEMO1 [FM-7,FM77AV40]
