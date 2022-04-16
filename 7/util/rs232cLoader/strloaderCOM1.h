@@ -1,6 +1,0 @@
-#ifndef RS232CLOADER_STRLOADERCOM1_H_IS_INCLUDED
-#define RS232CLOADER_STRLOADERCOM1_H_IS_INCLUDED
-
-extern const char * const strLoaderCOM1[];
-
-#endif

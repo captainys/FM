@@ -77,10 +77,6 @@ asmSource=[
 		["6809lib/com0io.asm",
 		 "6809lib/comio.asm",
 		 "rs232CLoader/strloader.asm",]],
-	["STRLOAD1",
-		["6809lib/com1io.asm",
-		 "6809lib/comio.asm",
-		 "rs232CLoader/strloader.asm",]],
 	["FBtestM",
 		["ym2612/FBtest.asm"]],
 	["TONEM",
@@ -314,7 +310,6 @@ def UpdateWinSource():
 	txt2cpp.TextFileToCpp("RS232CDiskBios/disk_bios_hook_clientCOM1.cpp","RS232CDiskBios/disk_bios_hook_clientCOM1.h","clientBinaryCOM1","buildFM7/232CDSK1.srec")
 
 	txt2cpp.TextFileToCpp("rs232cLoader/strloader.cpp","rs232cLoader/strloader.h","strLoaderCOM0","buildFM7/STRLOADR.srec")
-	txt2cpp.TextFileToCpp("rs232cLoader/strloaderCOM1.cpp","rs232cLoader/strloaderCOM1.h","strLoaderCOM1","buildFM7/STRLOAD1.srec")
 
 
 if __name__=="__main__":

@@ -1,6 +1,6 @@
 set(TARGET_NAME RS232CDiskBios)
 
-add_executable(${TARGET_NAME} main.cpp disk_bios_hook_client.cpp disk_bios_hook_client.h disk_bios_hook_clientCOM1.cpp disk_bios_hook_clientCOM1.h ../rs232cLoader/strloader.h ../rs232cLoader/strloader.cpp ../rs232cLoader/strloaderCOM1.h ../rs232cLoader/strloaderCOM1.cpp)
+add_executable(${TARGET_NAME} main.cpp disk_bios_hook_client.cpp disk_bios_hook_client.h disk_bios_hook_clientCOM1.cpp disk_bios_hook_clientCOM1.h ../rs232cLoader/strloader.h ../rs232cLoader/strloader.cpp)
 target_link_libraries(${TARGET_NAME} fm7lib d77lib comportlib)
 
 foreach(TARGET ${TARGET_NAME})
