@@ -474,6 +474,13 @@ void ShowOptionHelp(void)
 	printf("\tFM77AV20/40 and later models cannot configure to faster than 19200bps.\n");
 	printf("\tUse this option only if you have an RS232C card that is capable of\n");
 	printf("\t38400bps.\n");
+
+	printf("-COM0 / -COM1\n");
+	printf("\tSelect COM port on the FM-7 side.  -COM0 option (default) will let\n");
+	printf("\tFM-7/77 use COM0 (I/O $FD06,$FD07), or -COM1 option let FM-7/77 use\n");
+	printf("\tCOM1 (I/O $FD24,$FD25).  If RS232C card on FM-7/77 is configured as\n");
+	printf("COM1, -COM1 option needs to be used.\n");
+	printf("If you use on-board RS232C of FM77AV40 and later models, do not use -COM1.\n");
 }
 
 void ShowCommandHelp(void)
@@ -1557,6 +1564,7 @@ void SubCPU(void)
 	fc80.SetUpClientCode(clientCodeCOM1,clientBinaryCOM1);
 
 
+
 	fc80.Halt();
 	fc80.subCPUready=true;
 	fc80.Unhalt();
@@ -1777,6 +1785,8 @@ void SubCPU(void)
 							}
 							for(auto encoder : fc80.cpi.encoder)
 							{
+								FM7BinaryFile &clientCode=(0==fc80.cpi.FM7COMPort ? clientCodeCOM0 : clientCodeCOM1);
+
 								encoder.Decode(sectorData);
 
 								AlterSectorData(
@@ -1786,10 +1796,10 @@ void SubCPU(void)
 								    sectorData,
 								    fc80.cpi.instAddr,
 								    fc80.cpi.instAddr2,
-								    clientCodeCOM0.dat[clientCodeCOM0.dat.size()-3],
-								    clientCodeCOM0.dat[clientCodeCOM0.dat.size()-2],
-								    clientCodeCOM0.dat[clientCodeCOM0.dat.size()-1],
-								    clientCodeCOM0.dat[clientCodeCOM0.dat.size()-4]
+								    clientCode.dat[clientCode.dat.size()-3],
+								    clientCode.dat[clientCode.dat.size()-2],
+								    clientCode.dat[clientCode.dat.size()-1],
+								    clientCode.dat[clientCode.dat.size()-4]
 								    );
 
 								encoder.Encode(sectorData);

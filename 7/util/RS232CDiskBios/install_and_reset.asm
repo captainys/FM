@@ -30,12 +30,19 @@ PROGRAM_ENTRY			BRA		INSTALL_ENTRY
 HOOK_ADDRESS			FDB		$FC00
 HOOK_ADDRESS_SECOND		FDB		$FC00
 
-INSTALL_ENTRY			BSR		REAL_INSTALL_ENTRY
-						JMP		$6E00  After Booting
 
-FBASIC_INIT_HOOK		STX		FBASIC_INIT_HOOK-2,PCR
+						; 1st BSR REAL_INSTALL_ENTRY will not return because it will read IPL and JMP $100.
+						; The server will tweak IPL if it identifies it as F-BASIC so that IPL will jump to FBASIC_INIT_HOOK
+						; instead of JMP [$FBFE].
+						; 2nd BSR REAL_INSTALL_ENTRY will return because LDA #$FF will be changed to PULS A,B,X,Y,U,CC,DP,PC.
+INSTALL_ENTRY			BSR		REAL_INSTALL_ENTRY
+						JMP		$6E00  ; After Booting, this address will be overwritten to Disk BIOS entrance.
+
+FBASIC_INIT_HOOK		STX		FBASIC_INIT_HOOK-2,PCR  ; When IPL calls back, X is the Disk BIOS entrance.
 						LEAX	PROGRAM_ENTRY,PCR
 						JMP		[$FBFE]
+						; F-BASIC routine will initialize and then JMP ,X
+						; Therefore after initialization, F-BASIC will call PROGRAM_ENTRY for the second time.
 
 REAL_INSTALL_ENTRY		PSHS	A,B,X,Y,U,CC,DP
 
