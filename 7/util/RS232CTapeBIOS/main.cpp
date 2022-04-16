@@ -1199,6 +1199,11 @@ void SubCPU(void)
 			activity=true;
 			activityTimer=std::chrono::system_clock::now()+std::chrono::milliseconds(100);
 
+			if(true==fc80.verbose) // don't use fc80.GetVerboseMode().  Mutex is already locked.
+			{
+				printf("CMD %02x\n",c);
+			}
+
 			switch(state)
 			{
 			case STATE_NORMAL:

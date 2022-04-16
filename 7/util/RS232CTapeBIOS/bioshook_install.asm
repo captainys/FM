@@ -101,18 +101,18 @@ TRANSFER_LOOP			LDA		,X+
 
 
 BRIDGE_CODE				CLR		1,X ; Also clears carry ; 2 bytes
-						PSHS	A,B,X,Y,U,CC			; 2 bytes 4
+						PSHS	A,B,X,Y,U,DP,CC			; 2 bytes 4
 						ORCC	#$50					; 2 bytes 6
 						STA		$FD0F					; 3 bytes 9
 BRIDGE_JUMP				JSR		DEF_INSTALL_ADDRESS		; 3 bytes 12
-						; U=#$FD00 on return.
-						TST		$0F,U					; 3 bytes 15
+						; DP=#$FD on return.
+						TST		<$0F					; 3 bytes 15
 						BCC		BRIDGE_RTS				; 2 bytes 17
 
-						PULS	A,B,X,Y,U,CC				; 2 bytes 19
+						PULS	A,B,X,Y,U,DP,CC				; 2 bytes 19
 BRIDGE_FALLBACK			JMP		DEF_BIOS_ENTRY			; 3 bytes 22
 
-BRIDGE_RTS				PULS	A,B,X,Y,U,CC,PC			; 2 bytes 24
+BRIDGE_RTS				PULS	A,B,X,Y,U,DP,CC,PC		; 2 bytes 24
 BRIDGE_CODE_END
 
 
@@ -121,15 +121,15 @@ BRIDGE_CODE_END
 ; To be installed at the back end of URA RAM by default.
 
 NO_BRIDGE				CLR		1,X ; Also clears carry
-						PSHS	A,B,X,Y,U,CC
+						PSHS	A,B,X,Y,U,DP,CC
 						ORCC	#$50
 						BSR		BIOS_HOOK
 						BCC		NO_BRIDGE_RTS
 
-						PULS	A,B,X,Y,U,CC
+						PULS	A,B,X,Y,U,DP,CC
 NO_BRIDGE_FALLBACK		JMP		DEF_BIOS_ENTRY
 
-NO_BRIDGE_RTS			PULS	A,B,X,Y,U,CC,PC
+NO_BRIDGE_RTS			PULS	A,B,X,Y,U,DP,CC,PC
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

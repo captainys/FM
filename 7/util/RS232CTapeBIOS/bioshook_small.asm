@@ -9,10 +9,15 @@ BIOS_HOOK				; Typical way of handling I/O can bd
 						; But, it takes 4 bytes.
 						; If I use U register, I can set #$FD00 to U in 3 bytes.
 
-						; Bridge code assumes U=#$FD00 on return.
+						; That was before supporting FM-7 side COM1.
+						; COM1 requires $24,U and $25,U, which increases the size by 1 byte each.
+						; I need to go with DP.
 
-						LDU		#$FD00
-						LDA		#$B7 
+						; Bridge code expects DP=#$FD on return.
+
+						LDA		#$FD
+						TFR		A,DP
+						LDA		#$B7
 						; #$B7 will be written to RS232C command
 						; in BIOS_CTBWRT and BIOS_CTBRED
 						; In "Dig Dug" (COMPAC) loader, subsequent LOADM commands call
@@ -43,7 +48,7 @@ BIOS_MOTOR_ON			LEAX	RS232C_RESET_CMD,PCR
 MOTOR_RS232C_RESET_LOOP
 						CLRA								; 2 clocks
 						LDA		,X+							; 5 clocks
-						STA		IO_RS232C_COMMAND_LO,U
+						STA		<IO_RS232C_COMMAND_LO
 						BPL		MOTOR_RS232C_RESET_LOOP	; Only last command is negative ; 3 clocks
 
 						; CLRA clears carry flag.
@@ -72,10 +77,10 @@ BIOS_MOTOR_OFF
 						; I need that 1 bit to prevent printer confusion.
 						; I don't want to do it, but it wastes another 4 bytes.
 						LDA		#$40
-						STA		,U
+						STA		<$00
 
-						CLR		2,U ; Re-clear IRQ
-						CLR		IO_RS232C_COMMAND_LO,U
+						CLR		<$02 ; Re-clear IRQ
+						CLR		<IO_RS232C_COMMAND_LO
 						RTS		; Previous CLR 7,U also clears carry
 
 
@@ -86,15 +91,15 @@ BIOS_MOTOR_OFF
 						; Recovery time between writes for asynchronous mode is 8 tCY
 						; Probably it is recovery time between sends.
 						; May not need wait after setting the status bits.
-BIOS_CTBWRT				STA		IO_RS232C_COMMAND_LO,U
+BIOS_CTBWRT				STA		<IO_RS232C_COMMAND_LO
 						; A=#$B7=WRITE_REQUEST
 						BSR		RS232C_WRITE	; 7 clocks
 						LDA		2,X
 
-RS232C_WRITE			LDB		IO_RS232C_COMMAND_LO,U
+RS232C_WRITE			LDB		<IO_RS232C_COMMAND_LO
 						LSRB
 						BCC		RS232C_WRITE
-						STA		IO_RS232C_DATA_LO,U
+						STA		<IO_RS232C_DATA_LO
 
 						CLRA
 						RTS
@@ -103,15 +108,15 @@ RS232C_WRITE			LDB		IO_RS232C_COMMAND_LO,U
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-BIOS_CTBRED				STA		IO_RS232C_COMMAND_LO,U
+BIOS_CTBRED				STA		<IO_RS232C_COMMAND_LO
 						DECA					; A=#$B7 -> #$B6
 						; A=#$B6=READ_REQUEST
 						BSR		RS232C_WRITE	; 7 clocks
 
 RS232C_READ				LDA		#2
-						ANDA	IO_RS232C_COMMAND_LO,U
+						ANDA	<IO_RS232C_COMMAND_LO
 						BEQ		RS232C_READ
-						LDA		IO_RS232C_DATA_LO,U
+						LDA		<IO_RS232C_DATA_LO
 
 BIOS_CTBRED_EXIT		STA		2,X
 						CLRA
