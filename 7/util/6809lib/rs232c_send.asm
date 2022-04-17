@@ -51,7 +51,6 @@ RS232C_SEND_ASCII	PSHS	A,B,X,Y,CC
 
 					ORCC	#$50
 					STA		$FD0F
-					; BSR		RS232C_ENABLE_TRANSMISSION
 
 					LDX		RS232C_SEND_BUFFER_BEGIN,PCR
 					LDB		RS232C_SEND_ASCIIDUMP_BYTEPERLINE,PCR
@@ -88,8 +87,6 @@ RS232C_SEND_ASCII_LINEBREAKCHECKED
 					BSR		RS232C_SEND_CRLF
 
 RS232C_SEND_ASCII_EXIT
-					; BSR		RS232C_DISABLE_TRANSMISSION
-
 					LDA		$FD0F
 					PULS	A,B,X,Y,CC,PC
 
@@ -99,7 +96,6 @@ RS232C_SEND_BINARY	PSHS	A,B,X,Y,CC
 
 					ORCC	#$50
 					STA		$FD0F
-					; BSR		RS232C_ENABLE_TRANSMISSION
 
 					LDX		RS232C_SEND_BUFFER_BEGIN,PCR
 					LDY		RS232C_SEND_BUFFER_SIZE,PCR
@@ -118,57 +114,30 @@ RS232C_SEND_BINARY_LOOP
 
 
 RS232C_SEND_BINARY_EXIT
-					; BSR		RS232C_DISABLE_TRANSMISSION
 					LDA		$FD0F
 					PULS	A,B,X,Y,CC,PC
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-RS232C_ENABLE_TRANSMISSION
-					LDA		#$33
-					STA		$FD07			; OFF Sync Char search (?), 
-											; OFF Internal Reset,
-											; ON  RTS request
-											; ON  Clear Error Flags
-											; OFF Break
-											; OFF RXE Receive Enable
-											; ON  DTR Treminal Ready
-											; ON  TXE Transmission Enable
-					RTS
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-RS232C_DISABLE_TRANSMISSION
-					LDA		#$10
-					STA		$FD07			; OFF Sync Char search (?), 
-											; OFF Internal Reset,
-											; OFF RTS request
-											; ON  Clear Error Flags
-											; OFF Break
-											; OFF RXE Receive Enable
-											; OFF DTR Treminal Ready
-											; OFF TXE Transmission Enable
-					RTS
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 RS232C_SEND_ONEBYTE
-					PSHS	A,B
+					PSHS	A,B,U
+
+					LDU		RS232C_IO,PCR
 
 RS232C_SEND_ONEBYTE_WAITREADY
 					LDB		$FD04
 					ANDB	#2
 					BEQ		RS232C_SEND_ONEBYTE_EXIT
 
-					LDB		$FD07
+					LDB		1,U
 					ANDB	#1
 					BEQ		RS232C_SEND_ONEBYTE_WAITREADY
 
-					STA		$FD06
+					STA		,U
 
 RS232C_SEND_ONEBYTE_EXIT
-					PULS	A,B,PC
+					PULS	A,B,U,PC
 
 
 
@@ -176,14 +145,11 @@ RS232C_SEND_CRLF
 					PSHS	A,CC
 
 					ORCC	#$50
-					; BSR		RS232C_ENABLE_TRANSMISSION
 
 					LDA		#$0D
 					BSR		RS232C_SEND_ONEBYTE
 					LDA		#$0A
 					BSR		RS232C_SEND_ONEBYTE
-
-					; BSR		RS232C_DISABLE_TRANSMISSION
 
 					PULS	A,CC,PC
 
@@ -195,7 +161,6 @@ RS232C_SEND_WORD_ASCII_DATA	FDB	0
 RS232C_SEND_WORD_ASCII	
 					PSHS	A,CC
 					ORCC	#$50
-					; BSR		RS232C_ENABLE_TRANSMISSION
 
 					LDA		RS232C_SEND_WORD_ASCII_DATA,PCR
 					LBSR	RS232C_SEND_ASCII_TOASCII
@@ -212,7 +177,5 @@ RS232C_SEND_WORD_ASCII
 					BSR		RS232C_SEND_ONEBYTE
 					LDA		RS232C_SEND_ASCII_BYTE+1,PCR
 					BSR		RS232C_SEND_ONEBYTE
-
-					; BSR		RS232C_DISABLE_TRANSMISSION
 
 					PULS	A,CC,PC
