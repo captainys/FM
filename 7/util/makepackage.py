@@ -83,39 +83,43 @@ def main():
 	ClearDir(PackagingDir())
 	MakePackagingDir()
 	# CopySource() Sources are now from github
-	if True==winCode:
-		if True==clearBuild:
-			ClearDir("build32")
-			ClearDir("build64")
-
-		build.RunCMakeAndDeleteExe()
-		build.BuildForWin()
-
-		for fn in os.listdir("build32/exe"):
-			ext=os.path.splitext(fn)[1].upper()
-			print(fn,ext)
-			if ext==".EXE":
-				shutil.copyfile(os.path.join("build32","exe",fn),os.path.join(PackagingDir(),"exe32",fn))
-
-		for fn in os.listdir("build64/exe"):
-			ext=os.path.splitext(fn)[1].upper()
-			print(fn,ext)
-			if ext==".EXE":
-				shutil.copyfile(os.path.join("build64","exe",fn),os.path.join(PackagingDir(),"exe64",fn))
-
-		# Source files are open in github
-		# shutil.copytree(os.path.join("..","DiskFormat"),os.path.join(PackagingDir(),"src","fm7code","DiskFormat"))
 
 
-	if True==fm7Code:
-		build.BuildForFM7(FM7CodeDir())
-		if True==winCode:
-			build.UpdateWinSource()
-			build.BuildForWin()
+	if True==clearBuild:
+		ClearDir("build32")
+		ClearDir("build64")
+
+	build.RunCMakeAndDeleteExe()
+	build.BuildForWinPre()
+	build.BuildForFM7("buildFM7")
+	build.UpdateWinSource()
+	build.BuildForWinAll()
+
+	for fn in os.listdir("build32/exe"):
+		ext=os.path.splitext(fn)[1].upper()
+		print(fn,ext)
+		if ext==".EXE":
+			shutil.copyfile(os.path.join("build32","exe",fn),os.path.join(PackagingDir(),"exe32",fn))
+
+	for fn in os.listdir("build64/exe"):
+		ext=os.path.splitext(fn)[1].upper()
+		print(fn,ext)
+		if ext==".EXE":
+			shutil.copyfile(os.path.join("build64","exe",fn),os.path.join(PackagingDir(),"exe64",fn))
+
+	for fn in os.listdir("buildFM7"):
+		ext=os.path.splitext(fn)[1].upper()
+		print(fn,ext)
+		if ext==".T77" or ext==".D77" or ext==".SREC":
+			shutil.copyfile(os.path.join("buildFM7",fn),os.path.join(FM7CodeDir(),fn))
+
+	# Source files are open in github
+	# shutil.copytree(os.path.join("..","DiskFormat"),os.path.join(PackagingDir(),"src","fm7code","DiskFormat"))
+
 
 
 	shutil.copyfile(
-		"readme.txt",
+		"readme_j.txt",
 		os.path.expanduser(os.path.join("~","Packaging","FM7_RESURRECTION_UTIL","readme.txt")))
 	shutil.copyfile(
 		"readme_e.txt",
@@ -127,11 +131,14 @@ def main():
 		os.path.join("D77ToRS232C","readme_e.txt"),
 		os.path.expanduser(os.path.join("~","Packaging","FM7_RESURRECTION_UTIL","readme_D77ToRS232C_e.txt")))
 	shutil.copyfile(
-		os.path.join("RS232CDiskBios","readme.txt"),
+		os.path.join("RS232CDiskBIOS","readme.txt"),
 		os.path.expanduser(os.path.join("~","Packaging","FM7_RESURRECTION_UTIL","readme_RS232CDiskBios.txt")))
 	shutil.copyfile(
-		os.path.join("RS232CDiskBios","readme_e.txt"),
+		os.path.join("RS232CDiskBIOS","readme_e.txt"),
 		os.path.expanduser(os.path.join("~","Packaging","FM7_RESURRECTION_UTIL","readme_RS232CDiskBios_e.txt")))
+	shutil.copyfile(
+		os.path.join("RS232CTapeBIOS","readme.txt"),
+		os.path.expanduser(os.path.join("~","Packaging","FM7_RESURRECTION_UTIL","readme_RS232CTapeBIOS.txt")))
 	shutil.copyfile(
 		os.path.join("rawReadToRS232C","readme.txt"),
 		os.path.expanduser(os.path.join("~","Packaging","FM7_RESURRECTION_UTIL","readme_rawReadToRS232C.txt")))
@@ -148,15 +155,16 @@ def main():
 
 
 if __name__=="__main__":
+	os.chdir(THISDIR)
 	i=0
 	while i<len(sys.argv):
-		if sys.argv[i]=="-fm7only":
-			fm7Code=True
-			winCode=False
-			makeZip=False
-		if sys.argv[i]=="-dontclear":
-			clearBuild=False
-			makeZip=False
+		#if sys.argv[i]=="-fm7only":
+		#	fm7Code=True
+		#	winCode=False
+		#	makeZip=False
+		#if sys.argv[i]=="-dontclear":
+		#	clearBuild=False
+		#	makeZip=False
 		i=i+1
 
 	main()
