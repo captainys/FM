@@ -33,6 +33,9 @@ For English help, type:
 
 
 更新情報
+2021/04/16 T77toRS232CをRS232CTapeBIOSに改名。
+           RS232CDiskBIOS, RS232CTapeBIOS, RAWREADがCOM1モードRS232Cカードで動作確認。
+
 2018/11/20 RS232Cユーティリティを追加。いくつかツールがありますが、RAWREADを使うと実機でディスクを読んでイメージ化に必要な情報を
            WindowsなどのPCに送信できます。
 

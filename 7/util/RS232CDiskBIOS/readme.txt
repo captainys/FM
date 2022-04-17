@@ -3,6 +3,8 @@ by 山川機長
 http://www.ysflight.com
 
 
+2021/04/16 COM1-mode RS232Cカードで動作確認。
+
 2019/08/03
   Comrade Music Diskに対応。(-jsrfef0, -jsrff63オプション)
   その一環でM-DOS7に対応。

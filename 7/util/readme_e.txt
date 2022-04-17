@@ -21,6 +21,8 @@ http://www.ysflight.com
 
 
 Updates
+2021/04/16 Renamed T77toRS232C to RS232CTapeBIOS to make consistent with RS232CDiskBIOS.
+           Confirmed RS232CDiskBIOS, RS232CTapeBIOS, and RAWREAD work with COM1-mode RS232C card.
 
 2018/01/31 DISK2TAPE: -fm77av option.  If this option is given, the writer program will use expanded RAM (64K) of FM77AV to reduce number of .WAV files.
   DISK2TAPE: -use7000 option.  If this option is given, the write program will use $7000-$7FFF to reduce number of .WAV files.  But, if this option is used, the writer program must be started from the tape mode.  If started from Disk-BASIC, it destroys the Disk-BASIC area.

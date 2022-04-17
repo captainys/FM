@@ -3,6 +3,10 @@ Run a Disk-Based Titles on Fujitsu FM-7 8-bit Retro PC via RS232C
 by CaptainYS
 http://www.ysflight.com
 
+Updates
+2021/04/16 Confirmed with COM1-mode RS232C card.
+
+
 
 10 REM  -------- Introduction
 
