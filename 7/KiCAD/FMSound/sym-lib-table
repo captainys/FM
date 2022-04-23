@@ -1,0 +1,5 @@
+(sym_lib_table
+  (lib (name 74LSxx_additional)(type Legacy)(uri ${KIPRJMOD}/74LSxx_additional.lib)(options "")(descr ""))
+  (lib (name FM_Operator)(type Legacy)(uri ${KIPRJMOD}/FM_Operator.lib)(options "")(descr ""))
+  (lib (name Amplifier_Operational_additional)(type Legacy)(uri ${KIPRJMOD}/Amplifier_Operational_additional.lib)(options "")(descr ""))
+)

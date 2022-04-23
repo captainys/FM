@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name "Audio Connectors")(type KiCad)(uri ${KIPRJMOD}/AudioConn.fplib)(options "")(descr ""))
+  (lib (name Transistors)(type KiCad)(uri ${KIPRJMOD}/Transistors.fplib)(options "")(descr ""))
+)
