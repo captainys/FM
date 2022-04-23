@@ -40,8 +40,8 @@ CMOSMENU_MAINLOOP:
 
 						CALL	COUNT_CMOSMENU_CHOICES
 						MOVZX	CX,BL
-						MOV		SI,OFFSET CMOSMENU_ITEMS
-						CALL	DRAWMENU
+						MOV		SI,OFFSET MENU_EXPAND_BUF
+						CALL	DRAWMENU2
 
 						MOV		AX,DISPLACED_DEMOSPLASh_MESSAGE_LOCATION
 						CALL	DEMOSPLASH_MESSAGE_MOVABLE
@@ -462,7 +462,7 @@ UPDATE_ASSIGNMENT_MENU		PROC
 
 						MOV		SI,OFFSET CMOSMENU_OFF
 
-						MOV		DI,OFFSET CMOSMENU_ITEMS+CMOSMENU_SINGLE_DRIVE_MODE*MENUITEM_LENGTH+18
+						MOV		DI,OFFSET CMOSMENU_ITEM_SNGLDRV+18
 						CMP		BYTE PTR CS:[SINGLE_DRIVE_MODE],0
 						JE		@f
 						MOV		SI,OFFSET CMOSMENU_ON
@@ -472,21 +472,33 @@ UPDATE_ASSIGNMENT_MENU		PROC
 						REP		MOVSB
 
 
+						MOV		CX,CMOSMENU_ITEMS_END-CMOSMENU_ITEMS
+						MOV		SI,OFFSET CMOSMENU_ITEMS
+						MOV		DI,OFFSET MENU_EXPAND_BUF
+						REP		MOVSB
+
+
+
 						MOV		CX,MAX_NUM_DRIVE_ASSIGNMENTS
-						MOV		DI,OFFSET CMOSMENU_ITEMS+CMOSMENU_ITEMNUM_DRIVE_D*MENUITEM_LENGTH
+						MOV		AH,'D'
 						MOV		SI,OFFSET DRIVE_ASSIGNMENTS
 
 UPDATE_ASSIGNMENT_MENU_OUTER_LOOP:
+						PUSH	AX
 						PUSH	CX
 						PUSH	SI
 						PUSH	DI
 
-						ADD		DI,9
-						MOV		CX,MENUITEM_LENGTH-9-1
+						MOV		SI,OFFSET KEYWORD_DRIVE
+						MOV		CX,5
+						REP		MOVSB
 						MOV		AL,' '
-						REP		STOSB
+						STOSW
+						STOSB	; Make "DRIVE D "
 
 						POP		DI
+						POP		SI
+						PUSH	SI
 						PUSH	DI
 
 
@@ -500,11 +512,13 @@ UPDATE_ASSIGNMENT_MENU_OUTER_LOOP:
 						XCHG	AL,AH
 						MOV		[DI+10],AX
 
+						MOV		WORD PTR [DI+12],0020h ; ' ',00
+						ADD		DI,13
+
 						MOV		AX,[SI]
 						CMP		AL,BOOTDEVICETYPE_UNASSIGNED
 						JNE		@f
 
-						ADD		DI,13
 						MOV		SI,OFFSET CMOSMENU_UNASSIGNED
 						MOV		CX,(OFFSET CMOSMENU_UNASSIGNED_END)-(OFFSET CMOSMENU_UNASSIGNED)
 						REP		MOVSB
@@ -513,7 +527,6 @@ UPDATE_ASSIGNMENT_MENU_OUTER_LOOP:
 						CMP		AL,BOOTDEVICETYPE_FLOPPYDRIVE
 						JNE		@F
 
-						ADD		DI,13
 						MOV		SI,OFFSET CMOSMENU_FLOPPYDRIVE
 						MOV		CX,(OFFSET CMOSMENU_FLOPPYDRIVE_END)-(OFFSET CMOSMENU_FLOPPYDRIVE)
 						REP		MOVSB
@@ -522,7 +535,6 @@ UPDATE_ASSIGNMENT_MENU_OUTER_LOOP:
 						CMP		AL,BOOTDEVICETYPE_HARDDRIVE
 						JE		@F
 
-						ADD		DI,13
 						MOV		SI,OFFSET CMOSMENU_UNKNOWNDEVICE
 						MOV		CX,(OFFSET CMOSMENU_UNKNOWNDEVICE_END)-(OFFSET CMOSMENU_UNKNOWNDEVICE)
 						REP		MOVSB
@@ -530,11 +542,12 @@ UPDATE_ASSIGNMENT_MENU_OUTER_LOOP:
 
 @@:
 						PUSH	DI
-						ADD		DI,13
 						MOV		SI,OFFSET CMOSMENU_SCSIHDD
 						MOV		CX,(OFFSET CMOSMENU_SCSIHDD_END)-(OFFSET CMOSMENU_SCSIHDD)
 						REP		MOVSB
 						POP		DI
+
+						SUB		DI,13
 
 						; TRANSLATE AH (SCSIID|PARTITION)
 						XCHG	AL,AH
@@ -551,11 +564,20 @@ UPDATE_ASSIGNMENT_MENU_OUTER_LOOP:
 						XCHG	AL,AH
 						MOV		[DI+22],AX
 
+						ADD		DI,(OFFSET CMOSMENU_SCSIHDD_END)-(OFFSET CMOSMENU_SCSIHDD)+13
+
 UPDATE_ASSIGNMENT_MENU_NEXT:
+						MOV		AL,0
+						STOSB
+
 						POP		DI
 						POP		SI
 						POP		CX
-						ADD		DI,MENUITEM_LENGTH
+						POP		AX
+						XCHG	DI,SI
+						CALL	SKIP_CSTR_DS_SI
+						XCHG	DI,SI
+						INC		AH
 						ADD		SI,2
 						DEC		CX
 						JNE		UPDATE_ASSIGNMENT_MENU_OUTER_LOOP
@@ -623,23 +645,14 @@ DRIVE_COUNTER_CHECKSUM	DB	0
 CMOSMENU_SELECTION		DB	0
 CMOSMENU_VALUECHANGED	DB	0
 
-                           ; 01234567890123456789012345678901234567890123456789012345678901234567890123456789
-CMOSMENU_ITEMS			DB	"BACK TO MAIN MENU                                                              ",0
-						DB	"HELP (PAD0 BUTTON TO SEE HELP)                                                 ",0
-						DB	"SINGLE DRIVE MODE                                                              ",0
-						DB	"DRIVE D                                                                        ",0
-						DB	"DRIVE E                                                                        ",0
-						DB	"DRIVE F                                                                        ",0
-						DB	"DRIVE G                                                                        ",0
-						DB	"DRIVE H                                                                        ",0
-						DB	"DRIVE I                                                                        ",0
-						DB	"DRIVE J                                                                        ",0
-						DB	"DRIVE K                                                                        ",0
-						DB	"DRIVE L                                                                        ",0
-						DB	"DRIVE M                                                                        ",0
-						DB	"DRIVE N                                                                        ",0
-						DB	"DRIVE O                                                                        ",0
-						DB	"DRIVE P                                                                        ",0
+
+CMOSMENU_ITEMS			DB	"BACK TO MAIN MENU",0
+						DB	"HELP (PAD0 BUTTON TO SEE HELP)",0
+CMOSMENU_ITEM_SNGLDRV	DB	"SINGLE DRIVE MODE [OFF]",0
+CMOSMENU_ITEMS_END:
+
+
+KEYWORD_DRIVE			DB	"DRIVE",0
 						;            0200 SCSI ID=   PART=
 
 CMOSMENU_CONFIRM_ITEMS	DB	"SAVE CHANGES",0
