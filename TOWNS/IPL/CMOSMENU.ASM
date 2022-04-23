@@ -575,7 +575,7 @@ CMOSMENU_CONFIRM		PROC
 
 						MOV		CX,3
 						MOV		SI,OFFSET CMOSMENU_CONFIRM_ITEMS
-						CALL	DRAWMENU
+						CALL	DRAWMENU2
 
 						MOV		AH,2
 
@@ -642,9 +642,9 @@ CMOSMENU_ITEMS			DB	"BACK TO MAIN MENU                                          
 						DB	"DRIVE P                                                                        ",0
 						;            0200 SCSI ID=   PART=
 
-CMOSMENU_CONFIRM_ITEMS	DB	"SAVE CHANGES                                                                   ",0
-						DB	"DISCARD CHANGES                                                                ",0
-						DB	"BACK TO DRIVE-ASSIGNMENT MENU                                                  ",0
+CMOSMENU_CONFIRM_ITEMS	DB	"SAVE CHANGES",0
+						DB	"DISCARD CHANGES",0
+						DB	"BACK TO DRIVE-ASSIGNMENT MENU",0
 
 CMOSMENU_UNASSIGNED		DB	"*UNASSIGNED*"
 CMOSMENU_UNASSIGNED_END:
