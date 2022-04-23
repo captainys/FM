@@ -19,7 +19,7 @@ MAINMENU_OUTER_LOOP:
 
 						MOV		SI,OFFSET MAINMENU_ITEM_BUFFER
 						MOV		CX,NUM_MAINMENU_OPTIONS
-						CALL	DRAWMENU
+						CALL	DRAWMENU2
 
 						MOV		AX,DISPLACED_DEMOSPLASh_MESSAGE_LOCATION
 						CALL	DEMOSPLASH_MESSAGE_MOVABLE
@@ -85,11 +85,11 @@ MAINMENU				ENDP
 
 MAINMENU_SELECTION		DB		0
 	                           ; 01234567890123456789012345678901234567890123456789012345678901234567890123456789
-MAINMENU_ITEM_BUFFER	DB		"DRIVE LETTER ASSIGNMENTS                                                       ",0
-						DB		"BOOT MENU                                                                      ",0
-						DB		"RESET CMOS RAM                                                                 ",0
-						DB		"SERIAL (RS232C) MENU                                                           ",0
-						DB		"IPL DEBUG (DUMP B0000 to B00FF)                                                ",0
+MAINMENU_ITEM_BUFFER	DB		"DRIVE LETTER ASSIGNMENTS",0
+						DB		"BOOT MENU",0
+						DB		"RESET CMOS RAM",0
+						DB		"SERIAL (RS232C) MENU",0
+						DB		"IPL DEBUG (DUMP B0000 to B00FF)",0
 
 
 ; Input
@@ -225,7 +225,7 @@ TRIPLE_CONFIRM_LOOP:
 						PUSH	AX
 
 						MOV		CX,2		; 2 MENU ITEMS
-						CALL	DRAWMENU
+						CALL	DRAWMENU2
 
 						POP		AX
 						PUSH	AX
@@ -256,7 +256,8 @@ TRIPLE_CONFIRM_LOOP:
 						RET
 
 @@:
-						ADD		SI,MENUITEM_LENGTH*2
+						CALL	SKIP_CSTR_DS_SI
+						CALL	SKIP_CSTR_DS_SI
 						DEC		BX
 						JE		@f
 						MOV		AH,1	; CANCEL

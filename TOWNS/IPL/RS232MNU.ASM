@@ -21,18 +21,19 @@ RS232CMENU_OUTER_LOOP:
 						CALL	MENU_WAIT_PAD_RELEASE
 						CALL	CLEAR_FIVE_BELOW
 
-						MOV		BYTE PTR CS:[RS232CMENU_ITEM_BUFFER+MENUITEM_LENGTH*1+1],' '
-						MOV		BYTE PTR CS:[RS232CMENU_ITEM_BUFFER+MENUITEM_LENGTH*2+1],' '
+						MOV		BYTE PTR CS:[RS232CMENU_ITEM_BAUD+1],' '
+						MOV		BYTE PTR CS:[RS232CMENU_ITEM_BAUD2+1],' '
 
-						MOV		AL,MENUITEM_LENGTH
-						MOV		AH,CS:[RS232CMENU_BAUD_RATE]
-						MUL		AH
-						MOV		SI,AX
-						MOV		BYTE PTR CS:[RS232CMENU_ITEM_BUFFER+MENUITEM_LENGTH+1+SI],'X'
+						MOV		SI,OFFSET RS232CMENU_ITEM_BAUD
+						CMP		BYTE PTR CS:[RS232CMENU_BAUD_RATE],0
+						JE		RS232CMENU_PUT_BAUD_X
+						CALL	SKIP_CSTR_DS_SI
+RS232CMENU_PUT_BAUD_X:
+						MOV		BYTE PTR CS:[1+SI],'X'
 
 						MOV		SI,OFFSET RS232CMENU_ITEM_BUFFER
 						MOV		CX,NUM_RS232CMENU_OPTIONS
-						CALL	DRAWMENU
+						CALL	DRAWMENU2
 
 						MOV		CL,NUM_RS232CMENU_OPTIONS
 						MOV		AL,CS:[RS232CMENU_CURSOR_POS]
@@ -158,14 +159,14 @@ RS232CMENU_SEND_TEST_TEXT	DB	"HELLO FROM FM TOWNS RESCUE BOOT LOADER!",0DH,0AH,"
 
 
 	                           ; 01234567890123456789012345678901234567890123456789012345678901234567890123456789
-RS232CMENU_ITEM_BUFFER	DB		"RETURN TO MAIN MENU                                                            ",0
-						DB		"[X] 19200bps                                                                   ",0
-						DB		"[ ] 38400bps                                                                   ",0
-						DB		"SEND TEST STRING                                                               ",0
-						DB		"RECEIVE (RESTORE) CMOS RAM XMODEM CheckSum Mode                                ",0
-						DB		"RECEIVE (RESTORE) CMOS RAM XMODEM CRC Mode                                     ",0
-						DB		"SEND (BACKUP) CMOS RAM     XMODEM                                              ",0
-						DB		"SEND (DUMP) ROM IMAGE      XMODEM                                              ",0
+RS232CMENU_ITEM_BUFFER	DB		"RETURN TO MAIN MENU",0
+RS232CMENU_ITEM_BAUD	DB		"[X] 19200bps",0
+RS232CMENU_ITEM_BAUD2	DB		"[ ] 38400bps",0
+						DB		"SEND TEST STRING",0
+						DB		"RECEIVE (RESTORE) CMOS RAM XMODEM CheckSum Mode",0
+						DB		"RECEIVE (RESTORE) CMOS RAM XMODEM CRC Mode",0
+						DB		"SEND (BACKUP) CMOS RAM     XMODEM",0
+						DB		"SEND (DUMP) ROM IMAGE      XMODEM",0
 
 RS232CMENU_CURSOR_POS	DB		0
 RS232CMENU_BAUD_RATE	DB		1
@@ -323,12 +324,12 @@ RS232C_CMOS_SIZE_MSG_BUF	DB "00000000/00002000",0
 RS232C_WRONG_CMOSSIZE_MSG	DB "WRONG SIZE.  CMOS IMAGE IS SUPPOSED TO BE 8KB (8192 bytes)",0
 
 
-RS232C_CMOSLOAD_CONFIRM_1	DB	"CONFIRM WRITE TO CMOS RAM                                                      ",0
-							DB	"DON'T WRITE TO CMOS RAM                                                        ",0
-RS232C_CMOSLOAD_CONFIRM_2	DB	"REALLY WRITE TO CMOS RAM                                                       ",0
-							DB	"DON'T WRITE TO CMOS RAM                                                        ",0
-RS232C_CMOSLOAD_CONFIRM_3	DB	"ABSOLUTELY RESET CMOS RAM                                                      ",0
-							DB	"DON'T WRITE TO CMOS                                                            ",0
+RS232C_CMOSLOAD_CONFIRM_1	DB	"CONFIRM WRITE TO CMOS RAM",0
+							DB	"DON'T WRITE TO CMOS RAM",0
+RS232C_CMOSLOAD_CONFIRM_2	DB	"REALLY WRITE TO CMOS RAM",0
+							DB	"DON'T WRITE TO CMOS RAM",0
+RS232C_CMOSLOAD_CONFIRM_3	DB	"ABSOLUTELY RESET CMOS RAM",0
+							DB	"DON'T WRITE TO CMOS",0
 
 
 RS232C_NEED_RESET_MESSAGE	DB	"CMOS OVERWRITTEN BY THE BINARY RECEIVED VIA RS232C.",0

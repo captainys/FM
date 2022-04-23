@@ -212,6 +212,7 @@ MESSAGE_MACHINE_ID		DB	"MACHINE ID:",0
 						INCLUDE		INTRCEPT.ASM
 						INCLUDE		PATCH.ASM
 						INCLUDE		../RESOURCE/AOMORI.ASM
+						INCLUDE		BUFFERS.ASM
 
 
 						; After the end of the program.

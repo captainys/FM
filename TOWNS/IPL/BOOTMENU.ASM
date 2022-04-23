@@ -164,6 +164,47 @@ DRAWMENU				ENDP
 
 
 
+; Input
+;   DS:SI	Menu Top
+;   CX		Number of Items
+; Output
+;   CX,SI   Destroyed
+DRAWMENU2				PROC
+						MOV		AX,FIRST_MENU_ITEM_LOCATION
+DRAWMENU2_OUTER_LOOP:
+						PUSH	CX
+						PUSH	AX
+						PUSH	SI
+						CALL	LOCATE
+						CALL	PRINT_TALL
+						POP		SI
+
+						CALL	SKIP_CSTR_DS_SI
+
+						POP		AX
+						POP		CX
+						INC		AL
+						LOOP	DRAWMENU2_OUTER_LOOP
+
+						RET
+DRAWMENU2				ENDP
+
+
+
+; Input
+;   DS:SI   C-String
+; Output
+;   DS:SI   Next C-String
+SKIP_CSTR_DS_SI			PROC
+						INC		SI
+						CMP		BYTE PTR [SI],0
+						JNE		SKIP_CSTR_DS_SI
+						INC		SI
+						RET
+SKIP_CSTR_DS_SI			ENDP
+
+
+
 BOOTMENU_SETUP			PROC
 
 						MOV		CS:[NUM_BOOTMENU_OPTIONS],BOOTMENU_ITEMNUM_PARTITION_0
@@ -622,11 +663,3 @@ AUTOBOOT_COUNTER		DW		721		; 12*VSYNC_PER_SEC+1
 
 AUTOBOOT_MSG			DB		"AUTO BOOT IN "
 AUTOBOOT_NUMBER			DB		"00",0
-
-						; Settings Sector
-						ALIGN	512
-BOOTMENU_SELECTION		DB		BOOTMENU_ITEMNUM_SCSI_CD		;  BOOT MENU Default Option
-						DB		511 dup(0)
-
-						ALIGN	512
-PARTITION_TABLE			DB		512 dup (0)
