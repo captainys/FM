@@ -21,7 +21,7 @@ IDENTIFY_SCSI_DEVICE	PROC
 						CALL	SCSI_COMMAND
 
 						MOV		CL,[SCSI_DATABUF]
-						JAE		@f
+						JAE		SHORT @f
 						MOV		CL,0FFH
 @@:
 						POP		DS

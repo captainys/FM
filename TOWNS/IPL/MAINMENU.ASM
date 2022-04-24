@@ -48,31 +48,31 @@ MAINMENU_OUTER_LOOP:
 
 						;	AH is still Selection
 						CMP		AH,MAINMENU_ITEMNUM_CMOSMENU
-						JNE		@f
+						JNE		SHORT @f
 						CALL	CMOSMENU
 						JMP		MAINMENU_OUTER_LOOP
 
 @@:
 						CMP		AH,MAINMENU_ITEMNUM_BOOTMENU
-						JNE		@f
+						JNE		SHORT @f
 						CALL	BOOTMENU
 						JMP		MAINMENU_OUTER_LOOP
 
 @@:
 						CMP		AH,MAINMENU_ITEMNUM_RESETCMOS
-						JNE		@f
+						JNE		SHORT @f
 						CALL	CMOSRESET_CONFIRM
 						JMP		MAINMENU_OUTER_LOOP
 
 @@:
 						CMP		AH,MAINMENU_ITEMNUM_RS232CMENU
-						JNE		@f
+						JNE		SHORT @f
 						CALL	RS232CMENU
 						JMP		MAINMENU_OUTER_LOOP
 
 @@:
 						CMP		AH,MAINMENU_ITEMNUM_IPLDEBUGMENU
-						JNE		@f
+						JNE		SHORT @f
 						CALL	IPLDEBUG
 						JMP		MAINMENU_OUTER_LOOP
 
@@ -108,13 +108,13 @@ MOVE_ARROW_BY_PAD		PROC
 MOVE_ARROW_BY_PAD_DOWN:
 						INC		AH
 						CMP		AH,CH
-						JL		@f
+						JL		SHORT @f
 						XOR		AH,AH
 						RET
 
 MOVE_ARROW_BY_PAD_UP:
 						SUB		AH,1
-						JAE		@f
+						JAE		SHORT @f
 						MOV		AH,CH
 						DEC		AH
 @@:
@@ -136,25 +136,25 @@ PAD_TO_LEFT_RIGHT		PROC
 						XOR		BX,BX
 
 						TEST	AL,08H
-						JNE		@f
+						JNE		SHORT @f
 						MOV		BX,1
 						AND		BX,BX
 						RET
 @@:
 						TEST	AL,04H
-						JNE		@f
+						JNE		SHORT @f
 						MOV		BX,-1
 						AND		BX,BX
 						RET
 @@:
 						TEST	AL,10H
-						JNE		@f
+						JNE		SHORT @f
 						MOV		BX,1
 						AND		BX,BX
 						RET
 @@:
 						TEST	AL,20H
-						JNE		@f
+						JNE		SHORT @f
 						MOV		BX,-1
 
 @@:
@@ -250,14 +250,14 @@ TRIPLE_CONFIRM_LOOP:
 						JE		TRIPLE_CONFIRM_LOOP
 
 						CMP		AH,1
-						JNE		@f
+						JNE		SHORT @f
 						RET
 
 @@:
 						CALL	SKIP_CSTR_DS_SI
 						CALL	SKIP_CSTR_DS_SI
 						DEC		BX
-						JE		@f
+						JE		SHORT @f
 						MOV		AH,1	; CANCEL
 						JMP		TRIPLE_CONFIRM_LOOP
 

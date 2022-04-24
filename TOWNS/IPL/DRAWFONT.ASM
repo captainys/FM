@@ -195,7 +195,7 @@ PRINT_TALL				PROC
 						MOV		SI,BX
 						LODSB
 						CMP		AL,0
-						JE		@f
+						JE		SHORT @f
 						MOV		AH,AL
 						CALL	DRAWFONT_TALL
 						ADD		DI,1-80*16
@@ -252,7 +252,7 @@ DRAW_TEXT				PROC
 
 @@:
 						CMP		BYTE PTR DS:[SI],0
-						JE		@f
+						JE		SHORT @f
 						INC		SI
 						JMP		@b
 

@@ -33,7 +33,7 @@ BOOT_FROM_SCSI_CD		PROC
 						MOV		AX,FS:[0]
 						MOV		FS,AX
 						CALL	FIND_JUMP_INSTRUCTION
-						JB		@f
+						JB		SHORT @f
 
 						PUSH	FS
 						PUSH	SI
@@ -210,12 +210,12 @@ FIND_LAST_SCSI_CD_LOOP:
 						PUSH	AX
 						CALL	IDENTIFY_SCSI_DEVICE
 						POP		AX
-						JB		@f
+						JB		SHORT @f
 
 						CMP		CL,4
-						JB		@f
+						JB		SHORT @f
 						CMP		CL,5
-						JA		@f
+						JA		SHORT @f
 						POP		AX	; Get CX value to AX
 
 						XOR		CX,CX ; Fast-forward the counter to zero so that it breaks the loop.
@@ -223,12 +223,12 @@ FIND_LAST_SCSI_CD_LOOP:
 @@:
 						POP		CX
 						AND		CL,CL
-						JE		@f
+						JE		ShORT @f
 						DEC		CL
 						JMP		FIND_LAST_SCSI_CD_LOOP
 @@:
 						CMP		AL,0FFH
-						JE		@f
+						JE		SHORT @f
 						PUSH	AX
 						CALL	ITOX8
 						MOV		[FIND_LAST_SCSI_CD_ID],AH
@@ -283,7 +283,7 @@ FIND_FBIOS_SECTOR_LOOP:
 						MOV		AL,CS:[SCSI_PHASE_FLAG]
 						MOV		CS:[FIND_BIOS_SCSI_PHASE_FLAG],AL
 						CMP		AH,SCSI_STATUS_CHECK_CONDITION
-						JNE		@f
+						JNE		SHORT @f
 
 						CALL	SCSI_SENSE
 @@:
@@ -294,7 +294,7 @@ FIND_FBIOS_SECTOR_LOOP:
 						POP		EAX
 
 						CMP		DWORD PTR FS:[0],4F494246H ; "FBIO"
-   						JNE		@f
+   						JNE		SHORT @f
 						CMP		BYTE PTR FS:[4],53H ; 'S'
 						JE		FIND_FBIOS_SECTOR_FOUND
 @@:
@@ -351,7 +351,7 @@ FIND_BIOS_DEBUG_OUT:
 						MOV		AX,CS:[FIND_BIOS_DEBUG_POS]
 						ADD		AH,16
 						CMP		AH,80
-						JL		@f
+						JL		SHORT @f
 						INC		AL
 						XOR		AH,AH
 @@:
@@ -396,13 +396,13 @@ FIND_JUMP_INSTRUCTION_LOOP:
 						ADD		SI,3
 						MOV		AL,FS:[SI]
 						CALL	E8_OR_BE
-						JNE		@f
+						JNE		SHORT @f
 						LOOP	@b
 
 						ADD		SI,3
 						MOV		AL,FS:[SI]
 						CMP		AL,0EAH		; JMPF
-						JNE		@f
+						JNE		SHORT @f
 
 						; Found it!
 						ADD		SP,2
@@ -425,7 +425,7 @@ FIND_JUMP_INSTRUCTION_FOUND:
 ; Return ZF=1 if AL==E8 or BE
 E8_OR_BE:
 						CMP		AL,0E8H	; CALL
-						JE		@f
+						JE		SHORT @f
 						CMP		AL,0BEH ; MOV SI,
 @@:						RET
 

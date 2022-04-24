@@ -53,7 +53,7 @@ LOAD_YSSCSICD_FD:
 						DW		 0014H
 						DW		0FFFBH
 
-						JB		@f
+						JB		SHORT @f
 
 						INC		WORD PTR CS:[LOAD_YSSCSICD_TRK_SIDE]
 						ADD		WORD PTR CS:[LOAD_YSSCSICD_BUFFADDR],8192
@@ -118,7 +118,7 @@ LOAD_YSSCSICD_FROM_ICM:
 						DW		 0014H
 						DW		0FFFBH
 
-						JB		@f
+						JB		SHORT @f
 
 						MOV		BYTE PTR CS:[YSSCSICD_LOADED],1
 @@:
