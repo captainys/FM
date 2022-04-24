@@ -177,29 +177,24 @@ INTERRUPT				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-MSG_FOUND_CDROM_AT		DB		"Found CD-ROM Drive SCSI-ID:",0
-MSG_CDROM_NOT_FOUND		DB		"SCSI CD-ROM Drive not found.",0DH,0AH,0
 DATA_CODE				ENDS
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-						; INCLUDE	WRHIGH.ASM
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DATA_CODE				SEGMENT
 						INCLUDE	DATABUF.ASM
 
+SCSI_DATA_BUF:
+
+; >>>>
+; >>>>
+; >>>>
+; >>>>
+; This area will be destroyed as soon as SCAN_SCSI_CDROM is called from INITIALIZE.
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-DEVICE_END				DB		'DEVICE END',0
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-INITIALIZE				PROC	FAR
-						PUSH	ES
-						PUSH	DS
-						PUSHA
+INIT_OF_INIT			PROC
 
 						PUSH	CS
 						POP		DS
@@ -210,56 +205,14 @@ INITIALIZE				PROC	FAR
 						CALL	PRINT_CSTR
 
 						CALL	RECOGNIZE_COMMAND_PARAMETER
-;
-;						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
-;						JE		@f
-;						LEA		DI,[MSG_DEBUG_OUT_CON]
-;						CALL	PRINT_CSTR
-;@@:
-;
-;						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
-;						JE		@f
-;						LEA		DI,[MSG_DEBUG_OUT_RS232C]
-;						CALL	PRINT_CSTR
-;@@:
 
 						CALL	INSTALL_HOOK
 
-
 						MOV		WORD PTR CS:[DEVHDR_INTERRUPT],OFFSET INTERRUPT
 
-						CALL	SCAN_SCSI_CDROM
-						MOV		BYTE PTR [YSSCSICD_SCSI_ID],AL
-						CMP		AL,07H
-						JA		INIT_SCSI_NOT_FOUND
-
-						LEA		DI,[MSG_FOUND_CDROM_AT]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AL
-						CALL	PRINT_CRLF
-						JMP		INIT_SCSI_SCAN_DONE
-
-INIT_SCSI_NOT_FOUND:
-						LEA		DI,[MSG_CDROM_NOT_FOUND]
-						CALL	PRINT_CSTR
-INIT_SCSI_SCAN_DONE:
-
-
-						LES		DI,CS:[PACKET]
-
-						MOV		WORD PTR ES:[DI+3],0100H		; Status
-						MOV		BYTE PTR ES:[DI+13],0			; Number of Drives
-						MOV		WORD PTR ES:[DI+14],OFFSET DEVICE_END
-						MOV		WORD PTR ES:[DI+16],CS
-
-						POPA
-						POP		DS
-						POP		ES
 						RET
 
-INITIALIZE				ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+INIT_OF_INIT			ENDP
 
 ; I realized that if you set /R option in the CONFIG.SYS and if you don't have an RS232C connected to a computer,
 ; The driver freezes just waiting for the TX Ready, which is dangerous.
@@ -427,14 +380,12 @@ CMD_SYSDRV_BAD_DRIVE_LETTER:
 
 RECOGNIZE_COMMAND_PARAMETER	ENDP
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+						INCLUDE	HOOKINST.ASM
 
 MSG_INTRO				DB		"YS SCSI BIOS REDIRECTOR",0DH,0AH
-						DB		"Ver 0.95 2022/03/29",0DH,0AH
+						DB		"Ver 0.96 2022/04/24",0DH,0AH
 						DB		"By CaptainYS (http://www.ysflight.com)",0DH,0AH,0
 MSG_ERR_PARAM			DB		"UNRECOGNIZED COMMAND OPTION:",0
-;MSG_DEBUG_OUT_CON		DB		"DEBUG MESSAGE TO CONSOLE",0DH,0AH,0
-;MSG_DEBUG_OUT_RS232C	DB		"DEBUG MESSAGE TO RS232C",0DH,0AH,0
 
 MSG_SYSDRV				DB		"SET SYSTEM DRIVE TO ["
 CMD_SYSDRV_LETTER		DB		'Q'
@@ -443,6 +394,64 @@ CMD_SYSDRV_LETTER		DB		'Q'
 MSG_SYSDRV_BADDRV		DB		"BAD DRIVE LETTER",0DH,0AH,0
 
 MSG_ENABLE_SYSINIT_MSG	DB		"ENABLED SYSINIT.EXE MESSAGES",0DH,0AH,0
+
+; This area will be destroyed as soon as SCAN_SCSI_CDROM is called from INITIALIZE.
+; <<<<
+; <<<<
+; <<<<
+; <<<<
+
+DESTROYED_ON_INSTALLATION_END:
+						DB		SCSI_DATA_BUF_LENGTH-(DESTROYED_ON_INSTALLATION_END-SCSI_DATA_BUF) dup(077h)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+DEVICE_END				DB		'DEVICE END',0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+INITIALIZE				PROC	FAR
+						PUSH	ES
+						PUSH	DS
+						PUSHA
+
+						CALL	INIT_OF_INIT
+
+						CALL	SCAN_SCSI_CDROM
+						MOV		BYTE PTR [YSSCSICD_SCSI_ID],AL
+						CMP		AL,07H
+						JA		INIT_SCSI_NOT_FOUND
+
+						LEA		DI,[MSG_FOUND_CDROM_AT]
+						CALL	PRINT_CSTR
+						CALL	PRINT_AL
+						CALL	PRINT_CRLF
+						JMP		INIT_SCSI_SCAN_DONE
+
+INIT_SCSI_NOT_FOUND:
+						LEA		DI,[MSG_CDROM_NOT_FOUND]
+						CALL	PRINT_CSTR
+INIT_SCSI_SCAN_DONE:
+
+
+						LES		DI,CS:[PACKET]
+
+						MOV		WORD PTR ES:[DI+3],0100H		; Status
+						MOV		BYTE PTR ES:[DI+13],0			; Number of Drives
+						MOV		WORD PTR ES:[DI+14],OFFSET DEVICE_END
+						MOV		WORD PTR ES:[DI+16],CS
+
+						POPA
+						POP		DS
+						POP		ES
+						RET
+
+INITIALIZE				ENDP
+
+MSG_FOUND_CDROM_AT		DB		"Found CD-ROM Drive SCSI-ID:",0
+MSG_CDROM_NOT_FOUND		DB		"SCSI CD-ROM Drive not found.",0DH,0AH,0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DATA_CODE				ENDS
 

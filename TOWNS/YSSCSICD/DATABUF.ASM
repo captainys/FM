@@ -43,4 +43,3 @@ DEBUG_REDIR_SUBSTEP		DB		' '
 
 SCSI_DATABUF_PTR		DB		4 dup(0)
 SCSI_CMD				DB		12 dup(0)  ; SCSI_HDR and SCSI_CMD must be contiguous, probably.
-SCSI_DATA_BUF			DB		SCSI_DATA_BUF_LENGTH dup(?) ; I don't know what I get from FDH.
