@@ -38,8 +38,7 @@ REALMAIN:
 						MOV		SP,0FFFEH ; IO.SYS will reset the stack pointer anyway.
 
 						MOV		CS:[INCOMING_BX],BX
-						AND		BH,0FH
-						AND		BL,0FH
+						AND		BX,0F0FH
 						CMP		BL,1		; HD/CD?
 						JNE		SHORT @f
 						OR		BH,0B0H
