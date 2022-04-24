@@ -1,27 +1,15 @@
-
-
-VRAMMODE				PROC
-						PUSH	DX
+VRAMMODE:				PUSH	DX
 						PUSH	AX
-						MOV		DX,IO_FMR_VRAM_OR_MAINRAM
 						MOV		AL,0
-						OUT		DX,AL
-						POP		AX
-						POP		DX
-						RET
-VRAMMODE				ENDP
+						JMP		SHORT SET_VRAM_OR_RAM_MODE
 
-
-RAMMODE					PROC
-						PUSH	DX
+RAMMODE:				PUSH	DX
 						PUSH	AX
-						MOV		DX,IO_FMR_VRAM_OR_MAINRAM
 						MOV		AL,80H
+
+SET_VRAM_OR_RAM_MODE:
+						MOV		DX,IO_FMR_VRAM_OR_MAINRAM
 						OUT		DX,AL
 						POP		AX
 						POP		DX
 						RET
-RAMMODE					ENDP
-
-
-
