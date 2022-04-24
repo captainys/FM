@@ -59,22 +59,17 @@ RS232C2_INIT			PROC
 						MOV		DX,0A02H
 						XOR		AL,AL
 
-						MOV		DX,0A02H
-						XOR		AL,AL
+						CALL	RS232C2_DELAY
+
 						OUT		DX,AL
 						CALL	RS232C2_DELAY
 
-						MOV		DX,0A02H
-						XOR		AL,AL
 						OUT		DX,AL
 						CALL	RS232C2_DELAY
 
-						MOV		DX,0A02H
-						XOR		AL,AL
 						OUT		DX,AL
 						CALL	RS232C2_DELAY
 
-						MOV		DX,0A02H
 						MOV		AL,040H		; Internal reset
 						OUT		DX,AL
 						CALL	RS232C2_DELAY
@@ -87,7 +82,6 @@ RS232C2_INIT			PROC
 						; PN=0       -> No parity
 						; L2=1, L1=1 -> 8 bit
 						; B2=1, B1=0 -> 1/16 scalar
-						MOV		DX,0A02H
 						MOV		AL,4EH
 						OUT		DX,AL
 						CALL	RS232C2_DELAY
@@ -102,14 +96,13 @@ RS232C2_INIT			PROC
 						; ON	RXE Receive Enable
 						; ON	DTR Treminal Ready
 						; ON	TXE Transmission Enable
-						MOV		DX,0A02H
 						MOV		AL,0B7H
 						OUT		DX,AL
 						CALL	RS232C2_DELAY
 
 
-						MOV		DX,0A08H
-						MOV		AL,020H  ; DTR=1, Internal Clock for Rx and Tx
+						MOV		DL,08H	; DX=0A08H
+						MOV		AL,020H	; DTR=1, Internal Clock for Rx and Tx
 						OUT		DX,AL
 
 
@@ -141,6 +134,7 @@ RS232C2_WAIT_TX_READY	ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; Must not change DX and AL
 RS232C2_DELAY			PROC
 						PUSH	CX
 						MOV		CX,256
