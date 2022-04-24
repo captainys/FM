@@ -88,103 +88,62 @@ REDIRECT_CDROM_BIOSCALL	PROC
 						CMP		AH,05H
 						JA		SHORT @f
 						MOVZX	DI,AH
-						SHL		DI,1
+						ADD		DI,DI
 						CALL	WORD PTR CS:[REDIRECT_BIOS_CALLTABLE_00_05+DI]
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
+						; 50h to 58h?
+						CMP		AH,50h
+						JB		SHORT @f
+						CMP		AH,58h
+						JA		SHORT @f
+						MOVZX	DI,AH
+						SUB		DI,50h
+						ADD		DI,DI
+						CALL	WORD PTR CS:[REDIRECT_BIOS_CALLTABLE_50_58+DI]
+						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
+
+@@:
 						CMP		AH,0EH
-						JNE		@f
+						JNE		SHORT @f
 						CALL	CDROM_BIOS_0EH_TEST_UNIT_READY
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
 						CMP		AH,0FH
-						JNE		@f
+						JNE		SHORT @f
 						CALL	CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
 						CMP		AH,14H
-						JNE		@f
+						JNE		SHORT @f
 						CALL	CDROM_BIOS_PRETEND_NO_ERROR  ; CDISC2.SYS suggests do nothing for this function
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
 						CMP		AH,15H
-						JNE		@f
+						JNE		SHORT @f
 						CALL	CDROM_BIOS_15H_READ_SECTOR_MSF
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
-@@:
 
-						CMP		AH,050H
-						JNE		@f
-						CALL	CDROM_BIOS_050H_START_PLAY
-						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
-@@:
-
-						CMP		AH,051H
-						JNE		@f
-						CALL	CDROM_BIOS_051H_GET_PLAY_INFO
-						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
-@@:
-
-						CMP		AH,052H
-						JNE		@f
-						CALL	CDROM_BIOS_052H_STOP_PLAY
-						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
-@@:
-
-						CMP		AH,053H
-						JNE		@f
-						CALL	CDROM_BIOS_053H_GET_PLAY_STATE
-						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
-@@:
-
-						CMP		AH,054H
-						JNE		@f
-						CALL	CDROM_BIOS_054H_GET_DISC_INFO_TOC
-						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
-@@:
-
-						CMP		AH,055H
-						JNE		@f
-						CALL	CDROM_BIOS_055H_PAUSE
-						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
-@@:
-
-						CMP		AH,056H
-						JNE		@f
-						CALL	CDROM_BIOS_056H_UNPAUSE
-						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
-@@:
-
-						CMP		AH,057H
-						JNE		@f
-						CALL	CDROM_BIOS_057H_SET_ELEVOL
-						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
-@@:
-
-						CMP		AH,058H
-						JNE		@f
-						CALL	CDROM_BIOS_058H_GET_ELEVOL
-						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
 						CMP		AH,060H
-						JNE		@f
+						JNE		SHORT @f
 						CALL	CDROM_BIOS_PRETEND_NO_ERROR
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
 						CMP		AH,061H
-						JNE		@f
+						JNE		SHORT @f
 						CALL	CDROM_BIOS_PRETEND_NO_ERROR
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
 						CMP		AH,0FCH
-						JNE		@f
+						JNE		SHORT @f
 						CALL	CDROM_BIOS_PRETEND_NO_ERROR
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
@@ -196,7 +155,7 @@ REDIRECT_CDROM_BIOSCALL	PROC
 REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT:
 						MOV		BYTE PTR [BP+INCOMING_AX+1],AH
 						CMP		AH,80H
-						JNE		REDIRECT_CDROM_BIOSCALL_EXIT
+						JNE		SHORT REDIRECT_CDROM_BIOSCALL_EXIT
 						MOV		WORD PTR [BP+INCOMING_CX],CX
 REDIRECT_CDROM_BIOSCALL_EXIT:
 						POPF
@@ -219,6 +178,18 @@ REDIRECT_BIOS_CALLTABLE_00_05:
 						DW	OFFSET CDROM_BIOS_PRETEND_NO_ERROR  ; CDISC2.SYS suggests do nothing for this function
 						DW	OFFSET CDROM_BIOS_05H_READ_SECTOR_HSG
 
+REDIRECT_BIOS_CALLTABLE_50_58:
+						DW	OFFSET CDROM_BIOS_050H_START_PLAY
+						DW	OFFSET CDROM_BIOS_051H_GET_PLAY_INFO
+						DW	OFFSET CDROM_BIOS_052H_STOP_PLAY
+						DW	OFFSET CDROM_BIOS_053H_GET_PLAY_STATE
+						DW	OFFSET CDROM_BIOS_054H_GET_DISC_INFO_TOC
+						DW	OFFSET CDROM_BIOS_055H_PAUSE
+						DW	OFFSET CDROM_BIOS_056H_UNPAUSE
+						DW	OFFSET CDROM_BIOS_057H_SET_ELEVOL
+						DW	OFFSET CDROM_BIOS_058H_GET_ELEVOL
+
+
 
 REDIRECT_CDROM_BIOSCALL	ENDP
 
@@ -236,9 +207,9 @@ CDROM_BIOS_IS_SCSI_ERROR	PROC
 						CALL	IS_SCSI_ERROR
 						PUSHF
 						CMP		AH,BIOSERR_HARDERROR
-						JNE		@f
+						JNE		SHORT @f
 						CMP		CX,BIOSERR_DETAIL_MEDIACHANGED
-						JNE		@f
+						JNE		SHORT @f
 
 						MOV		BYTE PTR [BIOSFLAG_MEDIA_CHANGE_CACHE],1
 @@:
@@ -251,7 +222,7 @@ CDROM_BIOS_IS_SCSI_ERROR	ENDP
 
 CDROM_BIOS_00H_SET_DRIVE_MODE	PROC
 						CMP		DL,4
-						JE		@f
+						JE		SHORT @f
 
 						MOV		AH,BIOSERR_HARDERROR
 						MOV		DX,BIOSERR_DETAIL_PARAMETER
@@ -287,7 +258,7 @@ CDROM_BIOS_02H_GET_DRIVE_STATUS	PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READTOC
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f
+						JNC		SHORT @f
 						RET
 @@:
 
@@ -322,7 +293,7 @@ CDROM_BIOS_05H_READ_SECTOR_HSG	PROC
 						MOV		DI,[BP+INCOMING_DI]
 
 						CMP		CH,0FFH
-						JNE		@f
+						JNE		SHORT @f
 						JMP		CDROM_BIOS_READ_SECTOR_EX
 @@:
 
@@ -331,7 +302,7 @@ CDROM_BIOS_05H_READ_SECTOR_HSG	PROC
 						MOV		ES,[BP+INCOMING_DS]
 
 						CMP		CH,0
-						JE		@f
+						JE		SHORT @f
 						POP		ES
 						MOV		AH,BIOSERR_HARDERROR
 						MOV		CX,BIOSERR_DETAIL_PARAMETER
@@ -346,7 +317,7 @@ CDROM_BIOS_05H_READ_SECTOR_HSG	PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SECTOR_HSG
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f
+						JNC		SHORT @f
 
 						; Read all sectors.
 						MOV		WORD PTR [BP+INCOMING_BX],0
@@ -372,15 +343,15 @@ CDROM_BIOS_0EH_TEST_UNIT_READY	PROC
 						CALL	IS_SCSI_ERROR
 
 						CMP		AH,BIOSERR_HARDERROR
-						JE		CDROM_BIOS_0EH_HARDERR_FROM_DRIVE
+						JE		SHORT CDROM_BIOS_0EH_HARDERR_FROM_DRIVE
 
 						; Drive not reporting hard error.
 						CMP		AH,0
-						JNE		@f
+						JNE		SHORT @f
 
 						; Drive is not reporting an error.
 						CMP		BYTE PTR [BIOSFLAG_MEDIA_CHANGE_CACHE],0
-						JE		@f
+						JE		SHORT @f
 
 						; Media_Change Cache is 1
 						MOV		BYTE PTR [BIOSFLAG_MEDIA_CHANGE_CACHE],0
@@ -392,9 +363,9 @@ CDROM_BIOS_0EH_TEST_UNIT_READY	PROC
 
 CDROM_BIOS_0EH_HARDERR_FROM_DRIVE:
 						CMP		CX,BIOSERR_DETAIL_MEDIACHANGED
-						JE		@f
+						JE		SHORT @f
 						CMP		CX,BIOSERR_DETAIL_NOT_READY
-						JE		@f
+						JE		SHORT @f
 						RET
 @@:
 						MOV		BYTE PTR [BIOSFLAG_MEDIA_CHANGE_CACHE],0
@@ -411,7 +382,7 @@ CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG		PROC
 						;If CL==5         <Poll [0x567]>
 						;  DL=[0x567], [0x567] is reset to zero.
 						CMP		CL,5
-						JNE		@f
+						JNE		SHORT @f
 						XOR		DL,DL
 						XCHG	DL,[BIOSFLAG_0X567]
 						MOV		[BP+INCOMING_DX],DL
@@ -421,7 +392,7 @@ CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG		PROC
 						;If CL==0
 						;  DL=[0x564]
 						CMP		CL,0
-						JNE		@f
+						JNE		SHORT @f
 						MOV		DL,[BIOSFLAG_MEDIA_CHANGE_CACHE]
 						MOV		[BP+INCOMING_DX],DL
 						RET
@@ -432,7 +403,7 @@ CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG		PROC
 						;  [0x564]=DL
 						;  [0x566]|=DL
 						CMP		CL,1
-						JNE		@f
+						JNE		SHORT @f
 						MOV		[BIOSFLAG_MEDIA_CHANGE_CACHE],DL
 						OR		[BIOSFLAG_0X566],DL
 						RET
@@ -442,7 +413,7 @@ CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG		PROC
 						;If CL==2          <Poll [0x565]>
 						;  DL=[0x565], [0x565] is reset to zero.
 						CMP		CL,2
-						JNE		@f
+						JNE		SHORT @f
 						XOR		DL,DL
 						XCHG	[BIOSFLAG_0X565],DL
 						MOV		[BP+INCOMING_DX],DL
@@ -453,7 +424,7 @@ CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG		PROC
 						;If CL==4
 						;  [0x566]|=DL
 						CMP		CL,4
-						JNE		@f
+						JNE		SHORT @f
 						OR		[BIOSFLAG_0X566],DL
 						RET
 @@:
@@ -462,7 +433,7 @@ CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG		PROC
 						;If CL==8          <Retrieve [0x568] Pause flag>
 						;  DL=[0x568]
 						CMP		CL,8
-						JNE		@f
+						JNE		SHORT @f
 						MOV		DL,[BIOSFLAG_PAUSE_STATE]
 						MOV		[BP+INCOMING_DX],DL
 						RET
@@ -473,7 +444,7 @@ CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG		PROC
 						;  [0x568]=DL      <Set [0x568] Pause flag>
 						;  DL=[0x568]
 						CMP		CL,16
-						JNE		@f
+						JNE		SHORT @f
 						MOV		[BIOSFLAG_PAUSE_STATE],DL
 						RET
 @@:
@@ -487,7 +458,7 @@ CDROM_BIOS_0FH_DIRECT_ACCESS_INTERNAL_FLAG		ENDP
 
 CDROM_BIOS_15H_READ_SECTOR_MSF	PROC
 						CMP		CH,0FFH
-						JNE		@f
+						JNE		SHORT @f
 						JMP		CDROM_BIOS_READ_SECTOR_EX
 @@:
 
@@ -520,11 +491,11 @@ CDROM_BIOS_15H_READ_SECTOR_MSF	ENDP
 
 CDROM_BIOS_050H_START_PLAY		PROC
 						CMP		CH,0
-						JE		@f
+						JE		SHORT @f
 						CMP		CH,0FFH
-						JE		@f
+						JE		SHORT @f
 						CMP		CH,0FEH
-						JE		@f
+						JE		SHORT @f
 
 						; Parameter Error
 						MOV		AH,080H
@@ -548,14 +519,14 @@ CDROM_BIOS_050H_START_PLAY		PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f			; Jump if no SCSI error
+						JNC		SHORT @f			; Jump if no SCSI error
 						MOV		CS:[DEBUG_REDIR_SUBSTEP],'b'
 						RET
 @@:
 
 						MOV		AL,[SCSI_DATA_BUF+1]
 						CMP		BYTE PTR [SCSI_DATA_BUF+1],11H ; 11H=PLAYING
-						JNE		@f			; Jump if not playing
+						JNE		SHORT @f			; Jump if not playing
 						MOV		AH,10H
 						MOV		CS:[DEBUG_REDIR_SUBSTEP],'c'
 						RET
@@ -596,7 +567,7 @@ CDROM_BIOS_051H_GET_PLAY_INFO	ENDP
 
 CDROM_BIOS_052H_STOP_PLAY		PROC
 						CMP		CH,0FFH
-						JNE		@f
+						JNE		SHORT @f
 
 						; SCSI2 does not support idle-time to auto stop.  Just ignore.
 						MOV		AH,0
@@ -607,12 +578,12 @@ CDROM_BIOS_052H_STOP_PLAY		PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f
+						JNC		SHORT @f
 						RET
 @@:
 
 						CMP		BYTE PTR [SCSI_DATA_BUF+1],11H ; 11H=PLAYING
-						JE		@f			; Jump if playing
+						JE		SHORT @f			; Jump if playing
 						; If not playing, just return no error.
 						MOV		AH,0
 						RET
@@ -621,7 +592,7 @@ CDROM_BIOS_052H_STOP_PLAY		PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_STOP_PLAY
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JC		@f
+						JC		SHORT @f
 
 						; At least I can stop CD by sending RESTORE command.
 						; But, I don't want my CD head to go back and forth when playing in random tracks.
@@ -637,7 +608,7 @@ CDROM_BIOS_052H_STOP_PLAY		ENDP
 
 CDROM_BIOS_053H_GET_PLAY_STATE	PROC
 						CMP		CH,0
-						JE		@f
+						JE		SHORT @f
 						MOV		AH,BIOSERR_HARDERROR		; AH=080H
 						MOV		CX,BIOSERR_DETAIL_PARAMETER  ; CL=2
 						RET
@@ -646,7 +617,7 @@ CDROM_BIOS_053H_GET_PLAY_STATE	PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f
+						JNC		SHORT @f
 						RET
 @@:
 
@@ -670,7 +641,7 @@ CDROM_BIOS_053H_GET_PLAY_STATE	PROC
 
 						XOR		AH,AH
 						CMP		BYTE PTR [SCSI_DATA_BUF+1],11H ; 11H=PLAYING
-						JE		@f			; Jump if playing
+						JE		SHORT @f			; Jump if playing
 
 						XOR		AX,AX
 						XOR		CX,CX
@@ -718,13 +689,13 @@ CDROM_BIOS_054H_GET_DISC_INFO_TOC	PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f			; Jump if no SCSI error
+						JNC		SHORT @f			; Jump if no SCSI error
 						RET
 @@:
 
 						MOV		AL,[SCSI_DATA_BUF+1]
 						CMP		BYTE PTR [SCSI_DATA_BUF+1],11H ; 11H=PLAYING
-						JNE		@f			; Jump if not playing
+						JNE		SHORT @f			; Jump if not playing
 						MOV		AH,BIOSERR_ALREADY_PLAYING
 						RET
 @@:
@@ -733,7 +704,7 @@ CDROM_BIOS_054H_GET_DISC_INFO_TOC	PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READTOC
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f
+						JNC		SHORT @f
 						RET
 @@:
 
@@ -762,7 +733,7 @@ CDROM_BIOS_054H_GET_DISC_INFO_TOC	PROC
 						; Uncomment the following if it is correct.
 						; But, to make it compatible with FM TOWNS CD-ROM BIOS, it shouldn't subtract 2 seconds apparently.
 ;						SUB		AH,2	; 2 seconds
-;						JNC		@f
+;						JNC		SHORT @f
 ;						ADD		AH,60
 ;						DEC		DL
 ;@@:
@@ -781,7 +752,7 @@ CDROM_BIOS_054H_TRACK_LOOP:
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READTOC
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f
+						JNC		SHORT @f
 
 						POP		DX
 						POP		DI
@@ -830,7 +801,7 @@ CDROM_BIOS_054H_TRACK_LOOP:
 						MOV		AH,1  ; Tentatively audio
 						MOV		AL,BYTE PTR [SCSI_DATA_BUF+5]
 						CMP		AL,14H
-						JNE		@f
+						JNE		SHORT @f
 						MOV		AH,2	; Data track
 						OR		BYTE PTR [SCSI_DATA_BUF+9],80H
 @@:
@@ -845,7 +816,7 @@ CDROM_BIOS_054H_TRACK_LOOP:
 
 						INC		DL
 						CMP		DL,ES:[SI+2]
-						JBE		CDROM_BIOS_054H_TRACK_LOOP
+						JBE		SHORT CDROM_BIOS_054H_TRACK_LOOP
 
 
 						XOR		AH,AH
@@ -862,7 +833,7 @@ CDROM_BIOS_055H_PAUSE	PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f
+						JNC		SHORT @f
 						RET
 @@:
 						; [SCSI_DATA_BUF+1]  Audio Status
@@ -871,13 +842,13 @@ CDROM_BIOS_055H_PAUSE	PROC
 
 						MOV		AL,BYTE PTR [SCSI_DATA_BUF+1]
 						CMP		AL,12H
-						JNE		@f
+						JNE		SHORT @f
 						MOV		AH,BIOSERR_ALREADY_PAUSED
 						RET
 @@:
 
 						CMP		AL,11H
-						JE		@f
+						JE		SHORT @f
 
 						; Towns OS installer expects AH=0 if this command is called when CDDA has not started.
 						XOR		AH,AH
@@ -904,7 +875,7 @@ CDROM_BIOS_056H_UNPAUSE	PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		@f
+						JNC		SHORT @f
 						RET
 @@:
 						; [SCSI_DATA_BUF+1]  Audio Status
@@ -912,13 +883,13 @@ CDROM_BIOS_056H_UNPAUSE	PROC
 						;   12H  Paused
 						MOV		AH,BYTE PTR [SCSI_DATA_BUF+1]
 						CMP		AH,11H
-						JNE		@f
+						JNE		SHORT @f
 						MOV		AH,BIOSERR_ALREADY_PLAYING
 						RET
 @@:
 
 						CMP		AH,12H
-						JE		@f
+						JE		SHORT @f
 						MOV		AH,BIOSERR_NOT_PAUSED
 						RET
 @@:
@@ -1027,7 +998,7 @@ CDROM_BIOS_READ_SECTOR_EX	PROC
 
 
 						CMP		AH,15H
-						JNE		@f		; Jump if it is not Read Sector MSF
+						JNE		SHORT @f		; Jump if it is not Read Sector MSF
 
 						; Convert MSF to HSG
 						; BX is carrying number of sectors.  Don't break BX
@@ -1080,7 +1051,7 @@ CDROM_BIOS_READ_SECTOR_EX	PROC
 						CALL	SCSI_COMMAND
 						POP		DS
 
-						JB		@f
+						JB		SHORT @f
 
 						MOV		WORD PTR [BP+INCOMING_BX],0
 						MOV		AH,00H
@@ -1098,4 +1069,3 @@ CDROM_BIOS_READ_SECTOR_EX	PROC
 READ_SECTOR_EX_SCSI_CMD	DB		28H,0,0,0,0,0,0,0,0,0
 
 CDROM_BIOS_READ_SECTOR_EX	ENDP
-
