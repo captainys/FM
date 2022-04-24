@@ -98,21 +98,19 @@ INTERRUPT				PROC	FAR
 						MOV		WORD PTR ES:[DI+3],0100H  ; Stat=DONE
 
 						CMP		AL,13
-						JNE		@f
-						JMP		CMD_OPEN
-@@:
+						JE		SHORT CMD_OPEN
+
 						CMP		AL,14
-						JNE		@f
-						JMP		CMD_CLOSE
-@@:
+						JE		SHORT CMD_CLOSE
+
 						CMP		AL,8
-						JNE		@f
-						JMP		CMD_WRITE
-@@:
+						JE		SHORT CMD_WRITE
+
 						CMP		AL,9
-						JNE		@f
-						JMP		CMD_WRITE
-@@:
+						JE		SHORT CMD_WRITE
+
+CMD_OPEN:
+CMD_CLOSE:
 CMD_EXIT:
 
 						POPF
@@ -120,11 +118,6 @@ CMD_EXIT:
 						POP		DS
 						POP		ES
 						RET
-
-CMD_OPEN:
-						JMP		CMD_EXIT
-CMD_CLOSE:
-						JMP		CMD_EXIT
 
 CMD_WRITE:
 						; Source https://www.drdobbs.com/writing-ms-dos-device-drivers/184402277?pgno=2
@@ -135,24 +128,24 @@ CMD_WRITE_LOOP:
 						MOV		AL,ES:[SI]  ; Was there an 8086 instruction that does these two lines?
 						LEA		SI,[SI+1]
 						CMP		AL,'V'
-						JNE		@f
+						JNE		SHORT @f
 						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
 						JMP		CMD_WRITE_LOOP_NEXT
 @@:
 						CMP		AL,'v'
-						JNE		@f
+						JNE		SHORT @f
 						AND		BYTE PTR CS:[YSSCSICD_FLAGS],NOT YSSCSICD_FLAGS_DEBUG_CONSOLE
 						JMP		CMD_WRITE_LOOP_NEXT
 
 @@:
 						CMP		AL,'R'
-						JNE		@f
+						JNE		SHORT @f
 						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
 						JMP		CMD_WRITE_LOOP_NEXT
 
 @@:
 						CMP		AL,'r'
-						JNE		@f
+						JNE		SHORT @f
 						AND		BYTE PTR CS:[YSSCSICD_FLAGS],NOT YSSCSICD_FLAGS_DEBUG_RS232C
 @@:
 CMD_WRITE_LOOP_NEXT:
@@ -420,7 +413,7 @@ INITIALIZE				PROC	FAR
 						CALL	SCAN_SCSI_CDROM
 						MOV		BYTE PTR [YSSCSICD_SCSI_ID],AL
 						CMP		AL,07H
-						JA		INIT_SCSI_NOT_FOUND
+						JA		SHORT INIT_SCSI_NOT_FOUND
 
 						LEA		DI,[MSG_FOUND_CDROM_AT]
 						CALL	PRINT_CSTR
