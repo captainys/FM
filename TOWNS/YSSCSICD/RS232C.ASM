@@ -41,7 +41,7 @@ RS232C_INIT				PROC
 
 						; RS232C BIOS Disassembly showed it writes two bytes in 0052H in a sequence.
 						MOV 	DX,0052H
-						MOV		AL,04H
+						MOV		AL,02H	; 04H->19200bps  02H->38400bps
 						OUT		DX,AL
 						MOV		AL,00H
 						OUT		DX,AL
@@ -49,22 +49,14 @@ RS232C_INIT				PROC
 						MOV		DX,0A02H
 						XOR		AL,AL
 
-						MOV		DX,0A02H
-						XOR		AL,AL
+						CALL	RS232C_UNIT_DELAY
+						OUT		DX,AL
+						CALL	RS232C_UNIT_DELAY
+						OUT		DX,AL
+						CALL	RS232C_UNIT_DELAY
 						OUT		DX,AL
 						CALL	RS232C_UNIT_DELAY
 
-						MOV		DX,0A02H
-						XOR		AL,AL
-						OUT		DX,AL
-						CALL	RS232C_UNIT_DELAY
-
-						MOV		DX,0A02H
-						XOR		AL,AL
-						OUT		DX,AL
-						CALL	RS232C_UNIT_DELAY
-
-						MOV		DX,0A02H
 						MOV		AL,040H		; Internal reset
 						OUT		DX,AL
 						CALL	RS232C_UNIT_DELAY
@@ -77,7 +69,6 @@ RS232C_INIT				PROC
 						; PN=0       -> No parity
 						; L2=1, L1=1 -> 8 bit
 						; B2=1, B1=0 -> 1/16 scalar
-						MOV		DX,0A02H
 						MOV		AL,4EH
 						OUT		DX,AL
 						CALL	RS232C_UNIT_DELAY
@@ -92,7 +83,6 @@ RS232C_INIT				PROC
 						; ON	RXE Receive Enable
 						; ON	DTR Treminal Ready
 						; ON	TXE Transmission Enable
-						MOV		DX,0A02H
 						MOV		AL,0B7H
 						OUT		DX,AL
 						CALL	RS232C_UNIT_DELAY
