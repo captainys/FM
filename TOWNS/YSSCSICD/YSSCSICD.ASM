@@ -86,71 +86,6 @@ STRATEGY				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-INITIALIZE				PROC	FAR
-						PUSH	ES
-						PUSH	DS
-						PUSHA
-
-						PUSH	CS
-						POP		DS
-						PUSH	CS
-						POP		ES
-
-						LEA		DI,[MSG_INTRO]
-						CALL	PRINT_CSTR
-
-						CALL	RECOGNIZE_COMMAND_PARAMETER
-;
-;						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
-;						JE		@f
-;						LEA		DI,[MSG_DEBUG_OUT_CON]
-;						CALL	PRINT_CSTR
-;@@:
-;
-;						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
-;						JE		@f
-;						LEA		DI,[MSG_DEBUG_OUT_RS232C]
-;						CALL	PRINT_CSTR
-;@@:
-
-						CALL	INSTALL_HOOK
-
-
-						MOV		WORD PTR CS:[DEVHDR_INTERRUPT],OFFSET INTERRUPT
-
-						CALL	SCAN_SCSI_CDROM
-						MOV		BYTE PTR [YSSCSICD_SCSI_ID],AL
-						CMP		AL,07H
-						JA		INIT_SCSI_NOT_FOUND
-
-						LEA		DI,[MSG_FOUND_CDROM_AT]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AL
-						CALL	PRINT_CRLF
-						JMP		INIT_SCSI_SCAN_DONE
-
-INIT_SCSI_NOT_FOUND:
-						LEA		DI,[MSG_CDROM_NOT_FOUND]
-						CALL	PRINT_CSTR
-INIT_SCSI_SCAN_DONE:
-
-
-						LES		DI,CS:[PACKET]
-
-						MOV		WORD PTR ES:[DI+3],0100H		; Status
-						MOV		BYTE PTR ES:[DI+13],0			; Number of Drives
-						MOV		WORD PTR ES:[DI+14],OFFSET DEVICE_END
-						MOV		WORD PTR ES:[DI+16],CS
-
-						POPA
-						POP		DS
-						POP		ES
-						RET
-
-INITIALIZE				ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 INTERRUPT				PROC	FAR
 						PUSH	ES
 						PUSH	DS
@@ -258,6 +193,71 @@ DATA_CODE				SEGMENT
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DEVICE_END				DB		'DEVICE END',0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+INITIALIZE				PROC	FAR
+						PUSH	ES
+						PUSH	DS
+						PUSHA
+
+						PUSH	CS
+						POP		DS
+						PUSH	CS
+						POP		ES
+
+						LEA		DI,[MSG_INTRO]
+						CALL	PRINT_CSTR
+
+						CALL	RECOGNIZE_COMMAND_PARAMETER
+;
+;						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
+;						JE		@f
+;						LEA		DI,[MSG_DEBUG_OUT_CON]
+;						CALL	PRINT_CSTR
+;@@:
+;
+;						TEST	BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
+;						JE		@f
+;						LEA		DI,[MSG_DEBUG_OUT_RS232C]
+;						CALL	PRINT_CSTR
+;@@:
+
+						CALL	INSTALL_HOOK
+
+
+						MOV		WORD PTR CS:[DEVHDR_INTERRUPT],OFFSET INTERRUPT
+
+						CALL	SCAN_SCSI_CDROM
+						MOV		BYTE PTR [YSSCSICD_SCSI_ID],AL
+						CMP		AL,07H
+						JA		INIT_SCSI_NOT_FOUND
+
+						LEA		DI,[MSG_FOUND_CDROM_AT]
+						CALL	PRINT_CSTR
+						CALL	PRINT_AL
+						CALL	PRINT_CRLF
+						JMP		INIT_SCSI_SCAN_DONE
+
+INIT_SCSI_NOT_FOUND:
+						LEA		DI,[MSG_CDROM_NOT_FOUND]
+						CALL	PRINT_CSTR
+INIT_SCSI_SCAN_DONE:
+
+
+						LES		DI,CS:[PACKET]
+
+						MOV		WORD PTR ES:[DI+3],0100H		; Status
+						MOV		BYTE PTR ES:[DI+13],0			; Number of Drives
+						MOV		WORD PTR ES:[DI+14],OFFSET DEVICE_END
+						MOV		WORD PTR ES:[DI+16],CS
+
+						POPA
+						POP		DS
+						POP		ES
+						RET
+
+INITIALIZE				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
