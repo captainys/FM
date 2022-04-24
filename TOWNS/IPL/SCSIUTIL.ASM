@@ -14,7 +14,7 @@ IDENTIFY_SCSI_DEVICE	PROC
 						MOV		BYTE PTR [SI+1],0  ; Looks like Logical Unit ID needs to be zero.
 
 						MOV		EDI,DS
-						AND		EDI,0FFFFH
+						MOVZX	EDI,DI
 						SHL		EDI,4
 						ADD		EDI,OFFSET SCSI_DATABUF
 

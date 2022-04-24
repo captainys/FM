@@ -73,9 +73,9 @@ READ_HIGHB				PROC
 						JMP		@f
 @@:
 
-						AND		ESI,0000FFFFH
-						AND		EDI,0000FFFFH
-						AND		ECX,0000FFFFH
+						MOVZX	ESI,SI
+						MOVZX	EDI,DI
+						MOVZX	ECX,CX
 
 
 						; Quote from https://www.felixcloutier.com/x86/lgdt:lidt
