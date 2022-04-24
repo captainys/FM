@@ -2,18 +2,21 @@
 ; Incoming BH:Unit Number
 
 LOAD_YSSCSICD			PROC
+						PUSH	DS
+
 						MOV		DX,0404H ; TOWNSIO_FMR_VRAM_OR_MAINRAM
 						IN		AL,DX
 						PUSH	AX
+						PUSH	DX
 						MOV		AL,80H
 						OUT		DX,AL
 
 						MOV		WORD PTR [LOAD_YSSCSICD_BUFFADDR],0
 						MOV		BX,CS:[INCOMING_BX]
 						CMP		BL,2
-						JE		LOAD_YSSCSICD_FD
+						JE		SHORT LOAD_YSSCSICD_FD
 						CMP		BL,1
-						JE		LOAD_YSSCSICD_FROM_SCSI
+						JE		SHORT LOAD_YSSCSICD_FROM_SCSI
 						; CMP		BL,1
 						; JNE		YSSCSICD_LOAD_DONE
 						; JMP		LOAD_YSSCSICD_HD
@@ -21,16 +24,15 @@ LOAD_YSSCSICD			PROC
 						JE		LOAD_YSSCSICD_FROM_ICM
 
 YSSCSICD_LOAD_DONE:
+						POP		DX	; 2-bytes shorter than MOV DX,0404H.
 						POP		AX
-						MOV		DX,0404H ; TOWNSIO_FMR_VRAM_OR_MAINRAM
 						OUT		DX,AL
+						POP		DS
 						RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 LOAD_YSSCSICD_FD:
-						PUSH	DS
-
 						MOV		AX,YSSCSICD_FD_BEGIN_TRACK*2+YSSCSICD_FD_BEGIN_SIDE
 						MOV		CS:[LOAD_YSSCSICD_TRK_SIDE],AX
 
@@ -53,53 +55,42 @@ LOAD_YSSCSICD_FD:
 						DW		 0014H
 						DW		0FFFBH
 
-						JB		SHORT @f
+						JB		SHORT YSSCSICD_LOAD_DONE
 
 						INC		WORD PTR CS:[LOAD_YSSCSICD_TRK_SIDE]
 						ADD		WORD PTR CS:[LOAD_YSSCSICD_BUFFADDR],8192
 						MOV		DI,CS:[LOAD_YSSCSICD_BUFFADDR]
 						CMP		DI,0C000H
-						JB		@b
+						JB		SHORT @b
 
 						MOV		BYTE PTR CS:[YSSCSICD_LOADED],1
-
-@@:
-						POP		DS
-						JMP		YSSCSICD_LOAD_DONE
+						JMP		SHORT YSSCSICD_LOAD_DONE
 
 
 LOAD_YSSCSICD_FROM_SCSI:
-						PUSH	DS
-
-						MOV		SI,OFFSET SCSI_READ_SECTOR_CMD
-
-						MOV		EDX,CS:[YSSCSICD_LBA]
-						MOV		[SI+4],DH
-						MOV		[SI+5],DL
-						ROR		EDX,16
-						MOV		[SI+2],DH
-						MOV		[SI+3],DL
-
-						MOV		DL,CS:[YSSCSICD_SECTOR_COUNT]
-						MOV		[SI+8],DL
-
-						MOV		EDI,YSSCSICD_SEGMENT*16
-
 						MOV		CL,BYTE PTR CS:[INCOMING_BX+1]	; Incoming BH=Unit Number
+						MOV		EDX,CS:[YSSCSICD_LBA]
+						MOVZX	BX,BYTE PTR CS:[YSSCSICD_SECTOR_COUNT]
+						MOV		EDI,YSSCSICD_SEGMENT*16
+						PUSH	CS
+						POP		DS
 
-						CALL	SCSI_COMMAND
-						JB		@b
+						; Input
+						;   CL    SCSI ID
+						;   EDX   Starting Sector
+						;   BX    Number of Sectors
+						;   EDI   Data Buffer Physical Address
+						;   DS=CS
+						; Output
+						;   CF    Set if error
+						CALL	SCSI_READ_SECTOR
+						JB		SHORT YSSCSICD_LOAD_DONE
 
 						MOV		BYTE PTR CS:[YSSCSICD_LOADED],1
-
-@@:
-						POP		DS
-						JMP		YSSCSICD_LOAD_DONE
+						JMP		SHORT YSSCSICD_LOAD_DONE
 
 
 LOAD_YSSCSICD_FROM_ICM:
-						PUSH	DS
-
 						MOV		AX,YSSCSICD_SEGMENT
 						MOV		DS,AX
 						MOV		DI,CS:[LOAD_YSSCSICD_BUFFADDR]
@@ -118,11 +109,9 @@ LOAD_YSSCSICD_FROM_ICM:
 						DW		 0014H
 						DW		0FFFBH
 
-						JB		SHORT @f
+						JB		YSSCSICD_LOAD_DONE
 
 						MOV		BYTE PTR CS:[YSSCSICD_LOADED],1
-@@:
-						POP		DS
 						JMP		YSSCSICD_LOAD_DONE
 
 
