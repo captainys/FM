@@ -99,6 +99,9 @@ LOCATE					ENDP
 
 
 
+
+
+
 ; DI:  VRAM ADDRESS
 ; AH:  ASCII Code
 ; C0000H must be in FM-R VRAM mode.
