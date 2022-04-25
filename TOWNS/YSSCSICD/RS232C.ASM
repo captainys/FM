@@ -148,55 +148,35 @@ RS232C_PUTC				ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 RS232C_REGISTER			PROC
-
 						PUSHA
+
+						PUSH	ES
+						PUSH	DS
+						PUSH	CS
 						PUSH	DI
+						PUSH	SI
+						PUSH	DX
+						PUSH	CX
+						PUSH	BX
+						PUSH	AX
 
-						LEA		DI,[MSG_REG_AX]
+						MOV		DI,OFFSET MSG_REG_AX
+
+RS232C_REGISTER_OUTER_LOOP:
+						POP		AX
+						PUSH	DI
 						CALL	RS232C_CSTR
 						CALL	RS232C_AX
-
-						MOV		AX,BX
-						LEA		DI,[MSG_REG_BX]
-						CALL	RS232C_CSTR
-						CALL	RS232C_AX
-
-						MOV		AX,CX
-						LEA		DI,[MSG_REG_CX]
-						CALL	RS232C_CSTR
-						CALL	RS232C_AX
-
-						MOV		AX,DX
-						LEA		DI,[MSG_REG_DX]
-						CALL	RS232C_CSTR
-						CALL	RS232C_AX
-
-						MOV		AX,SI
-						LEA		DI,[MSG_REG_SI]
-						CALL	RS232C_CSTR
-						CALL	RS232C_AX
-
 						POP		DI
 
-						MOV		AX,DI
-						LEA		DI,[MSG_REG_DI]
-						CALL	RS232C_CSTR
-						CALL	RS232C_AX
+RS232C_REGISTER_INNER_LOOP:
+						INC		DI
+						CMP		BYTE PTR CS:[DI],0
+						JNE		RS232C_REGISTER_INNER_LOOP
+						INC		DI
 
-						MOV		AX,CS
-						LEA		DI,[MSG_REG_CS]
-						CALL	RS232C_CSTR
-						CALL	RS232C_AX
-
-						MOV		AX,DS
-						LEA		DI,[MSG_REG_DS]
-						CALL	RS232C_CSTR
-						CALL	RS232C_AX
-
-						MOV		AX,ES
-						LEA		DI,[MSG_REG_ES]
-						CALL	RS232C_CSTR
-						CALL	RS232C_AX
+						CMP		BYTE PTR CS:[DI],0
+						JNE		RS232C_REGISTER_OUTER_LOOP
 
 						MOV		AL,'$'
 						CALL	RS232C_PUTC
@@ -233,38 +213,6 @@ RS232C_AX				PROC
 						CALL	RS232C_AL
 						RET
 RS232C_AX				ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-RS232C_AX_CH			PROC
-
-						; FM TOWNS BIOS disassembly strongly suggests that CH is the error code.
-						; The meaning of CH is still unknown, but 0 means no error.
-						PUSH	CX
-						PUSH	AX
-						PUSH	BP
-
-						MOV		BP,SP
-						MOV		AL,BYTE PTR [BP+1]
-						CALL	RS232C_AL
-						MOV		AL,BYTE PTR [BP+0]
-						CALL	RS232C_AL
-
-						MOV		AL,' '
-						CALL	RS232C_PUTC
-						MOV		AL,BYTE PTR [BP+3]
-						CALL	RS232C_AL
-
-						MOV		AL,' '
-						CALL	RS232C_PUTC
-
-						POP		BP
-						POP		AX
-						POP		CX
-
-						RET
-
-RS232C_AX_CH			ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RS232C_AH_CX			PROC

@@ -37,59 +37,40 @@ MSG_REG_SI				DB		" SI=",0
 MSG_REG_DI				DB		" DI=",0
 MSG_REG_CS				DB		" CS=",0
 MSG_REG_DS				DB		" DS=",0
-MSG_REG_ES				DB		" ES=",0
+MSG_REG_ES				DB		" ES=",0,0
 
 
 PRINT_REGISTER			PROC
 
 						PUSHA
+
+						PUSH	ES
+						PUSH	DS
+						PUSH	CS
 						PUSH	DI
+						PUSH	SI
+						PUSH	DX
+						PUSH	CX
+						PUSH	BX
+						PUSH	AX
 
-						LEA		DI,[MSG_REG_AX]
+						MOV		DI,OFFSET MSG_REG_AX
+
+PRINT_REGISTER_OUTER_LOOP:
+						POP		AX
+						PUSH	DI
 						CALL	PRINT_CSTR
 						CALL	PRINT_AX
-
-						MOV		AX,BX
-						LEA		DI,[MSG_REG_BX]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AX
-
-						MOV		AX,CX
-						LEA		DI,[MSG_REG_CX]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AX
-
-						MOV		AX,DX
-						LEA		DI,[MSG_REG_DX]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AX
-
-						MOV		AX,SI
-						LEA		DI,[MSG_REG_SI]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AX
-
 						POP		DI
 
-						MOV		AX,DI
-						LEA		DI,[MSG_REG_DI]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AX
+PRINT_REGISTER_INNER_LOOP:
+						INC		DI
+						CMP		BYTE PTR CS:[DI],0
+						JNE		PRINT_REGISTER_INNER_LOOP
+						INC		DI
 
-						MOV		AX,CS
-						LEA		DI,[MSG_REG_CS]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AX
-
-						MOV		AX,DS
-						LEA		DI,[MSG_REG_DS]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AX
-
-						MOV		AX,ES
-						LEA		DI,[MSG_REG_ES]
-						CALL	PRINT_CSTR
-						CALL	PRINT_AX
+						CMP		BYTE PTR CS:[DI],0
+						JNE		PRINT_REGISTER_OUTER_LOOP
 
 						MOV		AL,'$'
 						CALL	PUTC
@@ -126,38 +107,6 @@ PRINT_AX				PROC
 						CALL	PRINT_AL
 						RET
 PRINT_AX				ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-PRINT_AX_CH				PROC
-
-						; FM TOWNS BIOS disassembly strongly suggests that CH is the error code from INT 93H AH=0FDH.
-						; The meaning of CH is still unknown, but 0 means no error.
-						PUSH	CX
-						PUSH	AX
-						PUSH	BP
-
-						MOV		BP,SP
-						MOV		AL,BYTE PTR [BP+3]
-						CALL	PRINT_AL
-						MOV		AL,BYTE PTR [BP+2]
-						CALL	PRINT_AL
-
-						MOV		AL,' '
-						CALL	PUTC
-						MOV		AL,BYTE PTR [BP+5]
-						CALL	PRINT_AL
-
-						MOV		AL,' '
-						CALL	PUTC
-
-						POP		BP
-						POP		AX
-						POP		CX
-
-						RET
-
-PRINT_AX_CH				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

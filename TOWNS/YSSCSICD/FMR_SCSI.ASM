@@ -84,21 +84,13 @@ BIOSERR_DETAIL_MEDIACHANGED	EQU		128
 ; Also tentatively set destination address to internal data buffer
 MAKE_CMD_BUF			PROC
 
-						PUSH	SI
-
-						LEA		SI,[SCSI_DATA_BUF]
-						MOV		WORD PTR [SCSI_DATABUF_PTR  ],SI
+						MOV		WORD PTR [SCSI_DATABUF_PTR  ],OFFSET SCSI_DATA_BUF
 						MOV		WORD PTR [SCSI_DATABUF_PTR+2],CS
 
+						MOV		DWORD PTR [SCSI_CMD  ],0
+						MOV		DWORD PTR [SCSI_CMD+4],0
+						MOV		DWORD PTR [SCSI_CMD+8],0
 						MOV		[SCSI_CMD  ],AL
-						MOV		BYTE PTR [SCSI_CMD+1],0
-						MOV		WORD PTR [SCSI_CMD+2],0
-						MOV		WORD PTR [SCSI_CMD+4],0
-						MOV		WORD PTR [SCSI_CMD+6],0
-						MOV		WORD PTR [SCSI_CMD+8],0
-						MOV		WORD PTR [SCSI_CMD+10],0
-
-						POP		SI
 
 						RET
 MAKE_CMD_BUF			ENDP
@@ -227,7 +219,7 @@ FIRE_INT_93H			PROC
 						MOV		CL,AL
 						AND		CL,7
 
-						LEA		SI,[SCSI_CMD]
+						MOV		SI,OFFSET SCSI_CMD
 						PUSH	CS
 						POP		DS
 
@@ -264,7 +256,7 @@ CLEAR_DATA_BUF			PROC
 						PUSH	CS
 						POP		ES
 
-						LEA		DI,[SCSI_DATA_BUF]
+						MOV		DI,OFFSET SCSI_DATA_BUF
 						MOV		AL,0
 						MOV		CX,SCSI_DATA_BUF_LENGTH
 						REP		STOSB
@@ -359,9 +351,9 @@ IS_SCSI_ERROR			ENDP
 IS_AUDIO_STATE_PLAYING	PROC
 
 						CMP		AL,11H
-						JE		@f
+						JE		SHORT @f
 						CMP		AL,12H
-						JE		@f
+						JE		SHORT @f
 						CLC
 						RET
 @@:
@@ -479,8 +471,9 @@ SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS	PROC
 						MOV		AL,SCSI2_CMD_READ_SUBCHANNEL
 						CALL	MAKE_CMD_BUF
 
-						MOV		BYTE PTR [SCSI_CMD+1],02H  ; MSF bit
-						MOV		BYTE PTR [SCSI_CMD+2],40H  ; Return SubQ info. What is it?
+						; MOV		BYTE PTR [SCSI_CMD+1],02H  ; MSF bit
+						; MOV		BYTE PTR [SCSI_CMD+2],40H  ; Return SubQ info. What is it?
+						MOV		WORD PTR [SCSI_CMD+1],4002H	; 40H=Return SubQ,  02H=MSF bit
 						MOV		BYTE PTR [SCSI_CMD+3],01H  ; Return format is CD-ROM Current Position
 						MOV		BYTE PTR [SCSI_CMD+8],16;  
 						; I have a feeling that the size [SCSI_CMD+8] needs to be 48, but
