@@ -100,28 +100,30 @@ INT93H_IS_CDROM_CALL:
 						JE		INT93H_NO_RS232C_POST
 						PUSHA
 
+						PUSH	AX
+
 						;;;;;;;;
 
-						PUSH	AX
+						PUSH	DI
 						PUSH	CX
 						CMP		BYTE PTR CS:[YSSCSICD_DEBUG_CMD_CACHE],050H
 						JNE		SHORT @f
-						CALL	INT93_DEBUG_RS232C_PLAY_INFO
+						CALL	INT93_DEBUG_RS232C_PLAY_INFO	; This proc will destroy DI, CX and AX.
 @@:
 						CMP		BYTE PTR CS:[YSSCSICD_DEBUG_CMD_CACHE],054H
 						JNE		SHORT @f
-						CALL	INT93_DEBUG_RS232C_TOC
+						CALL	INT93_DEBUG_RS232C_TOC	; This proc will destroy DI, CX and AX.
 @@:
 						POP		CX
-						POP		AX
+						POP		DI
 
 						;;;;;;;;
 
-						PUSH	AX
 						MOV		AL,'R'
 						CALL	RS232C_PUTC
 						MOV		AL,CS:[DEBUG_REDIR_SUBSTEP]
 						CALL	RS232C_PUTC
+
 						POP		AX
 						CALL	RS232C_AH_CX
 						CALL	RS232C_CRLF
@@ -137,30 +139,20 @@ INT93H_HOOKPROC			ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 INT93_DEBUG_RS232C_PLAY_INFO	PROC
-						PUSH	DI
-						PUSH	CX
-						PUSH	AX
 						MOV		CX,6
 @@:
 						MOV		AL,DS:[DI]
 						CALL	RS232C_AL
-						LEA		DI,[DI+1]
+						INC		DI
 						LOOP	SHORT @b
 
 						CALL	RS232C_CRLF
-						POP		AX
-						POP		CX
-						POP		DI
 						RET
 INT93_DEBUG_RS232C_PLAY_INFO	ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 INT93_DEBUG_RS232C_TOC	PROC
-						PUSH	DI
-						PUSH	CX
-						PUSH	AX
-
 						CMP		AH,0
 						JNE		INT93_DEBUG_RS232C_TOC_ERROR
 
@@ -180,9 +172,6 @@ INT93_DEBUG_RS232C_TOC	PROC
 						LOOP	SHORT @b
 
 INT93_DEBUG_RS232C_TOC_ERROR:
-						POP		AX
-						POP		CX
-						POP		DI
 						RET
 INT93_DEBUG_RS232C_TOC	ENDP
 
