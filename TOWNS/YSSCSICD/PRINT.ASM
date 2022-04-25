@@ -164,7 +164,7 @@ PRINT_CSTR				PROC
 						JE		PRINT_CSTR_EXIT
 						MOV		AH,06H
 						INT		21H
-						LEA		DI,[DI+1]
+						INC		DI
 						JMP		@b
 
 PRINT_CSTR_EXIT:

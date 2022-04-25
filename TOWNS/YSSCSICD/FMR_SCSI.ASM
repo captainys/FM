@@ -168,8 +168,8 @@ ISSUE_SCSI_CMD			ENDP
 ; FIRE_INT_93H			PROC
 ; Using Disk BIOS Hidden Function
 ;						PUSH	SI
-;						LEA		DI,[SCSI_DATABUF_PTR]
-;						; LEA		SI,[SCSI_DATA_BUF]	; Probably SI doesn't matter in this function.
+;						MOV		DI,OFFSET SCSI_DATABUF_PTR
+;						; MOV		SI,OFFSET SCSI_DATA_BUF	; Probably SI doesn't matter in this function.
 ;						XOR		CX,CX			; CH LUN (Must be zero)
 ;						MOV		AH,BIOS_DIRECT_COMMAND
 ;						AND		AL,7

@@ -269,7 +269,7 @@ RS232C_CSTR				PROC
 						CMP		AL,0
 						JE		RS232C_CSTR_EXIT
 						CALL	RS232C_PUTC
-						LEA		DI,[DI+1]
+						INC		DI
 						JMP		@b
 
 RS232C_CSTR_EXIT:

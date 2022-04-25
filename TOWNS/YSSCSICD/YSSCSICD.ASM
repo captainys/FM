@@ -126,7 +126,7 @@ CMD_WRITE:
 
 CMD_WRITE_LOOP:
 						MOV		AL,ES:[SI]  ; Was there an 8086 instruction that does these two lines?
-						LEA		SI,[SI+1]
+						INC		SI
 						CMP		AL,'V'
 						JNE		SHORT @f
 						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
@@ -280,7 +280,7 @@ CMD_PARAM_OUT_PARAM:
 						MOV		DH,1
 
 CMD_PARAM_NEXT:
-						LEA		SI,[SI+1]
+						INC		SI
 						JMP		CMD_PARAM_LOOP
 CMD_PARAM_EXIT:
 
