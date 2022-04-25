@@ -457,8 +457,8 @@ CDROM_BIOS_15H_READ_SECTOR_MSF	PROC
 						PUSH	AX
 
 						MOV		AX,DX
-						MOV		DL,CL
-						XOR		DH,DH
+						MOVZX	DX,CL  ; <-> Equiv MOV DL,CL / XOR DH,DH
+
 						; DX|AX  MSF
 						CALL	MSF2HSG
 						; DX|AX  HSG
@@ -484,10 +484,8 @@ CDROM_BIOS_15H_READ_SECTOR_MSF	ENDP
 CDROM_BIOS_050H_START_PLAY		PROC
 						CMP		CH,0
 						JE		SHORT @f
-						CMP		CH,0FFH
-						JE		SHORT @f
 						CMP		CH,0FEH
-						JE		SHORT @f
+						JAE		SHORT @f	; 0FEh or 0FFh
 
 						; Parameter Error
 						MOV		AH,080H
