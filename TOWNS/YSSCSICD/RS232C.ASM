@@ -35,16 +35,14 @@ RS232C_INIT				PROC
 						; Timer #4 must be set to Async 1/16 for 19200bps
 						; Timer #4 mode must be 2 "Rate Generator"
 						; RS232C BIOS is using mode 3 "Rectangular Rate Generator"
-						MOV		DX,0056H
 						MOV		AL,076H  ; Valule based on BIOS disassembly
-						OUT		DX,AL
+						OUT		056H,AL
 
 						; RS232C BIOS Disassembly showed it writes two bytes in 0052H in a sequence.
-						MOV 	DX,0052H
 						MOV		AL,02H	; 04H->19200bps  02H->38400bps
-						OUT		DX,AL
+						OUT		052H,AL
 						MOV		AL,00H
-						OUT		DX,AL
+						OUT		052H,AL
 
 						MOV		DX,0A02H
 						XOR		AL,AL
