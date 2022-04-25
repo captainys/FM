@@ -279,14 +279,13 @@ CLEAR_DATA_BUF			ENDP
 ;   CX            CD-ROM BIOS Error Code
 IS_SCSI_ERROR			PROC
 						CMP		CH,2
-						JNE		@f
+						JNE		SHORT @f
 						CMP		AH,0
-						JNE		@f
-						JMP		IS_SCSI_ERROR_YES
+						JE		IS_SCSI_ERROR_YES
 
 @@:
 						CMP		CH,0
-						JE		@f
+						JE		SHORT @f
 						MOV		AH,BIOSERR_HARDERROR
 						MOV		CX,BIOSERR_DETAIL_DISCONNECTED
 						STC
@@ -294,13 +293,12 @@ IS_SCSI_ERROR			PROC
 
 @@:
 						TEST	AH,7	; CDSD is ignoring bit 4 to 7.  Maybe it should be.
-						JNE		@f
+						JNE		SHORT IS_SCSI_ERROR_YES
 						MOV		AH,0
 						MOV		CX,0
 						CLC
 						RET
 
-@@:
 IS_SCSI_ERROR_YES:
 						MOV		AH,BIOSERR_HARDERROR
 
@@ -317,29 +315,29 @@ IS_SCSI_ERROR_YES:
 ;  6 media changed/reset
 ;  7 data protected
 ;  8 blank check what is it?
-
+						; If not know what to do, just default to not ready :-P
 						MOV		CX,BIOSERR_DETAIL_NOT_READY
-						CMP		AL,2
-						JE		@f
-						MOV		CX,BIOSERR_DETAIL_MEDIAERROR
-						CMP		AL,3
-						JE		@f
-						MOV		CX,BIOSERR_DETAIL_HARDWARE
-						CMP		AL,4
-						JE		@f
-						MOV		CX,BIOSERR_DETAIL_PARAMETER
-						CMP		AL,5
-						JE		@f
-						MOV		CX,BIOSERR_DETAIL_MEDIACHANGED
+
 						CMP		AL,6
-						JE		@f
+						JA		SENSE_KEY_DEFINED_BUT_FMR_BIOS_DOES_NOT
 
-						; If not know what to do, just say not ready :-P
-						MOV		CX,BIOSERR_DETAIL_NOT_READY
-@@:
+						PUSH	BX
+						MOVZX	BX,AL
+						MOVZX	CX,BYTE PTR CS:[SENSE_KEY_TO_FMR_BIOS_ERRORCODE+BX]
+						POP		BX
+
+SENSE_KEY_DEFINED_BUT_FMR_BIOS_DOES_NOT:
 						STC
 						RET
 
+SENSE_KEY_TO_FMR_BIOS_ERRORCODE:
+						DB		BIOSERR_DETAIL_NOT_READY	;  0 no sense -> Default to Not Ready
+						DB		BIOSERR_DETAIL_NOT_READY    ;  1 recovered error -> Default to Not Ready
+						DB		BIOSERR_DETAIL_NOT_READY	;  2 not ready
+						DB		BIOSERR_DETAIL_MEDIAERROR	;  3 media error
+						DB		BIOSERR_DETAIL_HARDWARE		;  4 hardware error
+						DB		BIOSERR_DETAIL_PARAMETER	;  5 illegal request
+						DB		BIOSERR_DETAIL_MEDIACHANGED	;  6 media changed/reset
 
 IS_SCSI_ERROR			ENDP
 
