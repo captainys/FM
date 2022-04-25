@@ -101,7 +101,7 @@ SCSI_COMMAND			PROC
 
 						CALL	SCSI_WAIT_BUSY
 						CALL	SCSI_START_COMMAND_SEQUENCE
-						JB		SCSI_ERROR_80
+						JB		SHORT SCSI_ERROR_80
 
 						; Keep DS:SI command pointer in the loop.
 
@@ -114,10 +114,10 @@ SCSI_PHASE_LOOP:
 						MOV		DX,IO_SCSI_STATUS
 						IN		AL,DX
 						TEST	AL,08H			; Zero means BUSFREE
-						JE		SCSI_END_OF_SEQUENCE
+						JE		SHORT SCSI_END_OF_SEQUENCE
 
 						TEST	AL,80H			; Non-Zero means REQ
-						JE		SCSI_PHASE_LOOP
+						JE		SHORT SCSI_PHASE_LOOP
 
 ; Phase and I/O [0xC32] read
 ;  PHASE_BUSFREE:       C_D=0x10  MSG=0x20  I_O=0x40     I/O [0xC32]  0x0*
@@ -131,15 +131,15 @@ SCSI_PHASE_LOOP:
 ;  PHASE_MESSAGE_IN:    C_D=0x10  MSG=0x20  I_O=0x40     I/O [0xC32]  0x7*
 
 						AND		AL,70H
-						JE		SCSI_DATA_OUT_PHASE
+						JE		SHORT SCSI_DATA_OUT_PHASE
 						CMP		AL,10H
-						JE		SCSI_COMMAND_PHASE
+						JE		SHORT SCSI_COMMAND_PHASE
 						CMP		AL,40H
-						JE		SCSI_DATA_IN_PHASE
+						JE		SHORT SCSI_DATA_IN_PHASE
 						CMP		AL,50H
-						JE		SCSI_STATUS_PHASE
+						JE		SHORT SCSI_STATUS_PHASE
 						CMP		AL,70H
-						JNE		SCSI_PHASE_LOOP
+						JNE		SHORT SCSI_PHASE_LOOP
 
 SCSI_MESSAGE_PHASE:
 						OR		BYTE PTR CS:[SCSI_PHASE_FLAG],PHASE_FLAG_MESSAGE
@@ -177,7 +177,7 @@ SCSI_END_OF_SEQUENCE:
 						MOV		AH,CS:[SCSI_STATUS_RETURN]
 						MOV		AL,CS:[SCSI_MESSAGE_RETURN]
 						AND		AH,AH
-						JNE		SCSI_ERROR
+						JNE		SHORT SCSI_ERROR
 
 SCSI_NOERR:
 						POPF
@@ -203,7 +203,7 @@ SCSI_WAIT_READY			PROC
 						MOV		DX,IO_SCSI_STATUS
 						IN		AL,DX
 						AND		AL,8	; BUSY Flag
-						JE		@f
+						JE		SHORT @f
 						OUT		IO_1US_WAIT,AL
 						LOOP	@b
 						STC
@@ -249,7 +249,7 @@ SCSI_WAIT_BUSY			PROC
 @@:						MOV		DX,IO_SCSI_STATUS
 						IN		AL,DX
 						AND		AL,8
-						JNE		@f		; Yes, the SCSI controller wakes up!
+						JNE		SHORT @f		; Yes, the SCSI controller wakes up!
 						OUT		IO_1US_WAIT,AL
 						LOOP	@b
 						STC
@@ -296,7 +296,7 @@ SCSI_EXEC_DMA_TRANSFER_LOOP:
 						MOV		DX,IO_DMA_STATUS
 						IN		AL,DX
 						AND		AL,2	; DMAE bit for SCSI (DMA Ch 1) Non-zero means Terminal Count or DMA End
-						JNE		@f
+						JNE		SHORT @f
 
 						MOV		DX,IO_SCSI_STATUS
 						IN		AL,DX
@@ -308,7 +308,7 @@ SCSI_EXEC_DMA_TRANSFER_LOOP:
 
 						XOR		AL,8
 						TEST	AL,38H	; Non-zero means no longer in Data-In nor Data-Out phase
-						JE		@b
+						JE		SHORT @b
 
 @@:
 						; Mask DMA
@@ -335,7 +335,7 @@ SCSI_EXEC_DMA_TRANSFER_LOOP:
 
 						XOR		AL,8
 						TEST	AL,38H	; Non-zero means no longer in Data-In nor Data-Out phase
-						JE		SCSI_EXEC_DMA_TRANSFER_LOOP
+						JE		SHORT SCSI_EXEC_DMA_TRANSFER_LOOP
 
 
 						; IO.SYS apparently won't reset Highest Byte of the DMA address.
