@@ -71,12 +71,13 @@ BOOT_FROM_SCSI_CD		PROC
 						MOV		AX,FS:[SI+3]
 						MOV		CS:[IOSYS_RESUME_CS],AX
 
+						MOV		BYTE PTR FS:[SI],9AH ; CALLF
 						MOV		WORD PTR FS:[SI+1],OFFSET IOSYS_INTERCEPT
 						MOV		FS:[SI+3],CS
 
 						MOV		CS:[IOSYS_ENTRY_CS],FS
 
-						MOV		AX,0F7FFH	; Make IO.SYS think B0000H to BFFFFH block is inaccessible
+						MOV		AX,0FFFFH	; Full RAM below 1MB
 						MOV		BX,0008H	; Pretend Booting from CD-ROM Drive
 						MOV		CX,0280H
 						MOV		DI,0
@@ -375,60 +376,77 @@ FIND_FBIOS_SECTOR		ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; Pattern
+; 8BD8                      MOV     BX,AX           -> CALLF 8000:INJECT_YSSCSICD
+; 83C310                    ADD     BX,10H          ->
+; B448                      MOV     AH,48H
+; CD21                      INT     21H (DOS)
+; 051000                    ADD     AX,0010H
+; 2EA3????                  MOV     CS:[????],AX
+; 8EC0                      MOV     ES,AX
+; 33FF                      XOR     DI,DI
+
+; +0 +1 +2 +3 +4 +5 +6 +7 +8 +9 +A +B +C +D +E +F
+; 8B D8 83 C3 10 B4 48 CD 21 05 10 00 2E A3 ?? ??
+; 8E C0 33 FF
+
+INT_21_AH_48_LEN	EQU	14
+INT_21_AH_48_PTN	DB	08BH,0D8H,083H,0C3H,010H,0B4H,048H,0CDH,021H,005H,010H,000H,02EH,0A3H
 
 
 ; Input
 ;   FS    IO.SYS Start Segment
 ; Output
-;   SI    Offset to the JMPF xxxx:0000
+;   DS:SI Offset to the JMPF xxxx:0000
 ;   CF    Set if not found
 FIND_JUMP_INSTRUCTION	PROC
+						PUSH	DS
+						PUSH	ES
+
+						PUSH	FS
+						POP		DS	; DS:SI  IO.SYS
+						PUSH	CS
+						POP		ES	; ES:DI  Pattern
+
+						CLD
+
+FIND_JUMP_INSTRUCTION_OUTER_LOOP:
 						MOV		SI,0
 
-FIND_JUMP_INSTRUCTION_LOOP:
-						MOV		AL,FS:[SI]
-						CALL	E8_OR_BE
-						JNE		FIND_JUMP_INSTRUCTION_NEXT
-
-						MOV		CX,10
+FIND_JUMP_INSTRUCTION_INNER_LOOP:
+						MOV		CX,INT_21_AH_48_LEN
+						MOV		DI,OFFSET INT_21_AH_48_PTN
 						PUSH	SI
-@@:
-						ADD		SI,3
-						MOV		AL,FS:[SI]
-						CALL	E8_OR_BE
-						JNE		SHORT @f
-						LOOP	@b
-
-						ADD		SI,3
-						MOV		AL,FS:[SI]
-						CMP		AL,0EAH		; JMPF
-						JNE		SHORT @f
-
-						; Found it!
-						ADD		SP,2
-						JMP		FIND_JUMP_INSTRUCTION_FOUND
-
-@@:
+						REPE	CMPSB
 						POP		SI
+						JNE		SHORT FIND_JUMP_INSTRUCTION_INNER_NEXT
 
-FIND_JUMP_INSTRUCTION_NEXT:
+						CMP		DWORD PTR [SI+010h],0FF33C08Eh
+						JE		SHORT FIND_JUMP_INSTRUCTION_FOUND
+
+FIND_JUMP_INSTRUCTION_INNER_NEXT:
 						INC		SI
-						CMP		SI,0FF00H	; Must not be that late in the segment
-						JNE		FIND_JUMP_INSTRUCTION_LOOP
-						STC
-						RET
+						CMP		SI,16
+						JNE		FIND_JUMP_INSTRUCTION_INNER_LOOP
+
+						MOV		SI,DS
+						INC		SI
+						MOV		DS,SI
+						CMP		SI,04000h
+						JB		FIND_JUMP_INSTRUCTION_OUTER_LOOP
+
+						STC	; Not found
+						JMP		FIND_JUMP_INSTRUCTION_EXIT
 
 FIND_JUMP_INSTRUCTION_FOUND:
 						CLC
+						PUSH	DS
+						POP		FS
+
+FIND_JUMP_INSTRUCTION_EXIT:
+						POP		ES
+						POP		DS
 						RET
-
-; Return ZF=1 if AL==E8 or BE
-E8_OR_BE:
-						CMP		AL,0E8H	; CALL
-						JE		SHORT @f
-						CMP		AL,0BEH ; MOV SI,
-@@:						RET
-
 
 FIND_JUMP_INSTRUCTION	ENDP
 
@@ -452,68 +470,17 @@ BUSY_WAIT_FFFFH			ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-
-; Secondary Loader tells IO.SYS that memory B0000H to BFFFFH does not exist to protect YSSCSICD.SYS.
-; However, it will set DOS's ENEMEM to B0000H, and 64KB is blocked just for 7KB YSSCSICD.SYS.
-; To free up as much memory as possible, this procedure patches MSDOS.SYS so that ENDMEM will become YSSCSICD_SEGMENT (BC00H) (Probably I can push it to BE00H)
-; This procedure first searches for MSDOS.SYS copy in the RAM, and then:
-; (1) Writes YSSCSICD_SEGMENT to DOSSEG:[02F2H] (ENDMEM)
-; (2) MOV CS:[02F2H],DX -> MOV DX,YSSCSICD_SEGMENT / NOP / NOP in MSINIT.
-PATCH_MSDOS_SYS			PROC
-						MOV		DX,0100H
-
-PATCH_MSDOS_LOOP:
-						MOV		ES,DX
-						CMP		BYTE PTR ES:[0000h],0E9H	; JMP
-						JNE		PATCH_MSDOS_LOOP_NEXT
-						CMP		WORD PTR ES:[0001H],6A9EH	; 6AA1H
-						JNE		PATCH_MSDOS_LOOP_NEXT
-
-						CMP		BYTE PTR ES:[0006H],42H		; 'B'
-						JNE		PATCH_MSDOS_LOOP_NEXT
-						CMP		WORD PTR ES:[0007H],4755H	; 'UG'
-						JNE		PATCH_MSDOS_LOOP_NEXT
-
-						CMP		DWORD PTR ES:[6AA3H],0F216892EH	; MOV	CS:[02F2H],DX
-						JNE		PATCH_MSDOS_LOOP_NEXT
-						CMP		BYTE PTR ES:[6AA7H],02H
-						JE		PATCH_MSDOS_FOUND
-PATCH_MSDOS_LOOP_NEXT:
-						INC		DX
-						CMP		DX,6000H
-						JNE		PATCH_MSDOS_LOOP
-						CLC
-						RET
-
-PATCH_MSDOS_FOUND:
-						; Yes, it is MSDOS.SYS V3.1
-						MOV		WORD PTR ES:[02F2H],YSSCSICD_SEGMENT
-						MOV		BYTE PTR ES:[6AA3H],0BAH	; MOV DX,imm
-						MOV		WORD PTR ES:[6AA4H],YSSCSICD_SEGMENT
-						MOV		WORD PTR ES:[6AA6H],9090H	; NOP NOP
-						STC
-						RET
-
-PATCH_MSDOS_SYS			ENDP
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-
 ; Intercept IO.SYS jump to MSDOS.SYS
 IOSYS_INTERCEPT			PROC
+						; Do what's replaced by CALLF 8000:IOSYS_INTERCEPT >>
+						MOV     BX,AX
+						ADD     BX,10H
+						; Do what's replaced by CALLF 8000:IOSYS_INTERCEPT <<
+
 						PUSHF
 						PUSH	DS
 						PUSH	ES
-						PUSH	AX
-						PUSH	BX
-						PUSH	CX
-						PUSH	DX
-						PUSH	SI
-						PUSH	DI
-						PUSH	BP
+						PUSHA
 
 						PUSH	CS
 						POP		DS
@@ -522,7 +489,6 @@ IOSYS_INTERCEPT			PROC
 
 
 						CALL	UNPATCH_V21L20
-
 
 						TEXTLOCATION	28H,00H
 						MOV		SI,OFFSET IOSYS_INTERCEPTED_MSG
@@ -533,38 +499,49 @@ IOSYS_INTERCEPT			PROC
 						CALL	DRAW_AOMORI
 
 						; Turned out MSDOS.SYS is copied to the conventional memory, but not installed yet.
-			; CALL	TSUGARU_DEBUG_BREAK
+						; It is possible to patch at this time, but not doing it any more.
+
+						; At this time, it is safe to use MALLOC
+						; YSSCSICD.SYS requires 6KB=01800H, or 0180H pages.
+						MOV		BX,0180H
+						MOV		AH,48H
+						INT		21H
+						JNC		MALLOCED_SPACE_FOR_YSSCSICD
+
+						TEXTLOCATION	28H,01H
+						MOV		SI,OFFSET CANNOT_MALLOC
+						CALL	PRINT_TALL
+						JMP		IOSYS_INTERCEPT_EXIT
+
+MALLOCED_SPACE_FOR_YSSCSICD:
+						; AX is the segment.
+
+						MOV		ES,AX
+						XOR		DI,DI
+
+						MOV		DS,CS:[YSSCSICD_INSTALL_CS]
+						XOR		SI,SI
+
+						MOV		CX,1800H	; 6KB
+						REP		MOVSB
+
+						MOV		CS:[YSSCSICD_INSTALL_CS],ES
 
 						MOV		AL,CS:[SCSI_ID_CDROM]
 
 						CALL	DWORD PTR CS:[YSSCSICD_INSTALL_IP]
 
-			; CALL	TSUGARU_DEBUG_BREAK
-
 						TEXTLOCATION	28H,01H
 						MOV		SI,OFFSET INSTALLED_HOOK_MSG
 						CALL	PRINT_TALL
 
-						CALL	PATCH_MSDOS_SYS
-						JAE		MSDOS_SYS_NOT_FOUND
-
-						TEXTLOCATION	28H,02H
-						MOV		SI,OFFSET PATCHED_MSDOS_SYS
-						CALL	PRINT_TALL
-
-MSDOS_SYS_NOT_FOUND:
-						POP		BP
-						POP		DI
-						POP		SI
-						POP		DX
-						POP		CX
-						POP		BX
-						POP		AX
+IOSYS_INTERCEPT_EXIT:
+						POPA
 						POP		ES
 						POP		DS
 						POPF
 
-						JMP		DWORD PTR CS:[IOSYS_RESUME_IP]
+						RETF
 
 YSSCSICD_INSTALL_IP		DW		YSSCSICD_DIRECT_INSTALL
 YSSCSICD_INSTALL_CS		DW		YSSCSICD_SEGMENT
@@ -574,7 +551,7 @@ IOSYS_RESUME_CS			DW		0
 
 IOSYS_INTERCEPTED_MSG	DB		"INTERCEPTED IO.SYS.",0
 INSTALLED_HOOK_MSG		DB		"INSTALLED INT 93H HOOK.",0
-PATCHED_MSDOS_SYS		DB		"PATCHED MSDOS.SYS",0
+CANNOT_MALLOC			DB		"MALLOC FAILED, CANNOT INSTALL YSSCSICD",0
 
 SCSI_ID_CDROM			DB		0
 
