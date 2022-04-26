@@ -119,7 +119,7 @@ REDIRECT_CDROM_BIOSCALL	PROC
 
 						CMP		AH,14H
 						JNE		SHORT @f
-						CALL	CDROM_BIOS_PRETEND_NO_ERROR  ; CDISC2.SYS suggests do nothing for this function
+						XOR		AH,AH ; CDISC2.SYS suggests do nothing for this function
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
@@ -132,19 +132,19 @@ REDIRECT_CDROM_BIOSCALL	PROC
 
 						CMP		AH,060H
 						JNE		SHORT @f
-						CALL	CDROM_BIOS_PRETEND_NO_ERROR
+						XOR		AH,AH
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
 						CMP		AH,061H
 						JNE		SHORT @f
-						CALL	CDROM_BIOS_PRETEND_NO_ERROR
+						XOR		AH,AH
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
 						CMP		AH,0FCH
 						JNE		SHORT @f
-						CALL	CDROM_BIOS_PRETEND_NO_ERROR
+						XOR		AH,AH
 						JMP		REDIRECT_CDROM_BIOSCALL_PROCESSED_EXIT
 @@:
 
@@ -193,14 +193,6 @@ REDIRECT_BIOS_CALLTABLE_50_58:
 
 REDIRECT_CDROM_BIOSCALL	ENDP
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-CDROM_BIOS_PRETEND_NO_ERROR	PROC
-						MOV		AH,0
-						RET
-CDROM_BIOS_PRETEND_NO_ERROR	ENDP
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CDROM_BIOS_IS_SCSI_ERROR	PROC
@@ -229,8 +221,11 @@ CDROM_BIOS_00H_SET_DRIVE_MODE	PROC
 						RET
 @@:
 						MOV		BYTE PTR [BIOSCACHE_DRIVEMODE],DL
-						XOR		AH,AH
-						RET
+
+CDROM_BIOS_PRETEND_NO_ERROR:			; <<  Theser 3 lines are used from outside this PROC.
+						XOR		AH,AH	; <<  Keep it XOR AH,AH / RET
+						RET				; << 
+
 CDROM_BIOS_00H_SET_DRIVE_MODE	ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -238,8 +233,9 @@ CDROM_BIOS_00H_SET_DRIVE_MODE	ENDP
 CDROM_BIOS_01H_GET_DRIVE_MODE	PROC
 						MOV		DL,BYTE PTR [BIOSCACHE_DRIVEMODE]
 						MOV		BYTE PTR [BP+INCOMING_DX],DL
-						XOR		AH,AH
-						RET
+						JMP		SHORT CDROM_BIOS_PRETEND_NO_ERROR
+						; This JMP saves one byte than XOR AH,AH / RET.
+						; Now I see why IO.SYS was doing it everywhere.
 CDROM_BIOS_01H_GET_DRIVE_MODE	ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -261,8 +257,8 @@ CDROM_BIOS_02H_GET_DRIVE_STATUS	PROC
 						JC		SHORT CDROM_BIOS_02H_RET	; Return what's returned by Read ToC
 
 						MOVZX	DX,BYTE PTR [SCSI_DATA_BUF+9]	; MIN
-						MOV		AH,BYTE PTR [SCSI_DATA_BUF+10]	; SEC
-						MOV		AL,BYTE PTR [SCSI_DATA_BUF+11]	; FRM
+						MOV		AX,WORD PTR [SCSI_DATA_BUF+10]	; SEC,FRM
+						XCHG	AH,AL	; SCSI is big-endian.  Make it little-endian.
 
 						CALL	MSF2HSG	; -> Max Sector is DX|AX
 
@@ -552,32 +548,25 @@ CDROM_BIOS_051H_GET_PLAY_INFO	ENDP
 
 CDROM_BIOS_052H_STOP_PLAY		PROC
 						CMP		CH,0FFH
-						JNE		SHORT @f
-
+						JE		CDROM_BIOS_PRETEND_NO_ERROR
 						; SCSI2 does not support idle-time to auto stop.  Just ignore.
-						MOV		AH,0
-						RET
 
-@@:
 
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		SHORT @f
-						RET
-@@:
+						JC		SHORT CDROM_BIOS_052H_RET
+
 
 						CMP		BYTE PTR [SCSI_DATA_BUF+1],11H ; 11H=PLAYING
-						JE		SHORT @f			; Jump if playing
+						JNE		CDROM_BIOS_PRETEND_NO_ERROR ; Jump if not playing
 						; If not playing, just return no error.
-						MOV		AH,0
-						RET
 
-@@:
+
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_STOP_PLAY
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JC		SHORT @f
+						JC		SHORT CDROM_BIOS_052H_RET
 
 						; At least I can stop CD by sending RESTORE command.
 						; But, I don't want my CD head to go back and forth when playing in random tracks.
@@ -585,7 +574,7 @@ CDROM_BIOS_052H_STOP_PLAY		PROC
 						; MOV		AL,[YSSCSICD_SCSI_ID]
 						; CALL	SCSI_RESTORE
 						; CALL	CDROM_BIOS_IS_SCSI_ERROR
-@@:
+CDROM_BIOS_052H_RET:
 						RET
 CDROM_BIOS_052H_STOP_PLAY		ENDP
 
@@ -602,9 +591,8 @@ CDROM_BIOS_053H_GET_PLAY_STATE	PROC
 						MOV		AL,[YSSCSICD_SCSI_ID]
 						CALL	SCSI_READ_SUB_CHANNEL_CDROM_CUR_POS
 						CALL	CDROM_BIOS_IS_SCSI_ERROR
-						JNC		SHORT @f
-						RET
-@@:
+						JC		SHORT CDROM_BIOS_053H_EXIT
+
 
 						; [SCSI_DATA_BUF+1]  Audio Status
 						;   11H  Playing
