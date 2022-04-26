@@ -103,11 +103,9 @@ INTERRUPT				PROC	FAR
 						CMP		AL,14
 						JE		SHORT CMD_CLOSE
 
+						AND		AL,0FEH
 						CMP		AL,8
-						JE		SHORT CMD_WRITE
-
-						CMP		AL,9
-						JE		SHORT CMD_WRITE
+						JE		SHORT CMD_WRITE	; 8=Write  9=Write with verify
 
 CMD_OPEN:
 CMD_CLOSE:
@@ -121,35 +119,38 @@ CMD_EXIT:
 
 CMD_WRITE:
 						; Source https://www.drdobbs.com/writing-ms-dos-device-drivers/184402277?pgno=2
-						LES		SI,ES:[DI+14]	; Data Pointer
-						CMP		CX,ES:[DI+18]	; Transfer Size
+						; Source https://sites.google.com/site/pcdosretro/dostables
+						MOV		CX,ES:[DI+18]	; Transfer Size
+						LDS		SI,ES:[DI+14]	; Data Pointer
+						MOV		BL,CS:[YSSCSICD_FLAGS]
 
 CMD_WRITE_LOOP:
-						MOV		AL,ES:[SI]  ; Was there an 8086 instruction that does these two lines?
-						INC		SI
+						LODSB
 						CMP		AL,'V'
 						JNE		SHORT @f
-						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_CONSOLE
+						OR		BL,YSSCSICD_FLAGS_DEBUG_CONSOLE
 						JMP		CMD_WRITE_LOOP_NEXT
 @@:
 						CMP		AL,'v'
 						JNE		SHORT @f
-						AND		BYTE PTR CS:[YSSCSICD_FLAGS],NOT YSSCSICD_FLAGS_DEBUG_CONSOLE
+						AND		BL,NOT YSSCSICD_FLAGS_DEBUG_CONSOLE
 						JMP		CMD_WRITE_LOOP_NEXT
 
 @@:
 						CMP		AL,'R'
 						JNE		SHORT @f
-						OR		BYTE PTR CS:[YSSCSICD_FLAGS],YSSCSICD_FLAGS_DEBUG_RS232C
+						OR		BL,YSSCSICD_FLAGS_DEBUG_RS232C
 						JMP		CMD_WRITE_LOOP_NEXT
 
 @@:
 						CMP		AL,'r'
 						JNE		SHORT @f
-						AND		BYTE PTR CS:[YSSCSICD_FLAGS],NOT YSSCSICD_FLAGS_DEBUG_RS232C
+						AND		BL,NOT YSSCSICD_FLAGS_DEBUG_RS232C
 @@:
 CMD_WRITE_LOOP_NEXT:
 						LOOP	CMD_WRITE_LOOP
+
+						MOV		CS:[YSSCSICD_FLAGS],BL
 
 						JMP		CMD_EXIT
 
@@ -189,12 +190,18 @@ SCSI_DATA_BUF:
 
 INIT_OF_INIT			PROC
 
+						LDS		DI,CS:[PACKET]
+						MOV		WORD PTR [DI+3],0100H		; Status
+						MOV		BYTE PTR [DI+13],0			; Number of Drives
+						MOV		WORD PTR [DI+14],OFFSET DEVICE_END
+						MOV		WORD PTR [DI+16],CS
+
 						PUSH	CS
 						POP		DS
 						PUSH	CS
 						POP		ES
 
-						LEA		DI,[MSG_INTRO]
+						MOV		DI,OFFSET MSG_INTRO
 						CALL	PRINT_CSTR
 
 						CALL	RECOGNIZE_COMMAND_PARAMETER
@@ -422,17 +429,9 @@ INITIALIZE				PROC	FAR
 						JMP		INIT_SCSI_SCAN_DONE
 
 INIT_SCSI_NOT_FOUND:
-						LEA		DI,[MSG_CDROM_NOT_FOUND]
+						MOV		DI,OFFSET MSG_CDROM_NOT_FOUND
 						CALL	PRINT_CSTR
 INIT_SCSI_SCAN_DONE:
-
-
-						LES		DI,CS:[PACKET]
-
-						MOV		WORD PTR ES:[DI+3],0100H		; Status
-						MOV		BYTE PTR ES:[DI+13],0			; Number of Drives
-						MOV		WORD PTR ES:[DI+14],OFFSET DEVICE_END
-						MOV		WORD PTR ES:[DI+16],CS
 
 						POPA
 						POP		DS
