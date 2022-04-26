@@ -76,12 +76,13 @@ REDIRECT_CDROM_BIOSCALL	PROC
 						PUSH	AX
 						CLC
 						PUSHF
+						CLD
 						MOV		BP,SP
 
-						MOV		DX,CS
-						MOV		DS,DX
-						MOV		ES,DX
-						MOV		DX,[BP+INCOMING_DX]
+						PUSH	CS
+						POP		DS
+						PUSH	CS
+						POP		ES
 
 
 						; 00 to 05?
@@ -222,7 +223,7 @@ CDROM_BIOS_00H_SET_DRIVE_MODE	PROC
 @@:
 						MOV		BYTE PTR [BIOSCACHE_DRIVEMODE],DL
 
-CDROM_BIOS_PRETEND_NO_ERROR:			; <<  Theser 3 lines are used from outside this PROC.
+CDROM_BIOS_PRETEND_NO_ERROR:			; <<  These 3 lines are used from outside this PROC.
 						XOR		AH,AH	; <<  Keep it XOR AH,AH / RET
 						RET				; << 
 
@@ -513,8 +514,8 @@ CDROM_BIOS_050H_START_PLAY		PROC
 						RET
 @@:
 
-						MOV		CX,CS
-						MOV		ES,CX
+						PUSH	CS	; MOV		CX,CS
+						POP		ES	; MOV		ES,CX
 						MOV		DI,OFFSET CDPLAY_INFO_CACHE
 						MOV		AL,[YSSCSICD_SCSI_ID]
 
@@ -533,12 +534,11 @@ CDROM_BIOS_051H_GET_PLAY_INFO	PROC
 						MOV		ES,[BP+INCOMING_DS]
 						MOV		DI,[BP+INCOMING_DI]
 
-						MOV		AX,WORD PTR [CDPLAY_INFO_CACHE]
-						MOV		ES:[DI],AX
-						MOV		AX,WORD PTR [CDPLAY_INFO_CACHE+2]
-						MOV		ES:[DI+2],AX
-						MOV		AX,WORD PTR [CDPLAY_INFO_CACHE+4]
-						MOV		ES:[DI+4],AX
+						PUSH	CS
+						POP		DS
+						MOV		SI,OFFSET CDPLAY_INFO_CACHE
+						MOVSD
+						MOVSW
 
 						XOR		AH,AH
 						RET
@@ -618,7 +618,7 @@ CDROM_BIOS_053H_GET_PLAY_STATE	PROC
 
 						XOR		AX,AX
 						XOR		CX,CX
-						MOV		[BP+INCOMING_AX],AL
+						MOV		[BP+INCOMING_AX],AL ; Why did I do this?  Is it needed?
 						RET
 
 @@:
@@ -637,8 +637,7 @@ CDROM_BIOS_053H_GET_PLAY_STATE	PROC
 						; Offset 12(=0), 13(=Min), 14(=Sec), 15(=Frm).
 						MOV		CX,WORD PTR [SCSI_DATA_BUF+13]
 						MOV		ES:[DI+3],CX		; Min, Sec
-						MOV		CL,[SCSI_DATA_BUF+15]
-						XOR		CH,CH
+						MOVZX	CX,BYTE PTR [SCSI_DATA_BUF+15]
 						MOV		ES:[DI+5],CX		; Frame
 
 						; Offset 4+4,4+5,4+6,4+7
@@ -650,7 +649,7 @@ CDROM_BIOS_053H_GET_PLAY_STATE	PROC
 
 						XOR		AH,AH
 						XOR		CX,CX
-						MOV		[BP+INCOMING_AX],AL
+						MOV		[BP+INCOMING_AX],AL ; Why did I do this?  Is it needed?
 CDROM_BIOS_053H_EXIT:
 						RET
 CDROM_BIOS_053H_GET_PLAY_STATE	ENDP
@@ -699,20 +698,19 @@ CDROM_BIOS_054H_GET_DISC_INFO_TOC	PROC
 						; Min, Sec, Frm are then converted to HSG and returned.
 
 						MOV		DL,BYTE PTR [SCSI_DATA_BUF+9]
-						MOV		AH,BYTE PTR [SCSI_DATA_BUF+10]
-						MOV		AL,BYTE PTR [SCSI_DATA_BUF+11]
+						MOV		AX,BYTE PTR [SCSI_DATA_BUF+10]
+						; !CAUTION!  SCSI uses big-endian.  AL is HIBYTE(sec) and AH is LOBYTE(frm).
 
 						; For unknown reason, CDSD.SYS seems to subtract 150 frames (2 seconds) from volume size.
 						; Uncomment the following if it is correct.
 						; But, to make it compatible with FM TOWNS CD-ROM BIOS, it shouldn't subtract 2 seconds apparently.
-;						SUB		AH,2	; 2 seconds
+;						SUB		AL,2	; 2 seconds
 ;						JNC		SHORT @f
-;						ADD		AH,60
+;						ADD		AL,60
 ;						DEC		DL
 ;@@:
 						MOV		ES:[SI+3],DL
-						MOV		ES:[SI+4],AH
-						MOV		ES:[SI+5],AL
+						MOV		ES:[SI+4],AX
 
 						LEA		DI,[SI+6]
 						MOV		DL,ES:[SI+1]
