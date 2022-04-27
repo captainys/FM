@@ -31,9 +31,12 @@ BOOT_FROM_SCSI_CD		PROC
 						MOV		AX,0050H
 						MOV		FS,AX
 						MOV		AX,FS:[0]
+						MOV		CS:[IOSYS_ENTRY_CS],AX	; IO.SYS should start from this segment:0000.
 						MOV		FS,AX
 						CALL	FIND_JUMP_INSTRUCTION
 						JB		SHORT @f
+
+						ADD 	SI,7	; Point to INT 21H
 
 						PUSH	FS
 						PUSH	SI
@@ -74,8 +77,6 @@ BOOT_FROM_SCSI_CD		PROC
 						MOV		BYTE PTR FS:[SI],9AH ; CALLF
 						MOV		WORD PTR FS:[SI+1],OFFSET IOSYS_INTERCEPT
 						MOV		FS:[SI+3],CS
-
-						MOV		CS:[IOSYS_ENTRY_CS],FS
 
 						MOV		AX,0FFFFH	; Full RAM below 1MB
 						MOV		BX,0008H	; Pretend Booting from CD-ROM Drive
@@ -377,11 +378,11 @@ FIND_FBIOS_SECTOR		ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Pattern
-; 8BD8                      MOV     BX,AX           -> CALLF 8000:INJECT_YSSCSICD
-; 83C310                    ADD     BX,10H          ->
+; 8BD8                      MOV     BX,AX
+; 83C310                    ADD     BX,10H
 ; B448                      MOV     AH,48H
-; CD21                      INT     21H (DOS)
-; 051000                    ADD     AX,0010H
+; CD21                      INT     21H (DOS)         -> CALLF 8000:INJECT_YSSCSICD
+; 051000                    ADD     AX,0010H          ->
 ; 2EA3????                  MOV     CS:[????],AX
 ; 8EC0                      MOV     ES,AX
 ; 33FF                      XOR     DI,DI
@@ -473,8 +474,8 @@ BUSY_WAIT_FFFFH			ENDP
 ; Intercept IO.SYS jump to MSDOS.SYS
 IOSYS_INTERCEPT			PROC
 						; Do what's replaced by CALLF 8000:IOSYS_INTERCEPT >>
-						MOV     BX,AX
-						ADD     BX,10H
+						INT     21H
+						ADD     AX,0010H
 						; Do what's replaced by CALLF 8000:IOSYS_INTERCEPT <<
 
 						PUSHF
@@ -531,6 +532,8 @@ MALLOCED_SPACE_FOR_YSSCSICD:
 
 						CALL	DWORD PTR CS:[YSSCSICD_INSTALL_IP]
 
+						PUSH	CS
+						POP		DS
 						TEXTLOCATION	28H,01H
 						MOV		SI,OFFSET INSTALLED_HOOK_MSG
 						CALL	PRINT_TALL
