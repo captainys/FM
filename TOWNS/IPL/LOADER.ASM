@@ -42,18 +42,18 @@ REALMAIN:
 						CMP		BL,1		; HD/CD?
 						JNE		SHORT @f
 						OR		BH,0B0H
-						JMP		DEVICE_ID_SET
+						JMP		SHORT DEVICE_ID_SET
 @@:
 						CMP		BL,2		; FD?
 						JNE		SHORT @f
 						OR		BH,020H
-						JMP		DEVICE_ID_SET
+						JMP		SHORT DEVICE_ID_SET
 
 @@:
 						CMP		BL,4		; ICM?
 						JNE		SHORT @f
 						MOV		BH,4AH
-						JMP		DEVICE_ID_SET
+						JMP		SHORT DEVICE_ID_SET
 
 @@:
 						XOR		BX,BX

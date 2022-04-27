@@ -70,7 +70,7 @@ READ_HIGHB				PROC
 						MOV		CR0,EDX
 
 						; https://wiki.osdev.org/Unreal_Mode suggest one jump "to tell 386/486 not to crash".
-						JMP		@f
+						JMP		SHORT @f
 @@:
 
 						MOVZX	ESI,SI
@@ -89,7 +89,7 @@ READ_HIGHB				PROC
 						AND		DL,0FEH
 						MOV		CR0,EDX
 
-						JMP		@f
+						JMP		SHORT @f
 @@:
 
 						LGDT	FWORD PTR CS:[GDT_BACKUP]
