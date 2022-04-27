@@ -27,12 +27,8 @@
 ;
 ;//////////////////////////////////////////////////////////// */
 
-SCSI_DATA_BUF_LENGTH 	EQU 	2340	; Just in case up to good for 1 sector.
-
 YSSCSICD_SCSI_ID		DB		0	; 0FFH:No SCSI CD  0 to 7:SCSI CD Found
 
-YSSCSICD_FLAGS_DEBUG_CONSOLE	EQU		1
-YSSCSICD_FLAGS_DEBUG_RS232C		EQU		2
 YSSCSICD_FLAGS			DB		0
 YSSCSICD_DEBUG_CMD_CACHE	DB		0
 

@@ -49,6 +49,8 @@
 						ORG		0
 						ASSUME	CS:DATA_CODE,DS:DATA_CODE
 
+						INCLUDE	DEF.ASM
+
 DATA_CODE				SEGMENT	USE16
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -157,7 +159,14 @@ INTERRUPT				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+						; Memo to myself.
+						; Avoid forward references as much as possible.
+						; MASM writes extra NOPs for forward reference.
 
+						INCLUDE	DATABUF.ASM
+
+						INCLUDE SCSIUTIL.ASM
+						INCLUDE	FMR_SCSI.ASM	; Keep FMR_SCSI.ASM before REDRFUNC.ASM
 						INCLUDE	PRINT.ASM
 						INCLUDE	RS232C.ASM
 						INCLUDE FMR_TIMR.ASM
@@ -165,17 +174,8 @@ INTERRUPT				ENDP
 						INCLUDE YS_EXT.ASM
 						INCLUDE	REDRFUNC.ASM
 						INCLUDE	..\SCSILIB\SCSIIO.ASM
-						INCLUDE SCSIUTIL.ASM
-						INCLUDE	FMR_SCSI.ASM
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-DATA_CODE				ENDS
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-DATA_CODE				SEGMENT
-						INCLUDE	DATABUF.ASM
 
 SCSI_DATA_BUF:
 
