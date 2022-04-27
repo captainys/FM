@@ -516,6 +516,14 @@ IOSYS_INTERCEPT			PROC
 
 MALLOCED_SPACE_FOR_YSSCSICD:
 						; AX is the segment.
+						; IO.SYS assumes that the PSP owner of the memory control block allocated
+						; during the initialization is this segment.
+						DEC		AX
+						MOV		ES,AX
+						INC		AX
+						MOV		ES:[0001h],AX
+						; Unless doing it, IO.SYS will go into infinite loop for searching last MCB.
+
 
 						MOV		ES,AX
 						XOR		DI,DI
