@@ -42,15 +42,22 @@ INT93H_HOOKPROC			PROC
 						JE		YS_EXT_PLAY_CDDA_BCD
 
 						CMP		AX,73C0H
-						JE		SHORT INT93H_GET_SCSI_CD_ID
+						JE		SHORT INT93H_INSTALLATION_CHECK
 
 						CMP		AL,0C0H
 						JE		SHORT INT93H_IS_CDROM_CALL
 
 						JMP		CS:[INT93_TOWNS]
 
-INT93H_GET_SCSI_CD_ID:
+; Return:
+;  AL:Using SCSI ID (0FFH if SCSI CD drive is not found.)
+;  BX:7711H
+;  CX:6809H
+; Call this function with BX=0 and CX=0, and check the values to see if the driver is installed.
+INT93H_INSTALLATION_CHECK:
 						MOV		AL,CS:[YSSCSICD_SCSI_ID]
+						MOV		BX,7711H
+						MOV		CX,6809H
 						IRET
 
 

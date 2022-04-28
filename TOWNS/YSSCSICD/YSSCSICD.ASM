@@ -87,6 +87,21 @@ STRATEGY				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+NOINTERRUPT				PROC	FAR
+						PUSH	ES
+						PUSH	DI
+						LES		DI,CS:[PACKET]
+						MOV		WORD PTR ES:[DI+3],0100H  ; Stat=DONE
+						POP		DI
+						POP		ES
+						RETF
+
+NOINTERRUPT				ENDP
+
+DEVICE_END_NO_INSTALL:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 INTERRUPT				PROC	FAR
 						PUSH	ES
 						PUSH	DS
@@ -116,7 +131,7 @@ CMD_EXIT:
 						POPA
 						POP		DS
 						POP		ES
-						RET
+						RETF
 
 CMD_WRITE:
 						; Source https://www.drdobbs.com/writing-ms-dos-device-drivers/184402277?pgno=2
@@ -188,6 +203,28 @@ SCSI_DATA_BUF:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 INIT_OF_INIT			PROC
+						CLD
+
+						XOR		BX,BX
+						XOR		CX,CX
+						MOV		AX,73C0H
+						INT		93H
+
+						CMP		BX,7711H
+						JNE		SHORT @f
+						CMP		CX,6809H
+						JNE		SHORT @f
+
+						PUSH	CS
+						POP		DS
+						PUSH	CS
+						POP		ES
+
+						MOV		DI,OFFSET ALREADY_INSTALLED_MSG
+						CALL	PRINT_CSTR
+						JMP		SHORT INIT_OF_INIT_FAILED ; Already installed!
+
+@@:
 
 						LDS		DI,CS:[PACKET]
 						MOV		WORD PTR [DI+3],0100H		; Status
@@ -208,7 +245,25 @@ INIT_OF_INIT			PROC
 						CALL	INSTALL_HOOK
 
 						MOV		WORD PTR CS:[DEVHDR_INTERRUPT],OFFSET INTERRUPT
+						CLC
 
+						RET
+
+INIT_OF_INIT_FAILED:
+						PUSH	CS
+						POP		ES
+						MOV		DI,OFFSET DEVHDR_NAME
+						MOV		CX,8
+						MOV		AL,'*'
+						REP		STOSB
+
+						LDS		DI,CS:[PACKET]
+						MOV		WORD PTR [DI+3],0100H		; Status
+						MOV		BYTE PTR [DI+13],0			; Number of Drives
+						MOV		WORD PTR [DI+14],OFFSET DEVICE_END_NO_INSTALL
+						MOV		WORD PTR [DI+16],CS
+
+						STC
 						RET
 
 INIT_OF_INIT			ENDP
@@ -394,6 +449,8 @@ MSG_SYSDRV_BADDRV		DB		"BAD DRIVE LETTER",0DH,0AH,0
 
 MSG_ENABLE_SYSINIT_MSG	DB		"ENABLED SYSINIT.EXE MESSAGES",0DH,0AH,0
 
+ALREADY_INSTALLED_MSG	DB		"YS SCSI BIOS REDIRECTOR Already Installed.",0DH,0AH,0
+
 ; This area will be destroyed as soon as SCAN_SCSI_CDROM is called from INITIALIZE.
 ; <<<<
 ; <<<<
@@ -415,6 +472,7 @@ INITIALIZE				PROC	FAR
 						PUSHA
 
 						CALL	INIT_OF_INIT
+						JB		SHORT INIT_SCSI_SCAN_DONE
 
 						CALL	SCAN_SCSI_CDROM
 						MOV		BYTE PTR [YSSCSICD_SCSI_ID],AL
@@ -435,7 +493,7 @@ INIT_SCSI_SCAN_DONE:
 						POPA
 						POP		DS
 						POP		ES
-						RET
+						RETF
 
 INITIALIZE				ENDP
 
