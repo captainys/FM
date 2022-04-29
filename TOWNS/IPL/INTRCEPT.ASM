@@ -83,8 +83,19 @@ HDIPLINTERCEPT:
 
 GENERALIPL_INTERCEPT:
 						; This is called after IO.SYS is loaded and no return.
+						PUSHA
 						CALL	PATCH_V21L20
-						PUSH    DX
+						CMP		BYTE PTR CS:[SCSI_ID_CDROM],0FFH
+						JE		SHORT GENERALIPL_INTERCEPT_SKIP_YSSCSICD
+						PUSH	DS
+						PUSH	CS
+						POP		DS
+						CALL	INJECT_YSSCSICD_INSTALL_CALLBACK
+						POP		DS
+
+GENERALIPL_INTERCEPT_SKIP_YSSCSICD:
+						POPA
+						PUSH    DX		; DX is IO.SYS entry segment
 						XOR		DX,DX
-						PUSH	DX
+						PUSH	DX		; IO.SYS Entry offset is always 0000h
 						RETF

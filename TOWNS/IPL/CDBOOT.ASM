@@ -4,10 +4,7 @@
 
 BOOT_FROM_SCSI_CD		PROC
 
-						CALL	LISTSCSI
-						CALL	FIND_LAST_SCSI_CD
-						MOV		CS:[SCSI_ID_CDROM],AL
-						CMP		AL,0FFH
+						CMP		BYTE PTR CS:[SCSI_ID_CDROM],0FFH
 						JE		@f
 
 						CALL	WAIT_SCSI_CD_READY
@@ -28,15 +25,59 @@ BOOT_FROM_SCSI_CD		PROC
 
 						CALL	PATCH_V21L20
 
+						CALL	INJECT_YSSCSICD_INSTALL_CALLBACK
+						JB		SHORT @f
 
-SETUP_IOSYS_INTERCEPT_AND_GO:
+						MOV		AX,0FFFFH	; Full RAM below 1MB
+						MOV		BX,0008H	; Pretend Booting from CD-ROM Drive
+						MOV		CX,0280H
+						MOV		DI,0
+						MOV		DX,0
+
+						; Cannot use direct jump because at the time of MOV CS:[IOSYS_ENTRY_CS]
+						; This location is already in cache.
+						; I'm not sure about the logic of MASM indirect jump, but if I make it
+						; DWORD PTR it woks just fine.  
+						; FWORD PTR looks to fetch 48 bytes, and doesn't work.
+						; WORD PTR makes it near jump.
+						JMP		DWORD PTR CS:[IOSYS_ENTRY_IP]
+
+; As a reminder for myself, I first tried the following, which didn't work.
+; 
+; 				MOV		CS:[IOSYS_ENTRY_CS],FS
+; 
+; 				DB	0EAH   ; JMPF xxxx:xxxx
+; 				DW	0
+; IOSYS_ENTRY_CS	DW	0
+; 
+; However, when I copied FS to CS:[IOSYS_ENTRY_CS], the instruction was already
+; in the 80486 cache.  Therefore, the jump destination segment was not updated.
+; The code worked perfectly in Tsugaru, but it didn't work on actual TOWNS.
+; It took a while to debug.
+
+@@:
+						
+						RET
+BOOT_FROM_SCSI_CD		ENDP
+
+BOOT_SCSICD_ERROR_MSG	DB		"BOOT SEQUENCE FAILED",0
+BOOT_SCSICD_FOUND_MSG	DB		"JMPF FOUND AT xxxx:xxxx",0
+
+IOSYS_ENTRY_IP			DW		0000H ; Fixed
+IOSYS_ENTRY_CS			DW		0000
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+INJECT_YSSCSICD_INSTALL_CALLBACK	PROC
 						MOV		AX,0050H
 						MOV		FS,AX
 						MOV		AX,FS:[0]
 						MOV		CS:[IOSYS_ENTRY_CS],AX	; IO.SYS should start from this segment:0000.
 						MOV		FS,AX
 						CALL	FIND_JUMP_INSTRUCTION
-						JB		SHORT @f
+						JB		SHORT INJECTION_POINT_NOT_FOUND	; Just keep CF=1 and return
 
 						ADD 	SI,7	; Point to INT 21H
 
@@ -80,45 +121,11 @@ SETUP_IOSYS_INTERCEPT_AND_GO:
 						MOV		WORD PTR FS:[SI+1],OFFSET IOSYS_INTERCEPT
 						MOV		FS:[SI+3],CS
 
-						MOV		AX,0FFFFH	; Full RAM below 1MB
-						MOV		BX,0008H	; Pretend Booting from CD-ROM Drive
-						MOV		CX,0280H
-						MOV		DI,0
-						MOV		DX,0
-
-						; Cannot use direct jump because at the time of MOV CS:[IOSYS_ENTRY_CS]
-						; This location is already in cache.
-						; I'm not sure about the logic of MASM indirect jump, but if I make it
-						; DWORD PTR it woks just fine.  
-						; FWORD PTR looks to fetch 48 bytes, and doesn't work.
-						; WORD PTR makes it near jump.
-						JMP		DWORD PTR CS:[IOSYS_ENTRY_IP]
-
-; As a reminder for myself, I first tried the following, which didn't work.
-; 
-; 				MOV		CS:[IOSYS_ENTRY_CS],FS
-; 
-; 				DB	0EAH   ; JMPF xxxx:xxxx
-; 				DW	0
-; IOSYS_ENTRY_CS	DW	0
-; 
-; However, when I copied FS to CS:[IOSYS_ENTRY_CS], the instruction was already
-; in the 80486 cache.  Therefore, the jump destination segment was not updated.
-; The code worked perfectly in Tsugaru, but it didn't work on actual TOWNS.
-; It took a while to debug.
-
-@@:
-						
+						CLC
+INJECTION_POINT_NOT_FOUND:
 						RET
-BOOT_FROM_SCSI_CD		ENDP
 
-BOOT_SCSICD_ERROR_MSG	DB		"BOOT SEQUENCE FAILED",0
-BOOT_SCSICD_FOUND_MSG	DB		"JMPF FOUND AT xxxx:xxxx",0
-
-IOSYS_ENTRY_IP			DW		0000H ; Fixed
-IOSYS_ENTRY_CS			DW		0000
-
-
+INJECT_YSSCSICD_INSTALL_CALLBACK	ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

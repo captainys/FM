@@ -327,6 +327,9 @@ CD_CHANGE_MESSAGE		DB		"INSERT TOWNS-APP CD IN THE SCSI CD DRIVE, AND",0
 LOAD_OPTION				PROC
 
 						MOV		BX,CS:[INCOMING_BX]
+						; BL:Device Type   1:SCSI  2:FD  8:CD
+						CMP		BL,1
+						JNE		SHORT LOAD_OPTION_EXIT
 
 						MOV		AH,5
 						MOV		AL,BH
@@ -347,7 +350,7 @@ LOAD_OPTION				PROC
 						DB		9AH		; CALLF FFFB:0014
 						DW		 0014H
 						DW		0FFFBH
-
+LOAD_OPTION_EXIT:
 						RET
 
 LOAD_OPTION				ENDP
@@ -357,6 +360,10 @@ LOAD_OPTION				ENDP
 SAVE_OPTION				PROC
 
 						MOV		BX,CS:[INCOMING_BX]
+						; BL:Device Type   1:SCSI  2:FD  8:CD
+						CMP		BL,1
+						JNE		SHORT SAVE_OPTION_EXIT
+
 
 						MOV		AH,6	; Write sector (Question is if SYSROM supports this command)
 						MOV		AL,BH
@@ -377,7 +384,7 @@ SAVE_OPTION				PROC
 						DB		9AH		; CALLF FFFB:0014
 						DW		 0014H
 						DW		0FFFBH
-
+SAVE_OPTION_EXIT:
 						RET
 
 SAVE_OPTION				ENDP
