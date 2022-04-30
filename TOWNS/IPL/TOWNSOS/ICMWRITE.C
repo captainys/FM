@@ -255,6 +255,16 @@ void PrintResult(int BIOSErr)
 		PrintString(100,320,"Return Key, Pad Button, or Mouse Button to return");
 		PrintString(100,336,"to MENU.");
 	}
+	else if(0==(BIOSErr&1))
+	{
+		PrintString(100,240,"正常に終了しました。");
+		PrintString(100,256,"リターンキー、パッドボタン、またはマウスボタンで");
+		PrintString(100,272,"メニューに戻ります。");
+
+		PrintString(100,304,"Written to IC Memory Card successfully..");
+		PrintString(100,320,"Return Key, Pad Button, or Mouse Button to return");
+		PrintString(100,336,"to MENU.");
+	}
 	else
 	{
 		PrintString(100,240,"エラーが発生しました。");
