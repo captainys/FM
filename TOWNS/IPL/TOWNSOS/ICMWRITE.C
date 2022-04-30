@@ -35,6 +35,8 @@ void DrawRect(int x0,int y0,int x1,int y1,int color)
 	EGB_rectangle(EGB_work,param);
 }
 
+char VersionStr[256]="VERSION ****";
+
 void Logo(void)
 {
 	MOS_disp(0);
@@ -42,7 +44,7 @@ void Logo(void)
 	PrintString(0,32,"by 山川機長 (http://www.ysflight.com)");
 	PrintString(0,48,"IC Memory Card Rescue IPL Writer");
 	PrintString(0,64,"by CaptainYS (http://www.ysflight.com)");
-	PrintString(0,80,"Version ****");
+	PrintString(0,80,VersionStr);
 
 	PrintString(0,128,"メモリカードを書き込み可能な状態にして、「書き込み」を選んでください。");
 	PrintString(0,144,"キーボード,マウス,パッドで操作できます。");
@@ -73,14 +75,27 @@ void PrintMenu(int menuSel)
 
 int RunMenu(void)
 {
+	EGB_writePage(EGB_work,1);
+	EGB_clearScreen(EGB_work);
+
+	EGB_writePage(EGB_work,0);
+	EGB_clearScreen(EGB_work);
 	Logo();
 
-	unsigned int prevPad=0;
+	unsigned int prevPad=0,prevButton=3;
+	int prevMX=0,prevMY=0;
 	int prevMenuSel=-1,menuSel=0;
 	for(;;)
 	{
 		if(prevMenuSel!=menuSel)
 		{
+			EGB_writePage(EGB_work,1);
+			EGB_clearScreen(EGB_work);
+
+			EGB_writePage(EGB_work,0);
+			EGB_clearScreen(EGB_work);
+			Logo();
+
 			PrintMenu(menuSel);
 			prevMenuSel=menuSel;
 		}
@@ -117,19 +132,27 @@ int RunMenu(void)
 
 		int button,mx,my;
 		MOS_rdpos(&button,&mx,&my);
-		if(0!=(button&1))
+		if(0!=(button&1) && 0==(prevButton&1))
 		{
 			break;
 		}
-		if(MENUX0<=mx && mx<=MENUX1)
+		int deltaX=mx-prevMX;
+		int deltaY=my-prevMY;
+		prevButton=button;
+		if(deltaX<-8 || 8<deltaX || deltaY<-8 || 8<deltaY)
 		{
-			if(MENU0_Y0<=my && my<=MENU0_Y1)
+			prevMX=mx;
+			prevMY=my;
+			if(MENUX0<=mx && mx<=MENUX1)
 			{
-				menuSel=0;
-			}
-			if(MENU1_Y0<=my && my<=MENU1_Y1)
-			{
-				menuSel=1;
+				if(MENU0_Y0<=my && my<=MENU0_Y1)
+				{
+					menuSel=0;
+				}
+				if(MENU1_Y0<=my && my<=MENU1_Y1)
+				{
+					menuSel=1;
+				}
 			}
 		}
 	}
@@ -195,8 +218,115 @@ void CancelledWrite(void)
 	WaitForKeyMouseOrPadButton();
 }
 
+void PrintResult(int BIOSErr)
+{
+
+	MOS_disp(0);
+	EGB_writePage(EGB_work,1);
+	EGB_clearScreen(EGB_work);
+
+	EGB_writePage(EGB_work,0);
+	EGB_clearScreen(EGB_work);
+
+	if(0!=BIOSErr)
+	{
+		char str[256];
+		sprintf(str,"BIOS Error Detail Code=0x%04x",BIOSErr);
+		PrintString(100,192,str);
+	}
+
+	if(0!=(BIOSErr&1))
+	{
+		PrintString(100,240,"ICメモリカードがありません。");
+		PrintString(100,256,"リターンキー、パッドボタン、またはマウスボタンで");
+		PrintString(100,272,"メニューに戻ります。");
+
+		PrintString(100,304,"IC Memory Card Not Ready.");
+		PrintString(100,320,"Return Key, Pad Button, or Mouse Button to return");
+		PrintString(100,336,"to MENU.");
+	}
+	else if(0!=(BIOSErr&1))
+	{
+		PrintString(100,240,"ICメモリカードが書き込み禁止になっています。");
+		PrintString(100,256,"リターンキー、パッドボタン、またはマウスボタンで");
+		PrintString(100,272,"メニューに戻ります。");
+
+		PrintString(100,304,"IC Memory Card Write Protected.");
+		PrintString(100,320,"Return Key, Pad Button, or Mouse Button to return");
+		PrintString(100,336,"to MENU.");
+	}
+	else
+	{
+		PrintString(100,240,"エラーが発生しました。");
+		PrintString(100,256,"リターンキー、パッドボタン、またはマウスボタンで");
+		PrintString(100,272,"メニューに戻ります。");
+
+		PrintString(100,304,"IC Memory Card Write Error.");
+		PrintString(100,320,"Return Key, Pad Button, or Mouse Button to return");
+		PrintString(100,336,"to MENU.");
+	}
+
+	MOS_disp(1);
+
+	WaitForKeyMouseOrPadButton();
+}
+
+#define ICM_SECTOR_SIZE 1024
+#define ICM_DEVICE_TYPE 0x50
+
+int WriteICM(void)
+{
+	int sector=1;
+	unsigned char writeBuf[ICM_SECTOR_SIZE];
+	for(unsigned int base=0; base<ICMIMAGE_size; base+=ICM_SECTOR_SIZE)
+	{
+		unsigned int i;
+		for(i=0; i<ICM_SECTOR_SIZE && base+i<ICMIMAGE_size; ++i)
+		{
+			writeBuf[i]=ICMIMAGE[base+i];
+		}
+		for(i=i; i<ICM_SECTOR_SIZE; ++i)
+		{
+			writeBuf[i]=0x77;
+		}
+
+		int blocknum; // Probably BX returned by Disk BIOS.
+		int err=DKB_write2(ICM_DEVICE_TYPE,sector,1,(char *)writeBuf,&blocknum);
+		if(0!=err)
+		{
+			return err;
+		}
+
+		++sector;
+	}
+	return 0;
+}
+
+
 int main(int ac,char *av[])
 {
+	for(int base=0; base+17<ICMIMAGE_size; ++base)
+	{
+		char cap[18];
+		for(int i=0; i<17; ++i)
+		{
+			cap[i]=ICMIMAGE[base+i];
+			if('a'<=cap[i] && cap[i]<='z')
+			{
+				cap[i]=cap[i]+'A'-'a';
+			}
+		}
+		if(0==strncmp(cap,"VERSION",7) && '0'<=cap[8] && cap[i]<='9')
+		{
+			cap[17]=0;
+			strcpy(VersionStr,cap);
+			break;
+		}
+
+	NEXTBASE:
+		;
+	}
+
 	EGB_init(EGB_work,EgbWorkSize);
 	EGB_resolution(EGB_work,0,3);	// 640x480 16 colors
 	EGB_resolution(EGB_work,1,10);	// 320x240 32K colors
@@ -229,8 +359,12 @@ int main(int ac,char *av[])
 	{
 		if(0==RunMenu())
 		{
-			// if(write succeeds) break
-			// otherwise, show error message and back to menu
+			int err=WriteICM();
+			PrintResult(err);
+			if(0==err)
+			{
+				break;
+			}
 		}
 		else
 		{
