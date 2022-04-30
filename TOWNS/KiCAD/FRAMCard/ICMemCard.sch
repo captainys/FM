@@ -68,7 +68,7 @@ Wire Wire Line
 Wire Wire Line
 	7400 5950 7400 5200
 Wire Wire Line
-	3900 3900 3900 5800
+	3900 3900 3900 5950
 Wire Wire Line
 	7450 5100 7450 2950
 Connection ~ 7450 5100
@@ -558,7 +558,7 @@ A13
 Text Label 2650 4000 0    50   ~ 0
 A14
 Text Label 2650 3900 0    50   ~ 0
-~WE_PC
+~WE
 Text Label 2650 3800 0    50   ~ 0
 RDY
 Text Label 2650 3600 0    50   ~ 0
@@ -763,8 +763,6 @@ Wire Wire Line
 	2450 4500 3850 4500
 Wire Wire Line
 	2450 3900 3900 3900
-Wire Wire Line
-	2450 3700 4300 3700
 NoConn ~ 3150 3800
 NoConn ~ 1550 2900
 NoConn ~ 1550 4300
@@ -815,34 +813,6 @@ Wire Wire Line
 	2900 1200 2750 1200
 Wire Wire Line
 	2750 1200 2750 1050
-Text Label 5350 5950 0    50   ~ 0
-~WE_IC
-Wire Wire Line
-	4300 3700 4300 5500
-Connection ~ 4300 3700
-Wire Wire Line
-	4300 3700 4400 3700
-$Comp
-L Jumper:Jumper_3_Open JP2
-U 1 1 62910D29
-P 4500 5800
-F 0 "JP2" H 4500 6024 50  0000 C CNN
-F 1 "Write_Disable" H 4500 5933 50  0000 C CNN
-F 2 "PCMCIA:MA_Memory_Card_Slide_Switch" H 4500 5800 50  0001 C CNN
-F 3 "~" H 4500 5800 50  0001 C CNN
-	1    4500 5800
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	4800 5800 4750 5800
-Wire Wire Line
-	4250 5800 3900 5800
-Wire Wire Line
-	4500 5950 7400 5950
-Wire Wire Line
-	4800 5800 4800 5500
-Wire Wire Line
-	4800 5500 4300 5500
 $Comp
 L Device:LED D1
 U 1 1 625C20EC
@@ -985,6 +955,10 @@ Wire Wire Line
 Connection ~ 8150 1700
 Wire Wire Line
 	8150 1700 8150 2300
+Wire Wire Line
+	2450 3700 4400 3700
+Wire Wire Line
+	3900 5950 7400 5950
 Wire Bus Line
 	3750 950  3750 5300
 Wire Bus Line

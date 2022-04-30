@@ -271,12 +271,13 @@ void PrintResult(int BIOSErr)
 	WaitForKeyMouseOrPadButton();
 }
 
-#define ICM_SECTOR_SIZE 1024
+#define ICM_SECTOR_SIZE 512
 #define ICM_DEVICE_TYPE 0x50
+// If accessed from device ID 0x4A, it seems to work as 1024 bytes per sector?
 
 int WriteICM(void)
 {
-	int sector=1;
+	int sector=0;
 	unsigned char writeBuf[ICM_SECTOR_SIZE];
 	for(unsigned int base=0; base<ICMIMAGE_size; base+=ICM_SECTOR_SIZE)
 	{
