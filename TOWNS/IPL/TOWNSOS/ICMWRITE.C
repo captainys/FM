@@ -417,6 +417,7 @@ int main(int ac,char *av[])
 	KYB_init();
 	unsigned int modeSave=KYB_rdcode();
 	KYB_setcode(0x4000); // Scan Mode/8bit Code/No Mask
+	KYB_clic(1); // No beep.  (0->Yes beep)
 
 	for(;;)
 	{
