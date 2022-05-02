@@ -94,6 +94,7 @@ DRAW_TEXT31K			ENDP
 ;   EBX Destroyed
 ;   EDI Zero
 WRHIGH_SETUP_GDT		PROC
+						; Don't destroy ECX
 						MOV		WORD PTR [VRAMGDT_BASE_LOW],BX
 						SHR		EBX,16
 						MOV		BYTE PTR [VRAMGDT_BASE_MIDHIGH],BL
@@ -317,11 +318,13 @@ CLS_HIGH				PROC
 						MOV		BYTE PTR CS:[VRAMGDT_BASE_MIDHIGH],AL
 
 						XOR		EBX,EBX
-						MOV		CX,8	; 10000H times 8 to clear both pages.
+						MOV		AL,8	; 10000H times 8 to clear both pages.
 CLS_HIGH_LOOP:
+						MOV		ECX,010000H
 						CALL	CLS_HIGH_SUB
 						ADD		EBX,010000H
-						LOOP	CLS_HIGH_LOOP
+						CMP		EBX,080000H
+						JB		CLS_HIGH_LOOP
 
 						RET
 CLS_HIGH				ENDP
@@ -332,18 +335,28 @@ CLS_5BELOW_HIGH				PROC
 						MOV		AX,0006H
 						CALL	LOCATE31K
 
-						XOR		AX,AX
-						MOV		WORD PTR CS:[VRAMGDT_BASE_LOW],AX
-						MOV		BYTE PTR CS:[VRAMGDT_BASE_MIDHIGH],AL
-
-						MOV		CX,4	; 10000H times 8 to clear both pages.
 CLS_5BELOW_HIGH_LOOP:
+						MOV		ECX,010000H
 						CALL	CLS_HIGH_SUB
 						ADD		EBX,010000H
-						LOOP	CLS_5BELOW_HIGH_LOOP
+						CMP		EBX,040000H
+						JB		CLS_5BELOW_HIGH_LOOP
 
 						RET
 CLS_5BELOW_HIGH				ENDP
+
+
+
+; Input
+;  EBX=VRAM top
+ERASE_LINE_HIGH				PROC
+						PUSH	ECX
+						MOV		ECX,CS:[VRAM_BYTES_PER_LINE]
+						SHL		ECX,4
+						CALL	CLS_HIGH_SUB
+						POP		ECX
+						RET
+ERASE_LINE_HIGH				ENDP
 
 
 
@@ -369,7 +382,6 @@ CLS_HIGH_SUB			PROC
 						MOV		DX,8	; Descriptor 1
 						MOV		ES,DX
 
-						MOV		ECX,04000H
 						XOR		EAX,EAX
 						REP		STOSD
 
