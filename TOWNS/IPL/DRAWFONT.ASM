@@ -238,30 +238,31 @@ ERASE_LINE_TALL			ENDP
 
 
 
-; INPUT
-;   AX LOCATION
-;   SI 0FFH-TERMINATED SEQUENCE OF C-STRINGS
-DRAW_TEXT				PROC
-
-						PUSH	AX
-						PUSH	SI
-						CALL	LOCATE
-						CALL	PRINT_TALL
-						POP		SI
-						POP		AX
-
-@@:
-						CMP		BYTE PTR DS:[SI],0
-						JE		SHORT @f
-						INC		SI
-						JMP		@b
-
-@@:
-						INC		SI
-						INC		AL
-
-						CMP		BYTE PTR [SI],0FFH
-						JNE		DRAW_TEXT
-
-						RET
-DRAW_TEXT		ENDP
+; No longer used.  Left for future reference.
+;; INPUT
+;;   AX LOCATION
+;;   SI 0FFH-TERMINATED SEQUENCE OF C-STRINGS
+;DRAW_TEXT				PROC
+;
+;						PUSH	AX
+;						PUSH	SI
+;						CALL	LOCATE
+;						CALL	PRINT_TALL
+;						POP		SI
+;						POP		AX
+;
+;@@:
+;						CMP		BYTE PTR DS:[SI],0
+;						JE		SHORT @f
+;						INC		SI
+;						JMP		@b
+;
+;@@:
+;						INC		SI
+;						INC		AL
+;
+;						CMP		BYTE PTR [SI],0FFH
+;						JNE		DRAW_TEXT
+;
+;						RET
+;DRAW_TEXT		ENDP

@@ -57,6 +57,35 @@ LOCATE31K				PROC
 LOCATE31K				ENDP
 
 
+; INPUT
+;   AX LOCATION
+;   SI 0FFH-TERMINATED SEQUENCE OF C-STRINGS
+DRAW_TEXT31K			PROC
+
+						PUSH	AX
+						PUSH	SI
+						CALL	LOCATE31K
+						CALL	WRSTRING_WHITE_HIGH
+						POP		SI
+						POP		AX
+
+@@:
+						CMP		BYTE PTR DS:[SI],0
+						JE		SHORT @f
+						INC		SI
+						JMP		@b
+
+@@:
+						INC		SI
+						INC		AL
+
+						CMP		BYTE PTR [SI],0FFH
+						JNE		DRAW_TEXT31K
+
+						RET
+DRAW_TEXT31K			ENDP
+
+
 ; Input
 ;   EBX Physical Address (Low 24-bits)
 ; Output
@@ -296,6 +325,27 @@ CLS_HIGH_LOOP:
 
 						RET
 CLS_HIGH				ENDP
+
+
+
+CLS_5BELOW_HIGH				PROC
+						MOV		AX,0006H
+						CALL	LOCATE31K
+
+						XOR		AX,AX
+						MOV		WORD PTR CS:[VRAMGDT_BASE_LOW],AX
+						MOV		BYTE PTR CS:[VRAMGDT_BASE_MIDHIGH],AL
+
+						MOV		CX,4	; 10000H times 8 to clear both pages.
+CLS_5BELOW_HIGH_LOOP:
+						CALL	CLS_HIGH_SUB
+						ADD		EBX,010000H
+						LOOP	CLS_5BELOW_HIGH_LOOP
+
+						RET
+CLS_5BELOW_HIGH				ENDP
+
+
 
 CLS_HIGH_SUB			PROC
 						PUSH	FS
