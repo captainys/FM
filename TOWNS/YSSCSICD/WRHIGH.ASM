@@ -56,16 +56,15 @@ WRITE_HIGH				PROC
 
 						CLI
 
+						SGDT	FWORD PTR CS:[GDT_BACKUP]
+						LGDT	FWORD PTR CS:[GDT_INFO]
+
 						MOV		EAX,CR0
 						PUSH	EAX
 						OR		AL,1
 						MOV		CR0,EAX
 
 
-						SGDT	FWORD PTR CS:[GDT_BACKUP]
-
-
-						LGDT	FWORD PTR CS:[GDT_INFO]
 
 						; https://wiki.osdev.org/Unreal_Mode suggest one jump "to tell 386/486 not to crash".
 						JMP		@f
@@ -84,13 +83,13 @@ WRITE_HIGH				PROC
 						REP		MOVSD
 
 
-						LGDT	FWORD PTR CS:[GDT_BACKUP]
-
 						POP		EAX
 						MOV		CR0,EAX
 
 						JMP		@f
 @@:
+
+						LGDT	FWORD PTR CS:[GDT_BACKUP]
 
 						POPF
 						POP		EAX
