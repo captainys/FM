@@ -102,38 +102,38 @@ LOCATE					ENDP
 
 
 
-; DI:  VRAM ADDRESS
-; AH:  ASCII Code
-; C0000H must be in FM-R VRAM mode.
-DRAWFONT				PROC
-						PUSH	DS
-						SUB		SP,8
-
-						MOV		DX,0C000H
-						MOV		DS,DX
-
-						MOV		DX,IO_KVRAM_OR_ANKFONT
-						MOV		AL,1
-						OUT		DX,AL
-
-						; ANK Font ROM CA000H-
-						MOV		AL,8
-						MUL		AH
-						ADD		AX,0A000H
-
-						MOV		CX,8
-						MOV		SI,AX
-@@:
-						MOV		DH,DS:[SI]
-						MOV		[DI],DH
-						INC		SI
-						ADD		DI,50H
-						LOOP	@b
-
-						ADD		SP,8
-						POP		DS
-						RET
-DRAWFONT				ENDP
+; ; DI:  VRAM ADDRESS
+; ; AH:  ASCII Code
+; ; C0000H must be in FM-R VRAM mode.
+; DRAWFONT				PROC
+; 						PUSH	DS
+; 						SUB		SP,8
+; 
+; 						MOV		DX,0C000H
+; 						MOV		DS,DX
+; 
+; 						MOV		DX,IO_KVRAM_OR_ANKFONT
+; 						MOV		AL,1
+; 						OUT		DX,AL
+; 
+; 						; ANK Font ROM CA000H-
+; 						MOV		AL,8
+; 						MUL		AH
+; 						ADD		AX,0A000H
+; 
+; 						MOV		CX,8
+; 						MOV		SI,AX
+; @@:
+; 						MOV		DH,DS:[SI]
+; 						MOV		[DI],DH
+; 						INC		SI
+; 						ADD		DI,50H
+; 						LOOP	@b
+; 
+; 						ADD		SP,8
+; 						POP		DS
+; 						RET
+; DRAWFONT				ENDP
 
 
 
