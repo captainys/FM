@@ -175,8 +175,8 @@ DRAWMENU2_OUTER_LOOP:
 						PUSH	CX
 						PUSH	AX
 						PUSH	SI
-						CALL	LOCATE
-						CALL	PRINT_TALL
+						CALL	LOCATE31K
+						CALL	WRSTRING_WHITE_HIGH
 						POP		SI
 
 						CALL	SKIP_CSTR_DS_SI
@@ -410,35 +410,33 @@ MENU_WAIT_PAD_RELEASE	ENDP
 ;   AL		Selection
 ;   CL		Number of menu items
 DRAWARROW				PROC
-						PUSH	AX
+						PUSH	DX
+
+						PUSH	AX	; Save Selection
 
 						MOV		AX,FIRST_ARROW_LOCATION
-						AND		CH,CH
+						XOR		CH,CH
 
 @@:
 						PUSH	AX
 						PUSH	CX
-						CALL	LOCATE
+						CALL	LOCATE31K
 						MOV		SI,OFFSET ARROW_ERASE
-						CALL	PRINT_TALL
+						CALL	WRSTRING_WHITE_HIGH
 						POP		CX
 						POP		AX
 						INC		AL
 						LOOP	@b
 
-						MOV		AL,0CH
-						CALL	COLOR
-
-						POP		CX
+						POP		CX	; Pop Selection in CL
 						MOV		AX,FIRST_ARROW_LOCATION
 						ADD		AL,CL
-						CALL	LOCATE
+						CALL	LOCATE31K
+						MOV		DH,0CH
 						MOV		SI,OFFSET ARROW_DRAW
-						CALL	PRINT_TALL
+						CALL	WRSTRING_HIGH
 
-						MOV		AL,0FH
-						CALL	COLOR
-
+						POP		DX
 						RET
 
 DRAWARROW				ENDP

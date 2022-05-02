@@ -1,3 +1,62 @@
+
+; Use one in RDHIGH.ASM
+; GDT_BACKUP				DW		0
+;						DD		0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+VRAMGDT_INFO			DW		VRAMGDT_END-VRAMGDT_BEGIN-1
+VRAMGDT_ADDR			DD		0	; Sounds like a linear address
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+VRAMADDR_HIGH			EQU		80H
+VRAMADDR_MIDHIGH		EQU		00H
+VRAMADDR_MIDLOW			EQU		00H
+VRAMADDR_LOW			EQU		00H
+
+VRAM_BYTES_PER_LINE		DD		512
+
+VRAMGDT_BEGIN			DD		0,0			; Table 0.  Not used?
+						; It must make a flat 32-bit descriptor.
+						; https://wiki.osdev.org/Unreal_Mode
+						DB		0FFH,0FFH	; Segment Limit (0-15)
+VRAMGDT_BASE_LOW		DB		VRAMADDR_LOW			; Base Address 0-7
+VRAMGDT_BASE_MIDLOW		DB		VRAMADDR_MIDLOW			; Base Address 8-15
+VRAMGDT_BASE_MIDHIGH	DB		VRAMADDR_MIDHIGH		; Base Address 16-23
+						DB		10010010B	; P=1, DPL=00, S=1, TYPE=0010
+						DB		11000111B	; G=1, DB=1, (Unused)=0, A=0, LIMIT 16-19=0011
+VRAMGDT_BASE_HIGH		DB		VRAMADDR_HIGH			; Base Address 24-31
+VRAMGDT_END				DB		0	; Dummy
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+LOCATE31K				PROC
+
+						PUSH	EAX
+						PUSH	ECX
+
+						MOVZX	BX,AH
+						MOVZX	EBX,BX
+						SHL		EBX,2
+
+						MOV		ECX,DWORD PTR CS:[VRAM_BYTES_PER_LINE]
+						SHL		ECX,4
+
+						XOR		AH,AH
+						MOVZX	EAX,AX
+						MUL		ECX
+
+						ADD		EBX,EAX
+
+						POP		ECX
+						POP		EAX
+						RET
+
+						
+LOCATE31K				ENDP
+
+
 ; Input
 ;   EBX Physical Address (Low 24-bits)
 ; Output
@@ -14,7 +73,7 @@ WRHIGH_SETUP_GDT		PROC
 						MOVZX	EBX,BX
 						SHL		EBX,4
 						ADD		EBX,OFFSET VRAMGDT_BEGIN
-						MOV		DWORD PTR [GDT_ADDR],EBX
+						MOV		DWORD PTR [VRAMGDT_ADDR],EBX
 
 						XOR		EDI,EDI
 
@@ -25,7 +84,14 @@ WRHIGH_SETUP_GDT		PROC
 WRHIGH_SETUP_GDT		ENDP
 
 
-; https://wiki.osdev.org/Unreal_Mode
+
+WRSTRING_WHITE_HIGH		PROC
+						PUSH	DX
+						MOV		DH,0FH;
+						CALL	WRSTRING_HIGH
+						POP		DX
+						RET
+WRSTRING_WHITE_HIGH		ENDP
 
 ; Input
 ;   DS:SI	C-String
@@ -265,38 +331,5 @@ CLS_HIGH_SUB			PROC
 						JMP		RESETGDT_POP_AND_RET
 
 CLS_HIGH_SUB			ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; Use one in RDHIGH.ASM
-; GDT_BACKUP				DW		0
-;						DD		0
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-VRAMGDT_INFO			DW		VRAMGDT_END-VRAMGDT_BEGIN-1
-; Use one in RDHIGH.ASM
-; GDT_ADDR				DD		0	; Sounds like a linear address
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-VRAMADDR_HIGH			EQU		80H
-VRAMADDR_MIDHIGH		EQU		00H
-VRAMADDR_MIDLOW			EQU		00H
-VRAMADDR_LOW			EQU		00H
-
-VRAM_BYTES_PER_LINE		DD		512
-
-VRAMGDT_BEGIN			DD		0,0			; Table 0.  Not used?
-						; It must make a flat 32-bit descriptor.
-						; https://wiki.osdev.org/Unreal_Mode
-						DB		0FFH,0FFH	; Segment Limit (0-15)
-VRAMGDT_BASE_LOW		DB		VRAMADDR_LOW			; Base Address 0-7
-VRAMGDT_BASE_MIDLOW		DB		VRAMADDR_MIDLOW			; Base Address 8-15
-VRAMGDT_BASE_MIDHIGH	DB		VRAMADDR_MIDHIGH		; Base Address 16-23
-						DB		10010010B	; P=1, DPL=00, S=1, TYPE=0010
-						DB		11000111B	; G=1, DB=1, (Unused)=0, A=0, LIMIT 16-19=0011
-VRAMGDT_BASE_HIGH		DB		VRAMADDR_HIGH			; Base Address 24-31
-VRAMGDT_END				DB		0	; Dummy
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
