@@ -1,6 +1,3 @@
-
-
-
 ; Needs to patch
 ; B200:000000F3 BF1201                    MOV     DI,0112H
 ; B200:000000F6 2EFF1D                    CALLF   WORD PTR CS:[DI]
@@ -84,6 +81,10 @@ HDIPLINTERCEPT:
 GENERALIPL_INTERCEPT:
 						; This is called after IO.SYS is loaded and no return.
 						PUSHA
+
+						CALL	CRTC640X400_640X400
+						CALL	CLS_HIGH
+
 						CALL	PATCH_V21L20
 						CMP		BYTE PTR CS:[SCSI_ID_CDROM],0FFH
 						JE		SHORT GENERALIPL_INTERCEPT_SKIP_YSSCSICD

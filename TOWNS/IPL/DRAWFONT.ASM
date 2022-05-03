@@ -39,28 +39,28 @@ CLS						ENDP
 
 
 
-CLEAR_FIVE_BELOW		PROC
-						PUSH	ES
-						PUSH	DI
-						PUSH	AX
-						PUSH	CX
-
-						MOV		AL,15
-						CALL	COLOR
-
-						MOV		AX,0C000H
-						MOV		ES,AX
-						MOV		DI,80*5*16
-						MOV		CX,80*20*16/2
-						MOV		AX,0
-						REP STOSW
-
-						POP		CX
-						POP		AX
-						POP		DI
-						POP		ES
-						RET
-CLEAR_FIVE_BELOW		ENDP
+;CLEAR_FIVE_BELOW		PROC
+;						PUSH	ES
+;						PUSH	DI
+;						PUSH	AX
+;						PUSH	CX
+;
+;						MOV		AL,15
+;						CALL	COLOR
+;
+;						MOV		AX,0C000H
+;						MOV		ES,AX
+;						MOV		DI,80*5*16
+;						MOV		CX,80*20*16/2
+;						MOV		AX,0
+;						REP STOSW
+;
+;						POP		CX
+;						POP		AX
+;						POP		DI
+;						POP		ES
+;						RET
+;CLEAR_FIVE_BELOW		ENDP
 
 
 
@@ -213,55 +213,57 @@ PRINT_TALL				ENDP
 
 
 
-; Input
-;   DI   First address of the line
-;        DI will be destroyed
-ERASE_LINE_TALL			PROC
+; No longer used.  Left for future reference.
+;; Input
+;;   DI   First address of the line
+;;        DI will be destroyed
+;ERASE_LINE_TALL			PROC
+;
+;						PUSH	ES
+;						PUSH	AX
+;						PUSH	CX
+;
+;						MOV		AX,0C000H
+;						MOV		ES,AX
+;
+;						XOR		AX,AX
+;						MOV		CX,80*16/2
+;						REP STOSW
+;
+;						POP		CX
+;						POP		AX
+;						POP		ES
+;						RET
+;
+;ERASE_LINE_TALL			ENDP
 
-						PUSH	ES
-						PUSH	AX
-						PUSH	CX
-
-						MOV		AX,0C000H
-						MOV		ES,AX
-
-						XOR		AX,AX
-						MOV		CX,80*16/2
-						REP STOSW
-
-						POP		CX
-						POP		AX
-						POP		ES
-						RET
-
-ERASE_LINE_TALL			ENDP
 
 
-
-; INPUT
-;   AX LOCATION
-;   SI 0FFH-TERMINATED SEQUENCE OF C-STRINGS
-DRAW_TEXT				PROC
-
-						PUSH	AX
-						PUSH	SI
-						CALL	LOCATE
-						CALL	PRINT_TALL
-						POP		SI
-						POP		AX
-
-@@:
-						CMP		BYTE PTR DS:[SI],0
-						JE		SHORT @f
-						INC		SI
-						JMP		@b
-
-@@:
-						INC		SI
-						INC		AL
-
-						CMP		BYTE PTR [SI],0FFH
-						JNE		DRAW_TEXT
-
-						RET
-DRAW_TEXT		ENDP
+; No longer used.  Left for future reference.
+;; INPUT
+;;   AX LOCATION
+;;   SI 0FFH-TERMINATED SEQUENCE OF C-STRINGS
+;DRAW_TEXT				PROC
+;
+;						PUSH	AX
+;						PUSH	SI
+;						CALL	LOCATE
+;						CALL	PRINT_TALL
+;						POP		SI
+;						POP		AX
+;
+;@@:
+;						CMP		BYTE PTR DS:[SI],0
+;						JE		SHORT @f
+;						INC		SI
+;						JMP		@b
+;
+;@@:
+;						INC		SI
+;						INC		AL
+;
+;						CMP		BYTE PTR [SI],0FFH
+;						JNE		DRAW_TEXT
+;
+;						RET
+;DRAW_TEXT		ENDP
