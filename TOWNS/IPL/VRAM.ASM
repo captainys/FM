@@ -1,4 +1,3 @@
-
 ; Use one in RDHIGH.ASM
 ; GDT_BACKUP				DW		0
 ;						DD		0
