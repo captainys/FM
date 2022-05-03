@@ -370,8 +370,8 @@ int main(int ac,char *av[])
 {
 	for(int base=0; base+17<ICMIMAGE_size; ++base)
 	{
-		char cap[18];
-		for(int i=0; i<17; ++i)
+		char cap[32];
+		for(int i=0; i<7; ++i)
 		{
 			cap[i]=ICMIMAGE[base+i];
 			if('a'<=cap[i] && cap[i]<='z')
@@ -379,10 +379,10 @@ int main(int ac,char *av[])
 				cap[i]=cap[i]+'A'-'a';
 			}
 		}
-		if(0==strncmp(cap,"VERSION",7) && '0'<=cap[8] && cap[i]<='9')
+		if(0==strncmp(cap,"VERSION",7) && '0'<=ICMIMAGE[base+i+8] && ICMIMAGE[base+i+8]<='9')
 		{
-			cap[17]=0;
-			strcpy(VersionStr,cap);
+			strncpy(VersionStr,(char *)ICMIMAGE+base,31);
+			cap[31]=0;
 			break;
 		}
 
