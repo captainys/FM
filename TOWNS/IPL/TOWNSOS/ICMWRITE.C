@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <conio.h>
 
 #include <egb.h>
 #include <mos.h>
@@ -297,7 +298,7 @@ void PrintResult(int BIOSErr)
 		PrintString(100,320,"Return Key, Pad Button, or Mouse Button to return");
 		PrintString(100,336,"to MENU.");
 	}
-	else if(0!=(BIOSErr&1))
+	else if(0!=(BIOSErr&2))
 	{
 		PrintString(100,240,"ICメモリカードが書き込み禁止になっています。");
 		PrintString(100,256,"リターンキー、パッドボタン、またはマウスボタンで");
