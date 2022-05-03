@@ -172,7 +172,7 @@ WRSTRING_HIGH			PROC
 
 
 						; https://wiki.osdev.org/Unreal_Mode suggest one jump "to tell 386/486 not to crash".
-						JMP		@f
+						JMP		SHORT @f
 @@:
 
 
@@ -226,7 +226,7 @@ WRFONTHIGH_LOOP_OUT:
 						POP		EAX
 						MOV		CR0,EAX
 
-						JMP		@f
+						JMP		SHORT @f
 @@:
 
 						MOV		DX,IO_KVRAM_OR_ANKFONT
@@ -266,7 +266,7 @@ WRAOMORI_HIGH			PROC
 
 
 						; https://wiki.osdev.org/Unreal_Mode suggest one jump "to tell 386/486 not to crash".
-						JMP		@f
+						JMP		SHORT @f
 @@:
 
 
@@ -311,7 +311,7 @@ WRAOMORIHIGH_LOOP_OUT:
 						POP		EAX
 						MOV		CR0,EAX
 
-						JMP		@f
+						JMP		SHORT @f
 @@:
 						JMP		RESETGDT_POP_AND_RET
 
@@ -374,12 +374,12 @@ CLS_HIGH_SUB			PROC
 
 						CLI
 
-						MOV		EAX,CR0
-						PUSH	EAX
-						OR		AL,1
-						MOV		CR0,EAX
+						; In this one, EBX is free.
+						MOV		EBX,CR0
+						OR		BL,1
+						MOV		CR0,EBX
 
-						JMP		@f
+						JMP		SHORT @f
 @@:
 
 						MOV		DX,8	; Descriptor 1
@@ -388,10 +388,10 @@ CLS_HIGH_SUB			PROC
 						XOR		EAX,EAX
 						REP		STOSD
 
-						POP		EAX
-						MOV		CR0,EAX
+						AND		BL,0FEH
+						MOV		CR0,EBX
 
-						JMP		@f
+						JMP		SHORT @f
 @@:
 						JMP		RESETGDT_POP_AND_RET
 
