@@ -1,8 +1,10 @@
 ; Question:
 ;   So, does SYSROM tweaks some bytes in the IPL sector after reading it to B000:0000 block?
+IPLDEBUG_BUF			DB		0,0,0
+
 IPLDEBUG				PROC
 
-						CALL	CLEAR_FIVE_BELOW
+						CALL	CLS_5BELOW_HIGH
 						CALL	MENU_WAIT_PAD_RELEASE
 
 						MOV		AX,0B000H
@@ -13,19 +15,15 @@ IPLDEBUG				PROC
 @@:
 						PUSH	AX
 						PUSH	SI
-						CALL	LOCATE
+						CALL	LOCATE31K
 
 						MOV		AL,FS:[SI]
 						CALL	ITOX8
 
-						PUSH	AX
-						PUSH	DI
-						CALL	DRAWFONT_TALL
-						POP		DI
-						ADD		DI,1
-						POP		AX
-						XCHG	AH,AL
-						CALL	DRAWFONT_TALL
+						MOV		SI,OFFSET IPLDEBUG_BUF
+						XCHG	AL,AH
+						MOV		CS:[SI],AX
+						CALL	WRSTRING_WHITE_HIGH
 
 						POP		SI
 						POP		AX
