@@ -36,9 +36,9 @@ LOCATE31K				PROC
 						PUSH	EAX
 						PUSH	ECX
 
-						MOVZX	BX,AH
-						MOVZX	EBX,BX
-						SHL		EBX,2
+						MOVZX	DI,AH
+						MOVZX	EDI,DI
+						SHL		EDI,2
 
 						MOV		ECX,DWORD PTR CS:[VRAM_BYTES_PER_LINE]
 						SHL		ECX,4
@@ -47,7 +47,7 @@ LOCATE31K				PROC
 						MOVZX	EAX,AX
 						MUL		ECX
 
-						ADD		EBX,EAX
+						ADD		EDI,EAX
 
 						POP		ECX
 						POP		EAX
@@ -64,8 +64,10 @@ DRAW_TEXT31K			PROC
 
 						PUSH	AX
 						PUSH	SI
+						PUSH	EDI
 						CALL	LOCATE31K
 						CALL	WRSTRING_WHITE_HIGH
+						POP		EDI
 						POP		SI
 						POP		AX
 
@@ -87,7 +89,7 @@ DRAW_TEXT31K			ENDP
 
 
 ; Input
-;   EBX Physical Address (Low 24-bits)
+;   EDI Physical Address (Low 24-bits)
 ; Output
 ;   GDT Prepared
 ;   DS=CS
@@ -95,6 +97,8 @@ DRAW_TEXT31K			ENDP
 ;   EDI Zero
 WRHIGH_SETUP_GDT		PROC
 						; Don't destroy ECX
+						MOV		EBX,EDI
+
 						MOV		WORD PTR [VRAMGDT_BASE_LOW],BX
 						SHR		EBX,16
 						MOV		BYTE PTR [VRAMGDT_BASE_MIDHIGH],BL
@@ -115,6 +119,9 @@ WRHIGH_SETUP_GDT		ENDP
 
 
 
+; Input
+;   DS:SI	C-String
+;   EDI		VRAM OFFSET
 WRSTRING_WHITE_HIGH		PROC
 						PUSH	DX
 						MOV		DH,0FH;
@@ -126,7 +133,7 @@ WRSTRING_WHITE_HIGH		ENDP
 ; Input
 ;   DS:SI	C-String
 ;   DH		Color
-;   EBX		VRAM OFFSET
+;   EDI		VRAM OFFSET
 WRSTRING_HIGH			PROC
 						PUSH	FS
 						PUSH	ES
@@ -313,17 +320,13 @@ WRAOMORI_HIGH			ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 CLS_HIGH				PROC
-						XOR		AX,AX
-						MOV		WORD PTR CS:[VRAMGDT_BASE_LOW],AX
-						MOV		BYTE PTR CS:[VRAMGDT_BASE_MIDHIGH],AL
-
-						XOR		EBX,EBX
+						XOR		EDI,EDI
 						MOV		AL,8	; 10000H times 8 to clear both pages.
 CLS_HIGH_LOOP:
-						MOV		ECX,010000H
+						MOV		ECX,04000H
 						CALL	CLS_HIGH_SUB
-						ADD		EBX,010000H
-						CMP		EBX,080000H
+						ADD		EDI,010000H
+						CMP		EDI,080000H
 						JB		CLS_HIGH_LOOP
 
 						RET
@@ -336,10 +339,10 @@ CLS_5BELOW_HIGH				PROC
 						CALL	LOCATE31K
 
 CLS_5BELOW_HIGH_LOOP:
-						MOV		ECX,010000H
+						MOV		ECX,04000H
 						CALL	CLS_HIGH_SUB
-						ADD		EBX,010000H
-						CMP		EBX,040000H
+						ADD		EDI,010000H
+						CMP		EDI,040000H
 						JB		CLS_5BELOW_HIGH_LOOP
 
 						RET
@@ -348,7 +351,7 @@ CLS_5BELOW_HIGH				ENDP
 
 
 ; Input
-;  EBX=VRAM top
+;  EDI=VRAM top
 ERASE_LINE_HIGH				PROC
 						PUSH	ECX
 						MOV		ECX,CS:[VRAM_BYTES_PER_LINE]
