@@ -98,11 +98,22 @@ CMOSMENU_RESET_CMOS:
 
 
 CMOSMENU_FASTMODE:
+						MOV		DX,IO_CMOS_FASTMODE
+						IN		AL,DX
+						AND		AL,1
+						SUB		AL,1
+						NEG		AL
+						OUT		DX,AL
+						CALL	RECONFIGURE_FASTMODE
 						JMP		CMOSMENU_OUTERLOOP
 
 
 
 CMOSMENU_AUTO_RESTORE:
+						CMP		BYTE PTR CS:[CMOS_BACKED_UP],0
+						JE		SHORT CMOSMENU_CMOS_NOT_BACKEDUP_ERROR
+
+CMOSMENU_AUTO_RESTORE_TOGGLE:
 						MOV		AL,1
 						MOV		DI,OFFSET AUTO_CMOS_RESTORE
 						SUB		AL,CS:[DI]
@@ -112,32 +123,7 @@ CMOSMENU_AUTO_RESTORE:
 
 
 CMOSMENU_BACKUP:
-						; Input
-						;	AL     Which segment selector:
-						;			bit0:DS
-						;			bit1:ES
-						;			bit2:FS
-						;			bit3:GS
-						;   EDX    Physical Address
-						MOV		AL,2	; Bit1=ES
-						MOV		EDX,ICM_CMOS_BACKUP_PHYSADDR
-						CALL	GET_UNREALMODE_SEG
-						MOV		DX,3000h
-						XOR		DI,DI
-CMOSMENU_BACKUP_OUTER_LOOP:
-						MOV		CX,4
-CMOSMENU_BACKUP_INNER_LOOP:
-						IN		AL,DX
-						ROR		EAX,8
-						INC		DX
-						INC		DX
-						LOOP	CMOSMENU_BACKUP_INNER_LOOP
-						STOSD
-						CMP		DI,4000h
-						JB		CMOSMENU_BACKUP_OUTER_LOOP
-
-						PUSH	CS
-						POP		ES
+						CALL	DO_BACKUP_CMOS
 
 						MOV		DI,OFFSET CMOS_BACKED_UP
 						MOV		AL,1
@@ -154,30 +140,13 @@ CMOSMENU_RESTORE:
 						CMP		BYTE PTR CS:[CMOS_BACKED_UP],0
 						JNE		CMOSMENU_RESTORE_GO
 
+CMOSMENU_CMOS_NOT_BACKEDUP_ERROR:
 						MOV		SI,OFFSET CMOSMENU_ERR_CMOS_NOT_BACKEDUP
 						CALL	SHOW_MESSAGE_WAIT
 						JMP		CMOSMENU_OUTERLOOP
 
 CMOSMENU_RESTORE_GO:
-						MOV		AL,1	; Bit0=DS
-						MOV		EDX,ICM_CMOS_BACKUP_PHYSADDR
-						CALL	GET_UNREALMODE_SEG
-						MOV		DX,3000h
-						XOR		SI,SI
-CMOSMENU_RESTORE_OUTER_LOOP:
-						MOV		CX,4
-						LODSD
-CMOSMENU_RESTORE_INNER_LOOP:
-						OUT		DX,AL
-						ROR		EAX,8
-						INC		DX
-						INC		DX
-						LOOP	CMOSMENU_RESTORE_INNER_LOOP
-						CMP		SI,4000h
-						JB		CMOSMENU_RESTORE_OUTER_LOOP
-
-						PUSH	CS
-						POP		DS
+						CALL	DO_RESTORE_CMOS
 
 						MOV		SI,OFFSET CMOSMENU_CMOS_RESTORED
 						CALL	SHOW_MESSAGE_WAIT
@@ -201,8 +170,135 @@ CMOSMENU_UPDATE_MENU	PROC
 CMOSMENU_UPDATE_AUTO_RESTORE:
 						MOV		CS:[CMOSMENU_AUTO_RESTORE_MENU+1],AL
 
+
+						MOV		DX,IO_CMOS_FASTMODE
+						IN		AL,DX
+						MOV		AH,' '
+						OR		AL,AL
+						JE		CMOSMENU_UPDATE_MENU_NOT_FASTMODE
+						MOV		AH,'X'
+CMOSMENU_UPDATE_MENU_NOT_FASTMODE:
+						MOV		CS:[CMOSMENU_FASTMODE_MENU+1],AH
+
 						RET
 CMOSMENU_UPDATE_MENU	ENDP
+
+
+
+; Based on AB.COM source:
+;             Normal    FAST
+;   model 1/2   3/6      2/?
+;   1F/2F       3/6      1/?
+;   10F/20F     3/6      0/3
+;   UX?         0/3      0/3?
+;   CX and newer, use 05ECh
+SET_FASTMODE			PROC
+						MOV		CS:[CMOSMENU_FASTMODE_MENU+1],'X'
+
+						MOV		DX,IO_CMOS_FASTMODE
+						MOV		AL,1
+						OUT		DX,AL
+
+						MOV		DX,IO_SPEED_CONTROL
+						IN		AL,DX
+						TEST	AL,80H
+						JNE		SHORT SET_FASTMODE_OLDER
+						MOV		AL,1
+						OUT		DX,AL
+						RET
+
+SET_FASTMODE_OLDER:
+						MOV		AL,31H
+						CMP		AL,020H
+						JE		SHORT SET_FASTMODE_MODEL2
+						CMP		AL,040H
+						JE		SHORT SET_FASTMODE_2F
+						CMP		AL,040H
+						JE		SHORT SET_FASTMODE_20F
+						RET
+
+SET_FASTMODE_MODEL2:
+						MOV		DX,IO_1STGEN_MAINRAM_WAIT
+						MOV		AL,2
+						OUT		DX,AL
+						RET
+SET_FASTMODE_2F:
+						MOV		AL,1
+						MOV		DX,IO_1STGEN_MAINRAM_WAIT
+						OUT		DX,AL
+						MOV		DX,IO_2NDGEN_MAINRAM_WAIT
+						OUT		DX,AL
+						RET
+SET_FASTMODE_20F:
+						XOR		AL,AL
+						MOV		DX,IO_1STGEN_MAINRAM_WAIT
+						OUT		DX,AL
+						MOV		DX,IO_2NDGEN_MAINRAM_WAIT
+						OUT		DX,AL
+						MOV		AL,3
+						MOV		DX,IO_3RDGEN_VRAM_WAIT
+						OUT		DX,AL
+						RET
+SET_FASTMODE			ENDP
+
+
+
+SET_SLOWMODE			PROC
+						MOV		CS:[CMOSMENU_FASTMODE_MENU+1],' '
+
+						MOV		DX,IO_CMOS_FASTMODE
+						XOR		AL,AL
+						OUT		DX,AL
+
+						MOV		DX,IO_SPEED_CONTROL
+						IN		AL,DX
+						TEST	AL,80H
+						JNE		SHORT SET_SLOWMODE_OLDER
+						MOV		AL,0
+						OUT		DX,AL
+						RET
+
+SET_SLOWMODE_OLDER:
+						MOV		AL,31H
+						CMP		AL,020H
+						JE		SHORT SET_SLOWMODE_MODEL2
+						CMP		AL,040H
+						JE		SHORT SET_SLOWMODE_2F
+						CMP		AL,040H
+						JE		SHORT SET_SLOWMODE_20F
+						RET
+
+SET_SLOWMODE_MODEL2:
+						MOV		DX,IO_1STGEN_MAINRAM_WAIT
+						MOV		AL,3
+						OUT		DX,AL
+						RET
+SET_SLOWMODE_2F:
+						MOV		AL,3
+						MOV		DX,IO_1STGEN_MAINRAM_WAIT
+						OUT		DX,AL
+						MOV		DX,IO_2NDGEN_MAINRAM_WAIT
+						OUT		DX,AL
+						RET
+SET_SLOWMODE_20F:
+						MOV		AL,3
+						MOV		DX,IO_1STGEN_MAINRAM_WAIT
+						OUT		DX,AL
+						MOV		DX,IO_2NDGEN_MAINRAM_WAIT
+						OUT		DX,AL
+						MOV		AL,6
+						MOV		DX,IO_3RDGEN_VRAM_WAIT
+						OUT		DX,AL
+						RET
+SET_SLOWMODE			ENDP
+
+RECONFIGURE_FASTMODE	PROC
+						MOV		DX,IO_CMOS_FASTMODE
+						IN		AL,DX
+						OR		AL,AL
+						JE		SET_SLOWMODE
+						JMP		SET_FASTMODE
+RECONFIGURE_FASTMODE	ENDP
 
 
 
@@ -222,6 +318,13 @@ ICM_WRITE_SETTING_AL	PROC
 
 						MOV		CL,AL
 
+						; Input
+						;	AL     Which segment selector:
+						;			bit0:DS
+						;			bit1:ES
+						;			bit2:FS
+						;			bit3:GS
+						;   EDX    Physical Address
 						MOV		AL,4	; Bit2=FS
 						MOV		EDX,ICM_LOADER_TOP
 						CALL	GET_UNREALMODE_SEG
@@ -264,3 +367,83 @@ SHOW_MESSAGE_WAIT		PROC
 
 						RET
 SHOW_MESSAGE_WAIT		ENDP
+
+
+
+DO_BACKUP_CMOS			PROC
+						PUSH	DS
+						PUSH	ES
+
+						; Input
+						;	AL     Which segment selector:
+						;			bit0:DS
+						;			bit1:ES
+						;			bit2:FS
+						;			bit3:GS
+						;   EDX    Physical Address
+						MOV		AL,2	; Bit1=ES
+						MOV		EDX,ICM_CMOS_BACKUP_PHYSADDR
+						CALL	GET_UNREALMODE_SEG
+
+
+						CALL	MAP_CMOS_D8000
+						PUSH	AX
+
+						MOV		DI,0D800H
+						MOV		DS,DI
+						XOR		SI,SI
+						XOR		DI,DI
+						MOV		CX,2000H/4
+						REP		MOVSD
+
+						POP		AX
+						CALL	RESTORE_D8000_MAPPING
+
+						POP		ES
+						POP		DS
+						RET
+DO_BACKUP_CMOS			ENDP
+
+
+DO_RESTORE_CMOS			PROC
+						PUSH	DS
+						PUSH	ES
+
+						; Input
+						;	AL     Which segment selector:
+						;			bit0:DS
+						;			bit1:ES
+						;			bit2:FS
+						;			bit3:GS
+						;   EDX    Physical Address
+						MOV		AL,1	; Bit0=DS
+						MOV		EDX,ICM_CMOS_BACKUP_PHYSADDR
+						CALL	GET_UNREALMODE_SEG
+
+						CALL	MAP_CMOS_D8000
+						PUSH	AX
+
+						MOV		DI,0D800H
+						MOV		ES,DI
+						XOR		SI,SI
+						XOR		DI,DI
+						MOV		CX,2000H/4
+						REP		MOVSD
+
+						POP		AX
+						CALL	RESTORE_D8000_MAPPING
+
+						CALL	RECONFIGURE_FASTMODE
+
+						POP		ES
+						POP		DS
+						RET
+DO_RESTORE_CMOS			ENDP
+
+
+
+RESTORE_CMOS_IF_AUTOCMOS_IS_SET	PROC
+						CMP		CS:[AUTO_CMOS_RESTORE],0
+						JNE		DO_RESTORE_CMOS
+						RET
+RESTORE_CMOS_IF_AUTOCMOS_IS_SET	ENDP

@@ -13,3 +13,31 @@ SET_VRAM_OR_RAM_MODE:
 						POP		AX
 						POP		DX
 						RET
+
+MAP_CMOS_D8000:
+						MOV		DX,IO_FMR_VRAM_OR_MAINRAM ; 0404H
+						IN		AL,DX
+						AND		AL,80H
+						MOV		AH,AL
+						MOV		DX,IO_FMR_SYSROM_DICROM	; 0480H
+						IN		AL,DX
+						AND		AL,3
+
+						PUSH	AX
+						MOV		AL,1
+						OUT		DX,AL
+						MOV		DL,(IO_FMR_VRAM_OR_MAINRAM AND 0FFH) ; 404H
+						MOV		AL,00H
+						OUT		DX,AL
+						POP		AX
+						RET
+
+
+
+RESTORE_D8000_MAPPING:
+						MOV		DX,IO_FMR_SYSROM_DICROM
+						OUT		DX,AL
+						MOV		DL,(IO_FMR_VRAM_OR_MAINRAM AND 0FFH) ; 404H
+						MOV		AL,AH
+						OUT		DX,AL
+						RET
