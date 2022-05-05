@@ -315,6 +315,11 @@ RECONFIGURE_FASTMODE	ENDP
 ; Needs to be WORD access.
 ; To be safe, DWORD access, which has been confirmed to work.
 ; Writes to both FRAM and the Config Area
+;
+;LOADER is written Memory Card offset 0400H, which is mapped to C0000400H.
+;Therefore, memory card offset is 0400H+OFFSET_TO_CS, which is C0000400H+OFFSET_TO_CS.
+;By directly writing to that address, it can save settings.
+;
 ICM_WRITE_SETTING_AL	PROC
 						PUSH	FS
 						PUSH	DI
