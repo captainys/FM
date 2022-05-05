@@ -394,7 +394,17 @@ DO_BACKUP_CMOS			PROC
 						XOR		SI,SI
 						XOR		DI,DI
 						MOV		CX,2000H/4
-						REP		MOVSD
+@@:
+						LODSB	; CMOS RAM Mapped to 0D8000h is byte-access only.  Confirmed.
+						ROR		EAX,8
+						LODSB
+						ROR		EAX,8
+						LODSB
+						ROR		EAX,8
+						LODSB
+						ROR		EAX,8
+						STOSD
+						LOOP	@b
 
 						POP		AX
 						CALL	RESTORE_D8000_MAPPING
@@ -428,7 +438,16 @@ DO_RESTORE_CMOS			PROC
 						XOR		SI,SI
 						XOR		DI,DI
 						MOV		CX,2000H/4
-						REP		MOVSD
+@@:
+						LODSD	; CMOS RAM Mapped to 0D8000h is byte-access only.  Confirmed.
+						STOSB
+						ROR		EAX,8
+						STOSB
+						ROR		EAX,8
+						STOSB
+						ROR		EAX,8
+						STOSB
+						LOOP	@b
 
 						POP		AX
 						CALL	RESTORE_D8000_MAPPING
