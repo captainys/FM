@@ -15,7 +15,9 @@ int main(int ac,char *av[])
 		return 1;
 	}
 
-	int sectorLen=2340;
+	int sectorLen=2048;
+	/* 2340-byte read never succeeded in actual FM TOWNS 2MX, nor on Tsugaru.
+	   I don't know if it was really supported.
 	if(0!=cdr_sdrvmd(0,2340))
 	{
 		printf("Cannot set sector size to 2340.\n");
@@ -23,6 +25,7 @@ int main(int ac,char *av[])
 		cdr_sdrvmd(0,2048);
 		sectorLen=2048;
 	}
+	*/
 
 
 	FILE *fp=fopen(av[1],"wb");
