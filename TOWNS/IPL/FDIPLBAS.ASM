@@ -80,7 +80,7 @@ REALMAIN:
 						MOV			BYTE PTR CS:[SECTOR],1
 						INC			WORD PTR CS:[TRACK_SIDE]
 						ADD			WORD PTR CS:[BUFFADDR],BX
-						JNC			@b
+						JNC			@b			; Read until carry -> Cross 64KB border.
 
 @@:
 						MOV			BX,BOOTLOADER_SEGMENT
