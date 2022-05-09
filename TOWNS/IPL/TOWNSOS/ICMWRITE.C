@@ -334,6 +334,28 @@ void PrintResult(int BIOSErr)
 	WaitForKeyMouseOrPadButton();
 }
 
+void PrintVerificationError(void)
+{
+	MOS_disp(0);
+	EGB_writePage(EGB_work,1);
+	EGB_clearScreen(EGB_work);
+
+	EGB_writePage(EGB_work,0);
+	EGB_clearScreen(EGB_work);
+
+	PrintString(100,240,"書き込み内容が一致しませんでした。");
+	PrintString(100,256,"リターンキー、パッドボタン、またはマウスボタンで");
+	PrintString(100,272,"メニューに戻ります。");
+
+	PrintString(100,304,"Verification Failure.");
+	PrintString(100,320,"Return Key, Pad Button, or Mouse Button to return");
+	PrintString(100,336,"to MENU.");
+
+	MOS_disp(1);
+
+	WaitForKeyMouseOrPadButton();
+}
+
 #define ICM_SECTOR_SIZE 512
 #define ICM_DEVICE_TYPE 0x50
 // If accessed from device ID 0x4A, it seems to work as 1024 bytes per sector?
@@ -366,6 +388,32 @@ int WriteICM(void)
 	return 0;
 }
 
+int VerifyICM(void)
+{
+	int sector=0;
+	unsigned char readBuf[ICM_SECTOR_SIZE];
+	for(unsigned int base=0; base<ICMIMAGE_size; base+=ICM_SECTOR_SIZE)
+	{
+		int blocknum; // Probably BX returned by Disk BIOS.
+		int err=DKB_read2(ICM_DEVICE_TYPE,sector,1,(char *)readBuf,&blocknum);
+		if(0!=err)
+		{
+			return err;
+		}
+
+		unsigned int i;
+		for(i=0; i<ICM_SECTOR_SIZE && base+i<ICMIMAGE_size; ++i)
+		{
+			if(readBuf[i]!=ICMIMAGE[base+i])
+			{
+				return -1;
+			}
+		}
+
+		++sector;
+	}
+	return 0;
+}
 
 int main(int ac,char *av[])
 {
@@ -428,7 +476,11 @@ int main(int ac,char *av[])
 			PrintResult(err);
 			if(0==err)
 			{
-				break;
+				if(0==VerifyICM())
+				{
+					break;
+				}
+				PrintVerificationError();
 			}
 		}
 		else
