@@ -342,22 +342,22 @@ SENSE_KEY_TO_FMR_BIOS_ERRORCODE:
 IS_SCSI_ERROR			ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Input
-;	AL		Play State
-; Output
-;   Carry   1:Playing   0:Not Playing
-IS_AUDIO_STATE_PLAYING	PROC
-
-						CMP		AL,11H
-						JE		SHORT @f
-						CMP		AL,12H
-						JE		SHORT @f
-						CLC
-						RET
-@@:
-						STC
-						RET
-IS_AUDIO_STATE_PLAYING	ENDP
+; No longer used
+;  ; Input
+;  ;	AL		Play State
+;  ; Output
+;  ;   Carry   1:Playing   0:Not Playing
+;  IS_AUDIO_STATE_PLAYING	PROC
+;  						CMP		AL,11H
+;  						JE		SHORT @f
+;  						CMP		AL,12H
+;  						JE		SHORT @f
+;  						CLC
+;  						RET
+;  @@:
+;  						STC
+;  						RET
+;  IS_AUDIO_STATE_PLAYING	ENDP
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
