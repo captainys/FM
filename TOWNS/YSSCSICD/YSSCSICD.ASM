@@ -249,6 +249,9 @@ INITIALIZE				PROC	FAR
 						CALL	INSTALL_HOOK
 
 						MOV		WORD PTR CS:[DEVHDR_INTERRUPT],OFFSET INTERRUPT
+
+						; The rest needs to be done outside of the sector buffer.
+						; SCSI-scan will destroy this area.
 						JMP		INITIALIZE_CONTINUE
 
 
