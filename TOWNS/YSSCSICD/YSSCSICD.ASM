@@ -202,7 +202,11 @@ SCSI_DATA_BUF:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-INIT_OF_INIT			PROC
+INITIALIZE				PROC	FAR
+						PUSH	ES
+						PUSH	DS
+						PUSHA
+
 						CLD
 
 						XOR		BX,BX
@@ -245,9 +249,8 @@ INIT_OF_INIT			PROC
 						CALL	INSTALL_HOOK
 
 						MOV		WORD PTR CS:[DEVHDR_INTERRUPT],OFFSET INTERRUPT
-						CLC
+						JMP		INITIALIZE_CONTINUE
 
-						RET
 
 INIT_OF_INIT_FAILED:
 						PUSH	CS
@@ -263,10 +266,12 @@ INIT_OF_INIT_FAILED:
 						MOV		WORD PTR [DI+14],OFFSET DEVICE_END_NO_INSTALL
 						MOV		WORD PTR [DI+16],CS
 
-						STC
-						RET
+						POPA
+						POP		DS
+						POP		ES
+						RETF
 
-INIT_OF_INIT			ENDP
+INITIALIZE				ENDP
 
 ; I realized that if you set /R option in the CONFIG.SYS and if you don't have an RS232C connected to a computer,
 ; The driver freezes just waiting for the TX Ready, which is dangerous.
@@ -437,7 +442,7 @@ RECOGNIZE_COMMAND_PARAMETER	ENDP
 						INCLUDE	HOOKINST.ASM
 
 MSG_INTRO				DB		"YS SCSI BIOS REDIRECTOR",0DH,0AH
-						DB		"Ver 0.97 2022/04/27",0DH,0AH
+						DB		"Ver 0.98 2022/05/08",0DH,0AH
 						DB		"By CaptainYS (http://www.ysflight.com)",0DH,0AH,0
 MSG_ERR_PARAM			DB		"UNRECOGNIZED COMMAND OPTION:",0
 
@@ -466,14 +471,7 @@ DEVICE_END				DB		'DEVICE END',0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-INITIALIZE				PROC	FAR
-						PUSH	ES
-						PUSH	DS
-						PUSHA
-
-						CALL	INIT_OF_INIT
-						JB		SHORT INIT_SCSI_SCAN_DONE
-
+INITIALIZE_CONTINUE:
 						CALL	SCAN_SCSI_CDROM
 						MOV		BYTE PTR [YSSCSICD_SCSI_ID],AL
 						CMP		AL,07H
@@ -495,7 +493,6 @@ INIT_SCSI_SCAN_DONE:
 						POP		ES
 						RETF
 
-INITIALIZE				ENDP
 
 MSG_FOUND_CDROM_AT		DB		"Found CD-ROM Drive SCSI-ID:",0
 MSG_CDROM_NOT_FOUND		DB		"SCSI CD-ROM Drive not found.",0
