@@ -70,16 +70,16 @@ Wire Wire Line
 Wire Wire Line
 	3900 3900 3900 5950
 Wire Wire Line
-	7450 5100 7450 2950
-Connection ~ 7450 5100
+	7550 5100 7550 2950
+Connection ~ 7550 5100
 Wire Wire Line
-	6450 5100 7450 5100
+	6450 5100 7550 5100
 Wire Wire Line
-	7450 2550 6450 2550
+	7550 2550 6450 2550
 Wire Wire Line
-	7450 6000 7450 5100
+	7550 6000 7550 5100
 Wire Wire Line
-	3850 6000 7450 6000
+	3850 6000 7550 6000
 Wire Wire Line
 	3850 4500 3850 6000
 Wire Wire Line
@@ -718,13 +718,9 @@ Wire Wire Line
 Wire Wire Line
 	900  4600 1950 4600
 Wire Wire Line
-	6900 4900 6900 6100
-Wire Wire Line
-	7700 2350 7700 6050
+	7700 2350 7700 5200
 Wire Wire Line
 	6450 4900 6900 4900
-Text Label 6750 2350 0    50   ~ 0
-~CS1
 Wire Wire Line
 	2450 4600 4000 4600
 Wire Wire Line
@@ -913,10 +909,10 @@ Wire Wire Line
 Wire Wire Line
 	9000 2550 9000 2750
 Wire Wire Line
-	7450 2950 8400 2950
-Connection ~ 7450 2950
+	7550 2950 8400 2950
+Connection ~ 7550 2950
 Wire Wire Line
-	7450 2950 7450 2550
+	7550 2950 7550 2550
 Wire Wire Line
 	8400 4700 7400 4700
 Connection ~ 7400 4700
@@ -959,6 +955,48 @@ Wire Wire Line
 	2450 3700 4400 3700
 Wire Wire Line
 	3900 5950 7400 5950
+$Comp
+L Device:R_US R5
+U 1 1 627E564B
+P 8150 5200
+F 0 "R5" V 7945 5200 50  0000 C CNN
+F 1 "4.7K" V 8036 5200 50  0000 C CNN
+F 2 "PCMCIA:KOA_RK73G2AAT" V 8190 5190 50  0001 C CNN
+F 3 "~" H 8150 5200 50  0001 C CNN
+	1    8150 5200
+	0    1    1    0   
+$EndComp
+$Comp
+L Device:R_US R6
+U 1 1 627F2696
+P 8150 5550
+F 0 "R6" V 7945 5550 50  0000 C CNN
+F 1 "4.7K" V 8036 5550 50  0000 C CNN
+F 2 "PCMCIA:KOA_RK73G2AAT" V 8190 5540 50  0001 C CNN
+F 3 "~" H 8150 5550 50  0001 C CNN
+	1    8150 5550
+	0    1    1    0   
+$EndComp
+Text GLabel 8450 5200 2    50   Input ~ 0
+Vcc
+Text GLabel 8450 5550 2    50   Input ~ 0
+Vcc
+Wire Wire Line
+	8450 5200 8300 5200
+Wire Wire Line
+	8450 5550 8300 5550
+Wire Wire Line
+	8000 5200 7700 5200
+Connection ~ 7700 5200
+Wire Wire Line
+	7700 5200 7700 6050
+Wire Wire Line
+	8000 5550 6900 5550
+Wire Wire Line
+	6900 4900 6900 5550
+Connection ~ 6900 5550
+Wire Wire Line
+	6900 5550 6900 6100
 Wire Bus Line
 	3750 950  3750 5300
 Wire Bus Line
