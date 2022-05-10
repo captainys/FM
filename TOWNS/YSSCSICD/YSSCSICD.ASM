@@ -46,6 +46,8 @@
 
 						.386p
 
+						PAGE	99,160
+
 						ORG		0
 						ASSUME	CS:DATA_CODE,DS:DATA_CODE
 
