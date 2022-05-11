@@ -5,7 +5,7 @@ int main(int ac,char *av[])
 {
 	if(ac<3)
 	{
-		printf("BIN2ASM input.bin output.asm\n");
+		printf("BIN2ASM input.bin output.asm <size>\n");
 		return 1;
 	}
 
@@ -14,6 +14,15 @@ int main(int ac,char *av[])
 
 	size_t fSize=ftell(fp);
 	fseek(fp,0,SEEK_SET);
+
+	if(4<=ac)
+	{
+		int reqSize=atoi(av[3]);
+		if(reqSize<fSize)
+		{
+			fSize=reqSize;
+		}
+	}
 
 	unsigned char *dat=malloc(fSize);
 	fread(dat,1,fSize,fp);

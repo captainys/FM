@@ -1,2 +1,2 @@
-#define ICMIMAGE_size 65536
+#define ICMIMAGE_size 57340
 extern unsigned char ICMIMAGE[ICMIMAGE_size];

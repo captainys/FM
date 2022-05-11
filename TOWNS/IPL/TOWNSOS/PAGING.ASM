@@ -7,6 +7,7 @@
 						PUBLIC	SETUP_PAGE_TABLE
 						PUBLIC	TRANSFER_TO_ICM
 						PUBLIC	MALLOC_PHYS_ADDR
+						PUBLIC	CLEAR_ICM
 
 CODE					SEGMENT
 
@@ -127,6 +128,9 @@ TRANSFER_TO_ICM			PROC
 						PUSH	EDX
 						PUSH	ES
 
+						PUSH	DS
+						POP		ES
+
 						MOV		ECX,[EBP+8]
 						ADD		ECX,3
 						SHR		ECX,2
@@ -145,6 +149,44 @@ TRANSFER_TO_ICM			PROC
 						RET
 
 TRANSFER_TO_ICM			ENDP
+
+
+
+;	[EBP]		EBP
+;	[EBP+4]		Return EIP
+;	[EBP+8]		Size (Must be 4*N)
+;	[EBP+12]	Pointer to CMOS address
+CLEAR_ICM				PROC
+
+						PUSH	EBP
+						MOV		EBP,ESP
+						PUSH	ESI
+						PUSH	EDI
+						PUSH	EBX
+						PUSH	EDX
+						PUSH	ES
+
+						PUSH	DS
+						POP		ES
+
+						MOV		ECX,[EBP+8]
+						ADD		ECX,3
+						SHR		ECX,2
+						MOV		EDI,[EBP+12]
+						XOR		EAX,EAX
+						CLD
+						REP		STOSD
+
+						POP		ES
+						POP		EDX
+						POP		EBX
+						POP		EDI
+						POP		ESI
+						MOV		ESP,EBP
+						POP		EBP
+						RET
+
+CLEAR_ICM				ENDP
 
 
 

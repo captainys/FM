@@ -5,7 +5,7 @@ int main(int ac,char *av[])
 {
 	if(ac<4)
 	{
-		printf("BIN2C input.bin filename-base variable-name\n");
+		printf("BIN2C input.bin filename-base variable-name <size>\n");
 		return 1;
 	}
 
@@ -22,7 +22,14 @@ int main(int ac,char *av[])
 
 	printf("File Size=%d\n",fSize);
 
-
+	if(5<=ac)
+	{
+		int reqSize=atoi(av[4]);
+		if(reqSize<fSize)
+		{
+			fSize=reqSize;
+		}
+	}
 
 	char hName[256];
 	sprintf(hName,"%s.h",av[2]);

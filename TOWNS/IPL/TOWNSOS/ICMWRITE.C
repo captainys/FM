@@ -11,11 +11,13 @@
 
 #include "icmimage.h"
 
+#define CMOS_BACKUP_ADDR 0xDFFC
 unsigned char *C0000000H=NULL;
 
 extern void SETUP_PAGE_TABLE(unsigned char *pageBuf);
 extern unsigned char *MALLOC_PHYS_ADDR(void);
 extern void TRANSFER_TO_ICM(unsigned int size,const unsigned char from[],unsigned char to[]); // size needs to be 4*N
+extern void CLEAR_ICM(unsigned int size,unsigned char cmosptr[]);
 
 static char EGB_work[EgbWorkSize],mos[MosWorkSize],snd[16384];
 
@@ -117,18 +119,23 @@ void Logo(void)
 #define MENUX1 560
 #define MENU0_Y0 (224-16-16)
 #define MENU0_Y1 (224+16)
-#define MENU1_Y0 (320-16-16)
-#define MENU1_Y1 (320+16)
+#define MENU1_Y0 (288-16-16)
+#define MENU1_Y1 (288+16)
+#define MENU2_Y0 (352-16-16)
+#define MENU2_Y1 (352+16)
 
 void PrintMenu(int menuSel)
 {
 	MOS_disp(0);
 
 	DrawRect(MENUX0,MENU0_Y0,MENUX1,MENU0_Y1,(0==menuSel ? 15 : 0));
-	PrintString(100,224,"èëÇ´çûÇ› Write");
+	PrintString(100,MENU0_Y0+32,"èëÇ´çûÇ› Write");
 
 	DrawRect(MENUX0,MENU1_Y0,MENUX1,MENU1_Y1,(1==menuSel ? 15 : 0));
-	PrintString(100,320,"Ç‚Ç¡ÇœÇËèëÇ©Ç»Ç¢ Cancel Write");
+	PrintString(100,MENU1_Y0+32,"ÉNÉäÉAÇµÇƒèëÇ´çûÇ›  Clear and then Write");
+
+	DrawRect(MENUX0,MENU2_Y0,MENUX1,MENU2_Y1,(2==menuSel ? 15 : 0));
+	PrintString(100,MENU2_Y0+32,"Ç‚Ç¡ÇœÇËèëÇ©Ç»Ç¢ Cancel Write");
 
 	MOS_disp(1);
 }
@@ -162,13 +169,20 @@ int RunMenu(void)
 
 		int gamePad;
 		SND_joy_in_2(0,&gamePad);
-		if(0xF0!=(gamePad&0xF0))
+		if(0xF0==(prevPad&0xF0) && 0xF0!=(gamePad&0xF0))
 		{
 			break;
 		}
 		if(3==(prevPad&3) && 3!=(gamePad&3))
 		{
-			menuSel=1-menuSel;
+			if(0==(gamePad&1)) // Up
+			{
+				menuSel=(menuSel+2)%3;
+			}
+			else if(0==(gamePad&2)) // Down
+			{
+				menuSel=(menuSel+1)%3;
+			}
 		}
 		prevPad=gamePad;
 
@@ -183,10 +197,13 @@ int RunMenu(void)
 			{
 				break;
 			}
-			if(0x4D==keyAddr || // Up
-			   0x50==keyAddr) // Down
+			if(0x4D==keyAddr) // Up
 			{
-				menuSel=1-menuSel;
+				menuSel=(menuSel+2)%3;
+			}
+			if(0x50==keyAddr) // Down
+			{
+				menuSel=(menuSel+1)%3;
 			}
 		}
 
@@ -212,6 +229,10 @@ int RunMenu(void)
 				if(MENU1_Y0<=my && my<=MENU1_Y1)
 				{
 					menuSel=1;
+				}
+				if(MENU2_Y0<=my && my<=MENU2_Y1)
+				{
+					menuSel=2;
 				}
 			}
 		}
@@ -366,6 +387,11 @@ void PrintVerificationError(void)
 #define ICM_DEVICE_TYPE 0x50
 // If accessed from device ID 0x4A, it seems to work as 1024 bytes per sector?
 
+void ClearICMCMOSBackUp(void)
+{
+	CLEAR_ICM(65536-CMOS_BACKUP_ADDR,C0000000H+CMOS_BACKUP_ADDR);
+}
+
 int WriteICM(void)
 {
 	TRANSFER_TO_ICM(ICMIMAGE_size,ICMIMAGE,C0000000H);
@@ -428,7 +454,7 @@ int VerifyICM(void)
 
 int main(int ac,char *av[])
 {
-	_outp(0x2386,2); //Tsugaru debugger break.
+	// _outp(0x2386,2); //Tsugaru debugger break.
 
 	C0000000H=MALLOC_PHYS_ADDR();
 
@@ -489,20 +515,29 @@ int main(int ac,char *av[])
 
 	for(;;)
 	{
-		if(0==RunMenu())
+		auto menuSel=RunMenu();
+		if(0==menuSel || 1==menuSel)
 		{
+			if(1==menuSel)
+			{
+				ClearICMCMOSBackUp();
+			}
 			int err=WriteICM();
-			PrintResult(err);
 			if(0==err)
 			{
 				if(0==VerifyICM())
 				{
+					PrintResult(err);
 					break;
 				}
 				PrintVerificationError();
 			}
+			else
+			{
+				PrintResult(err);
+			}
 		}
-		else
+		else if(2==menuSel)
 		{
 			CancelledWrite();
 			break;
