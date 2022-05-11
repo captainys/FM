@@ -11,8 +11,11 @@
 
 #include "icmimage.h"
 
+unsigned char *C0000000H=NULL;
+
 extern void SETUP_PAGE_TABLE(unsigned char *pageBuf);
-extern void TRANSFER_TO_ICM(unsigned int size,unsigned char data[]); // size needs to be 4*N
+extern unsigned char *MALLOC_PHYS_ADDR(void);
+extern void TRANSFER_TO_ICM(unsigned int size,const unsigned char from[],unsigned char to[]); // size needs to be 4*N
 
 static char EGB_work[EgbWorkSize],mos[MosWorkSize],snd[16384];
 
@@ -365,7 +368,7 @@ void PrintVerificationError(void)
 
 int WriteICM(void)
 {
-	TRANSFER_TO_ICM(ICMIMAGE_size,ICMIMAGE);
+	TRANSFER_TO_ICM(ICMIMAGE_size,ICMIMAGE,C0000000H);
 /*
 	// Disk BIOS fails to recognize the Memory Card if everything is 00h.
 	// (Probably checking reg, but FRAM card does not have REG memory for saving cost.)
@@ -426,8 +429,12 @@ int VerifyICM(void)
 int main(int ac,char *av[])
 {
 	_outp(0x2386,2); //Tsugaru debugger break.
-	unsigned char *pageBuf=malloc(32768+4095); // Need space that puts 8 pages.  32768+4095 should be good enough.
-	SETUP_PAGE_TABLE(pageBuf);
+
+	C0000000H=MALLOC_PHYS_ADDR();
+
+	// This method worked on Tsugaru, but didn't work on actual MX.
+	// unsigned char *pageBuf=malloc(32768+4095); // Need space that puts 8 pages.  32768+4095 should be good enough.
+	// SETUP_PAGE_TABLE(pageBuf);
 
 	for(int base=0; base+17<ICMIMAGE_size; ++base)
 	{

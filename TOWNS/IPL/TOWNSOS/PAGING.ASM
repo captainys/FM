@@ -6,9 +6,12 @@
 
 						PUBLIC	SETUP_PAGE_TABLE
 						PUBLIC	TRANSFER_TO_ICM
+						PUBLIC	MALLOC_PHYS_ADDR
 
 CODE					SEGMENT
 
+
+; This proc worked on Tsugaru, but didn't work on actual.
 
 ; [EBP]		ESP
 ; [EBP+4]	Return EIP
@@ -109,11 +112,12 @@ SETUP_PAGE_TABLE		ENDP
 
 
 
-; TRANSFER_TO_ICM(unsigned int size,unsigned char data[]);
+; TRANSFER_TO_ICM(unsigned int size,const unsigned char from[],unsigned char to[]);
 ;	[EBP]		EBP
 ;	[EBP+4]		Return EIP
 ;	[EBP+8]		Size (Must be 4*N)
-;	[EBP+12]	Data
+;	[EBP+12]	FROM
+;	[EBP+16]	TO
 TRANSFER_TO_ICM			PROC
 						PUSH	EBP
 						MOV		EBP,ESP
@@ -123,15 +127,11 @@ TRANSFER_TO_ICM			PROC
 						PUSH	EDX
 						PUSH	ES
 
-
-						MOV		AX,0040H	; 00000000H to FFFFFFFFH Linear Access for updating page table.
-						MOV		ES,AX
-						MOV		EDI,0C0000000H
-
 						MOV		ECX,[EBP+8]
 						ADD		ECX,3
 						SHR		ECX,2
 						MOV		ESI,[EBP+12]
+						MOV		EDI,[EBP+16]
 						CLD
 						REP		MOVSD
 
@@ -148,9 +148,6 @@ TRANSFER_TO_ICM			ENDP
 
 
 
-; Broken promise by DOS Extender.
-; This function call (250AH) does not work.
-; Looks like High-C takes all the available RAM and do malloc on its own.
 MALLOC_PHYS_ADDR		PROC
 
 
@@ -160,10 +157,9 @@ MALLOC_PHYS_ADDR		PROC
 						PUSH	EDI
 						PUSH	ES
 
-						PUSH	DS
-						POP		ES	; Append to DS
+						MOV		AX,DS
 						MOV		EBX,0C0000000H
-						MOV		ECX,8192		; 8K pages
+						MOV		ECX,32	; 32 pages * 4KB = 128KB	; At this time I only need 64K, but for the future.
 						MOV		AX,250AH
 						INT		21H
 						; EAX is the pointer to C0000000H
