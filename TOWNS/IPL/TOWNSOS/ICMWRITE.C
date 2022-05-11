@@ -11,6 +11,9 @@
 
 #include "icmimage.h"
 
+extern void SETUP_PAGE_TABLE(unsigned char *pageBuf);
+extern void TRANSFER_TO_ICM(unsigned int size,unsigned char data[]); // size needs to be 4*N
+
 static char EGB_work[EgbWorkSize],mos[MosWorkSize],snd[16384];
 
 unsigned char Aomori[]=
@@ -362,6 +365,10 @@ void PrintVerificationError(void)
 
 int WriteICM(void)
 {
+	TRANSFER_TO_ICM(ICMIMAGE_size,ICMIMAGE);
+/*
+	// Disk BIOS fails to recognize the Memory Card if everything is 00h.
+	// (Probably checking reg, but FRAM card does not have REG memory for saving cost.)
 	int sector=0;
 	unsigned char writeBuf[ICM_SECTOR_SIZE];
 	for(unsigned int base=0; base<ICMIMAGE_size; base+=ICM_SECTOR_SIZE)
@@ -385,6 +392,7 @@ int WriteICM(void)
 
 		++sector;
 	}
+*/
 	return 0;
 }
 
@@ -417,6 +425,10 @@ int VerifyICM(void)
 
 int main(int ac,char *av[])
 {
+	_outp(0x2386,2); //Tsugaru debugger break.
+	unsigned char *pageBuf=malloc(32768+4095); // Need space that puts 8 pages.  32768+4095 should be good enough.
+	SETUP_PAGE_TABLE(pageBuf);
+
 	for(int base=0; base+17<ICMIMAGE_size; ++base)
 	{
 		char cap[32];
