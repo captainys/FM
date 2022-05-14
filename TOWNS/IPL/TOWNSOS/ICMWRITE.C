@@ -21,6 +21,15 @@ extern void CLEAR_ICM(unsigned int size,unsigned char cmosptr[]);
 
 static char EGB_work[EgbWorkSize],mos[MosWorkSize],snd[16384];
 
+#define ERROR_LOG_MAX 16
+int nErr=0;
+struct ErrorLog
+{
+	unsigned int addr;
+	unsigned char read,shouldBe;
+};
+struct ErrorLog err[ERROR_LOG_MAX];
+
 unsigned char Aomori[]=
 {
 0x63,0x22,0x67,0x20,0x00,0x00,0x00,0x00,0x94,0xb6,0x94,0xa0,0x00,0x00,0x00,0x00,
@@ -56,6 +65,11 @@ unsigned char Aomori[]=
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
+
+unsigned int GetICMStatusByte(void)
+{
+	return _inp(0x48A);
+}
 
 void PrintString(int x,int y,const char str[])
 {
@@ -165,6 +179,11 @@ int RunMenu(void)
 
 			PrintMenu(menuSel);
 			prevMenuSel=menuSel;
+
+			unsigned int sta=GetICMStatusByte();
+			char str[128];
+			sprintf(str,"ICM Status (048AH):%02x",sta);
+			PrintString(100,420,str);
 		}
 
 		int gamePad;
@@ -378,6 +397,20 @@ void PrintVerificationError(void)
 	PrintString(100,320,"Return Key, Pad Button, or Mouse Button to return");
 	PrintString(100,336,"to MENU.");
 
+	int x=100,y=380;
+	for(int i=0; i<nErr; ++i)
+	{
+		char str[256];
+		sprintf(str,"%08x %02x %02x",err[i].addr,err[i].read,err[i].shouldBe);
+		PrintString(x,y,str);
+		x+=128;
+		if(612<=x)
+		{
+			x=100;
+			y+=16;
+		}
+	}
+
 	MOS_disp(1);
 
 	WaitForKeyMouseOrPadButton();
@@ -389,11 +422,25 @@ void PrintVerificationError(void)
 
 void ClearICMCMOSBackUp(void)
 {
-	CLEAR_ICM(65536-CMOS_BACKUP_ADDR,C0000000H+CMOS_BACKUP_ADDR);
+	unsigned int sta=GetICMStatusByte();
+	if(0==(sta&1))
+	{
+		CLEAR_ICM(65536-CMOS_BACKUP_ADDR,C0000000H+CMOS_BACKUP_ADDR);
+	}
 }
 
 int WriteICM(void)
 {
+	unsigned int sta=GetICMStatusByte();
+	if(0!=(sta&1))
+	{
+		return 2; // Write Protected bit
+	}
+	if(0!=(sta&6))
+	{
+		return 1; // Card not ready bit
+	}
+
 	TRANSFER_TO_ICM(ICMIMAGE_size,ICMIMAGE,C0000000H);
 /*
 	// Disk BIOS fails to recognize the Memory Card if everything is 00h.
@@ -427,15 +474,17 @@ int WriteICM(void)
 
 int VerifyICM(void)
 {
+	int returnCode=0;
 	int sector=0;
 	unsigned char readBuf[ICM_SECTOR_SIZE];
+	nErr=0;
 	for(unsigned int base=0; base<ICMIMAGE_size; base+=ICM_SECTOR_SIZE)
 	{
 		int blocknum; // Probably BX returned by Disk BIOS.
-		int err=DKB_read2(ICM_DEVICE_TYPE,sector,1,(char *)readBuf,&blocknum);
-		if(0!=err)
+		int biosErr=DKB_read2(ICM_DEVICE_TYPE,sector,1,(char *)readBuf,&blocknum);
+		if(0!=biosErr)
 		{
-			return err;
+			return biosErr;
 		}
 
 		unsigned int i;
@@ -443,13 +492,20 @@ int VerifyICM(void)
 		{
 			if(readBuf[i]!=ICMIMAGE[base+i])
 			{
-				return -1;
+				if(nErr<ERROR_LOG_MAX)
+				{
+					err[nErr].addr=base+i;
+					err[nErr].read=readBuf[i];
+					err[nErr].shouldBe=ICMIMAGE[base+i];
+					++nErr;
+				}
+				returnCode=-1;
 			}
 		}
 
 		++sector;
 	}
-	return 0;
+	return returnCode;
 }
 
 int main(int ac,char *av[])
