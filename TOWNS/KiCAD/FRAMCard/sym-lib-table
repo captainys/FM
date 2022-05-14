@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "ICMemCard-rescue")(type "Legacy")(uri "${KIPRJMOD}/ICMemCard-rescue.lib")(options "")(descr ""))
+)
