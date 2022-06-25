@@ -7,6 +7,13 @@
 extern void XModemSend(unsigned int dataLength,const unsigned char data[],int baud); // baud  2:38400bps  4:19200bps
 
 
+struct CRCErrorLog
+{
+	struct CRCErrorLog *next;
+	DKB_SEC sector;
+};
+struct CRCErrorLog *crcErrLog=NULL,*crcErrLogTail=NULL;
+
 #define BUFFERSIZE 3200*1024
 #define NUM_SECTOR_BUF 160
 
@@ -300,6 +307,23 @@ unsigned int ReadTrack(
 
 		if(0!=(biosErr&BIOSERR_FLAG_CRC))  // If finally I couldn't read without CRC error.
 		{
+			struct CRCErrorLog *newLog=(struct CRCErrorLog *)malloc(sizeof(struct CRCErrorLog));
+			if(NULL!=newLog)
+			{
+				newLog->next=NULL;
+				newLog->sector=sector[i];
+				if(NULL==crcErrLog)
+				{
+					crcErrLog=newLog;
+					crcErrLogTail=newLog;
+				}
+				else
+				{
+					crcErrLogTail->next=newLog;
+					crcErrLogTail=newLog;
+				}
+			}
+
 			for(retry=0; retry<cpi->secondRetryCount; ++retry)
 			{
 				printf("%02x%02x%02x%02x",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
@@ -432,6 +456,29 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 		trackData+=ReadTrack(devNo,track,1,cpi,d77Image,d77HeaderPtr,trackTable,trackData);
 	}
 	d77HeaderPtr->diskSize=(trackData-d77Image);
+
+
+	if(NULL!=crcErrLog)
+	{
+		printf("CRC Error Summary\n");
+		int nCRCError=0,nCRCErrorNotF5F6F7=0;;
+		struct CRCErrorLog *ptr;
+		for(ptr=crcErrLog; NULL!=ptr; ptr=ptr->next)
+		{
+			printf("CRC Err at Track:%d  Side:%d  Sector:%d\n",ptr->sector.trakno,ptr->sector.hedno,ptr->sector.secno);
+			if(0xF5!=ptr->sector.secno && 0xF6!=ptr->sector.secno && 0xF7!=ptr->sector.secno)
+			{
+				++nCRCErrorNotF5F6F7;
+			}
+			++nCRCError;
+		}
+		printf("%d CRC Errors.\n",nCRCError);
+		printf("%d CRC Errors in not F5,F6,F7 sectors.\n",nCRCErrorNotF5F6F7);
+	}
+	else
+	{
+		printf("No CRC Error.\n");
+	}
 
 
 	printf("D77 Image Size=%d bytes\n",d77HeaderPtr->diskSize);
