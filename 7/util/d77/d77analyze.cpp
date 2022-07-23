@@ -4,6 +4,8 @@
 
 #include <vector>
 #include <string>
+#include <unordered_set>
+#include <fstream>
 
 #include "d77.h"
 #include "../lib/cpplib.h"
@@ -190,6 +192,92 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 				printf("Too few arguments.\n");
 			}
 		}
+//		else if("D77EXT"==cmd)
+//		{
+//			if(2<=argv.size())
+//			{
+//				std::ofstream ofp(argv[1]);
+//				if(true!=ofp.is_open())
+//				{
+//					printf("Cannot open file.\n");
+//					return;
+//				}
+//
+//				auto diskPtr=d77Ptr->GetDisk(diskId);
+//				for(auto loc : diskPtr->AllTrack())
+//				{
+//					std::unordered_set <unsigned int> doneSectors;
+//					auto trk=diskPtr->GetTrack(loc.track,loc.side);
+//					if(nullptr!=trk)
+//					{
+//						for(int i=0; i<trk->sector.size(); ++i)
+//						{
+//							if(doneSectors.end()!=doneSectors.find(trk->sector[i].sector))
+//							{
+//								continue;
+//							}
+//							doneSectors.insert(trk->sector[i].sector);
+//
+//							std::vector <bool> korokoro;
+//							korokoro.resize(trk->sector[i].sectorData.size());
+//							for(auto &b : korokoro)
+//							{
+//								b=false;
+//							}
+//							int count=0;
+//							for(int j=i+1; j<trk->sector.size(); ++j)
+//							{
+//								if(trk->sector[i].sector==trk->sector[j].sector && // Same Number, same size
+//								   trk->sector[i].sectorData.size()==trk->sector[j].sectorData.size())
+//								{
+//									for(int k=0; k<trk->sector[i].sectorData.size(); ++k)
+//									{
+//										if(trk->sector[i].sectorData[k]!=trk->sector[j].sectorData[k])
+//										{
+//											korokoro[k]=true;
+//											++count;
+//										}
+//									}
+//								}
+//							}
+//
+//							if(0<count)
+//							{
+//								korokoro.push_back(false);
+//
+//								bool prev=false;
+//								bool first=true;
+//								for(int k=0; k<korokoro.size(); ++k)
+//								{
+//									if(true!=prev && true==korokoro[k])
+//									{
+//										if(true==first)
+//										{
+//											ofp << "S " << loc.track << " " << loc.side << " " << (int)trk->sector[i].sector;
+//											first=false;
+//										}
+//										ofp << " KOROKORO " << k << ":";
+//									}
+//									else if(true==prev && true!=korokoro[k])
+//									{
+//										ofp << k-1;
+//									}
+//									prev=korokoro[k];
+//								}
+//								if(true!=first)
+//								{
+//									ofp << std::endl;
+//								}
+//							}
+//						}
+//					}
+//				}
+//			}
+//			else
+//			{
+//				printf("Too few arguments.\n");
+//			}
+//		}
 		else
 		{
 			if(4<=argv.size())
@@ -840,6 +928,9 @@ void D77Analyzer::Help(void) const
 	printf("\tWrite multi-disk image to single-disk images 1.d77 2.d77 ....\n");
 	printf("WRAW filename.bin\n");
 	printf("\tWrite Raw Binary.\n");
+//	printf("D77EXT filename.D77EXT\n");
+//	printf("\tWrite D77EXT file of unstable bytes information.  D77 image\n");
+//	printf("\trequires duplicates (multiple-reads) of the sectors of unstable bytes.\n");
 	printf("X D DS\n");
 	printf("\tDiagnose duplicate sectors.\n");
 	printf("X F SC secId\n");

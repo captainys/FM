@@ -40,6 +40,11 @@ IO_FDC_SIDE			EQU		$FD1C
 IO_FDC_DRIVE_MOTOR	EQU		$FD1D
 IO_FDC_DRQ_IRQ		EQU		$FD1F
 
+IO_FDC_DATA_DP		EQU		$1B
+IO_FDC_DRQ_IRQ_DP	EQU		$1F
+
+
+
 FDCCMD_STEPIN		EQU		$5A
 FDCCMD_READTRACK	EQU		$E4
 FDCCMD_WRITETRACK	EQU		$F4
@@ -88,7 +93,7 @@ RAWREADBARRIER		FDB		$FC00
 SECTORDUMPADDR		FDB		$8000			; INPUT (RawRead transmitted then SectorRead. OK to be same)
 SECTORDUMPBARRIER	FDB		$FC00
 
-DUMPSECTOR_CRCERROR_RETRY_MAX		FCB		4
+DUMPSECTOR_CRCERROR_RETRY_MAX		FCB		16	; Xanadu Senario 1 reads sector for 10 times.  To be safe.  Read 16 times.
 DUMPSECTOR_CRCERROR_RETRY_COUNTER	FCB		4
 
 ADDRMARKADDR		FDB		$5800
@@ -97,6 +102,10 @@ ADDRMARKUSED		FDB		$0
 LASTIRQDRQ			FCB		0				; $180C
 LASTFDCSTATE		FCB		0
 ERRORRETURN			FCB		0				; $180D
+
+READSECTOR_LOOPCTR	FDB		0
+; Turned out many games including Ys2, Nobunaga Zenokoku, and Silpheed uses loop-count for reading a sector
+; for copy protection.  Keep this information in here.
 
 SEEKTRACK			PSHS	A,B,X,Y,U,CC
 					CLR		ERRORRETURN,PCR
@@ -253,8 +262,11 @@ READTRACK_NOTREADY	LDA		#DISKERR_NOTREADY
 					; Emulate BIOS Call
 					; This does not re-seek to the track [4,X].
 					; A register will return error code
-READSECTOR			PSHS	B,X,Y,U,CC
+READSECTOR			PSHS	B,X,Y,U,CC,DP
 					ORCC	#$50
+
+					LDA		#$FD
+					TFR		A,DP
 
 					LDA		7,X
 					STA		DRIVE,PCR
@@ -279,16 +291,34 @@ READSECTOR			PSHS	B,X,Y,U,CC
 
 					LDY		2,X
 
+					LDU		#0	; Count loop
+
 					LDA		#FDCCMD_READSECTOR
 					STA		IO_FDC_STAT_CMD
 
-READSECTOR_DATALOOP	LDA		IO_FDC_DRQ_IRQ
-					BPL		READSECTOR_NODRQ
-					LDA		IO_FDC_DATA
+
+READSECTOR_1STBYTE	LDA		<IO_FDC_DRQ_IRQ_DP
+					BMI		READSECTOR_1STBYTE_DRQ
+					LSLA
+					BPL		READSECTOR_1STBYTE
+					BRA		READSECTOR_IRQ
+
+
+READSECTOR_1STBYTE_DRQ
+					LDA		<IO_FDC_DATA_DP
 					STA		,Y+
-					BRA		READSECTOR_DATALOOP
-READSECTOR_NODRQ	BITA	#$40		; IRQ?
-					BEQ		READSECTOR_DATALOOP
+
+READSECTOR_DATALOOP	LEAU	1,U
+					LDA		<IO_FDC_DRQ_IRQ_DP
+					BPL		READSECTOR_NODRQ
+					LDB		<IO_FDC_DATA_DP
+					STB		,Y+
+READSECTOR_NODRQ	LSLA	; IRQ?
+					BPL		READSECTOR_DATALOOP
+
+
+READSECTOR_IRQ		STU		READSECTOR_LOOPCTR,PCR
+
 					LDA		IO_FDC_STAT_CMD
 					STA		LASTFDCSTATE,PCR
 
@@ -318,7 +348,7 @@ READSECTOR_NODRQ	BITA	#$40		; IRQ?
 					;	Otherwise, DDM
 
 					CLRA
-					PULS	B,X,Y,U,CC,PC
+					PULS	B,X,Y,U,CC,DP,PC
 
 READSECTOR_NOTREADY
 					LDA		#DISKERR_NOTREADY
@@ -618,9 +648,9 @@ DUMPSECTOR_LOOP
 					STA		DUMPSECTOR_CRCERROR_RETRY_COUNTER,PCR
 
 DUMPSECTOR_CRCERROR_RETRY_LOOP
-					; Version 2:
-					; +0 +1 +2 +3  +4+5            +6           +7           +8 to +15
-					; C  H  R  N   ActualReadSize  LastFDCState BIOSErrCode  Zero
+					; Version 3:
+					; +0 +1 +2 +3  +4+5            +6           +7          +8+9       +10 to +15
+					; C  H  R  N   ActualReadSize  LastFDCState BIOSErrCode LoopCount  Zero
 					; +16
 					; ActualReadSize bytes of data
 					LDD		,Y
@@ -655,14 +685,20 @@ DUMPSECTOR_CLEAR_HEADER_LOOP
 					LDA		LASTFDCSTATE,PCR
 					STA		6,U
 
+					LDD		READSECTOR_LOOPCTR,PCR
+					STD		8,U
+
+					; Update Read-Buffer Pointer & Save Read Size>>
 					LDD		READSIZE,PCR
 					STD		4,U
+
 					LEAU	16,U		; Move to the next sector location
 
 					ADDD	#15			; 16-byte alignment
 					ANDB	#$F0		; 16-byte alignment
 
 					LEAU	D,U
+					; Update Read-Buffer Pointer & Save Read Size <<
 
 
 					LDA		LASTFDCSTATE,PCR
