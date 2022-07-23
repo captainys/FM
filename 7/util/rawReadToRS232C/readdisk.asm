@@ -685,11 +685,12 @@ DUMPSECTOR_CLEAR_HEADER_LOOP
 					LDA		LASTFDCSTATE,PCR
 					STA		6,U
 
-					LDD		READSIZE,PCR
-					STD		4,U
-
 					LDD		READSECTOR_LOOPCTR,PCR
 					STD		8,U
+
+					; Update Read-Buffer Pointer & Save Read Size>>
+					LDD		READSIZE,PCR
+					STD		4,U
 
 					LEAU	16,U		; Move to the next sector location
 
@@ -697,6 +698,7 @@ DUMPSECTOR_CLEAR_HEADER_LOOP
 					ANDB	#$F0		; 16-byte alignment
 
 					LEAU	D,U
+					; Update Read-Buffer Pointer & Save Read Size <<
 
 
 					LDA		LASTFDCSTATE,PCR
