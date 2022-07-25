@@ -112,6 +112,11 @@ LASTIRQDRQ			FCB		0				; $180C
 LASTFDCSTATE		FCB		0
 ERRORRETURN			FCB		0				; $180D
 
+
+; To use FM77AV's extra RAM area $00000 to $FFFFF,
+; there ar ethree sizes.  One is total, one is bytes in extra RAM, the last one is in the URA (shadow) RAM.
+; F-BASIC program calling this assmbly only cares total size.
+; For calculating check sum and XOR, correct number of bytes from extra RAM and URA RAM should be counted.
 EXTRAM_USAGE		FDB		0				; DUMPSIZEHIGH|DUMPSIZE=EXTRAM_USAGE+URARAM_USAGE
 URARAM_USAGE		FDB		0
 
@@ -1112,7 +1117,7 @@ TFR_TO_EXTRAM_LOOP
 
 				LDX		#0
 				INCB
-				STB		$FD80
+				STB		$FD80	; I have a feeling that I can just do INC $FD80.
 				BRA		TFR_TO_EXTRAM_LOOP
 
 TFR_TO_EXTRAM_LOOP_EXIT
@@ -1139,9 +1144,10 @@ TFR_TO_EXTRAM_LOOP_EXIT
 
 
 TRANSMIT_SECTOR_DUMP
-				PSHS	A,B,X,Y,U
+				PSHS	A,B,X,Y,U,CC
 				CLR		,-S	; For MMR
 
+				ORCC	#$50
 				STA		$FD0F
 
 				LBSR	RS232C_OPEN
@@ -1167,7 +1173,7 @@ TRANSMIT_SECTOR_DUMP_MMR_SETSIZE
 				LBSR	RS232C_SEND_ASCII
 				PULS	X
 
-				INC		,S
+				INC		,S	; I have a feeling that I can do INC $FD80.
 				EXG		X,D
 				SUBD	#$1000
 				EXG		X,D
@@ -1190,4 +1196,4 @@ TRANSMIT_SECTOR_DUMP_DONE
 
 				LDA		$FD0F
 
-				PULS	A,B,X,Y,U,PC
+				PULS	A,B,X,Y,U,CC,PC
