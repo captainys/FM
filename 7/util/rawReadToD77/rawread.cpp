@@ -217,7 +217,7 @@ bool FM7RawDiskRead::Track::SectorDumpToSector(const SectorInfo &info,const Sect
 		return false;
 	}
 
-	if(2==dump.version)
+	if(2<=dump.version)
 	{
 		// From Silpheed copy protection (was not able to confirm due to floppy-disk contamination):
 		// Track 0 Sector 8 CHRS tells it is 256 bytes.  However, actually it seems to return only 220 bytes or so with no CRC error.
@@ -255,6 +255,7 @@ bool FM7RawDiskRead::Track::SectorDumpToSector(const SectorInfo &info,const Sect
 		if(nSecFromInfo!=sec.size())
 		{
 			fprintf(stderr,"Actual number of sectors and format-info size mismatch (%d vs %d).\n",(int)sec.size(),nSecFromInfo);
+			fprintf(stderr,"(Can be expected for multiple samples of CRC-error sectors.\n");
 			return false;
 		}
 	}
@@ -296,6 +297,8 @@ bool FM7RawDiskRead::Track::SectorDumpToSector(const SectorInfo &info,const Sect
 		if(dumpPtr!=dump.dat.size())
 		{
 			fprintf(stderr,"Calculated sector size and sector dump size mismatch.\n");
+			fprintf(stderr,"  Calculated %d\n",dumpPtr);
+			fprintf(stderr,"  Actual %d\n",dump.dat.size());
 			return false;
 		}
 		return true;
