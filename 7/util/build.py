@@ -289,13 +289,9 @@ def BuildForWinPre():
 		"--parallel",
 		"--target",
 		"rs232ctfr",
-		"--target",
 		"srecdump",
-		"--target",
 		"77avtyper",
-		"--target",
 		"d77fileutil",
-		"--target",
 		"t77save",
 	])
 	build32proc.communicate()
@@ -317,13 +313,9 @@ def BuildForWinPre():
 		"--parallel",
 		"--target",
 		"rs232ctfr",
-		"--target",
 		"srecdump",
-		"--target",
 		"77avtyper",
-		"--target",
 		"d77fileutil",
-		"--target",
 		"t77save",
 	])
 	build64proc.communicate()

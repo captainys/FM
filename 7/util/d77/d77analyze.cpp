@@ -1224,7 +1224,73 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 	{
 		for(auto trkLoc : diskPtr->AllTrack())
 		{
-			diskPtr->DeleteDuplicateSector(trkLoc.track,trkLoc.side);
+			// diskPtr->DeleteDuplicateSector(trkLoc.track,trkLoc.side);
+
+			// Make it corocoro aware.
+			auto trkPtr=diskPtr->FindTrack(trkLoc.track,trkLoc.side);
+			auto &t=*trkPtr;
+			for(int i=0; i<trkPtr->sector.size(); ++i)
+			{
+				std::vector <int> duplicateIdx;
+				duplicateIdx.push_back(i);
+				for(int j=0; j<trkPtr->sector.size(); ++j)
+				{
+					auto &si=trkPtr->sector[i];
+					auto &sj=trkPtr->sector[j];
+					if(sj.cylinder==si.cylinder &&
+					   sj.head==si.head &&
+					   sj.sector==si.sector &&
+					   sj.sizeShift==si.sizeShift)
+					{
+						duplicateIdx.push_back(j);
+					}
+				}
+				if(1<duplicateIdx.size())
+				{
+					int toLeave=duplicateIdx[0];
+					// Which sector to leave?
+					if(0xF7==trkPtr->sector[i].sector)
+					{
+						for(auto idx : duplicateIdx)
+						{
+							bool corocoro=true;
+							auto &sec=trkPtr->sector[idx];
+							for(int i=0; i<20; ++i)
+							{
+								if(sec.sectorData[i]!=0xF7)
+								{
+									corocoro=false;
+									break;
+								}
+							}
+							for(int i=0; i<19; ++i)
+							{
+								if(sec.sectorData[i+24]!=0xF6)
+								{
+									corocoro=false;
+									break;
+								}
+							}
+							if(true==corocoro)
+							{
+								printf("Found Corocoro Protect V2.\n");
+								toLeave=idx;
+								break;
+							}
+						}
+					}
+
+					for(size_t i=duplicateIdx.size()-1; 0<=i && i<duplicateIdx.size(); --i)
+					{
+						if(duplicateIdx[i]!=toLeave)
+						{
+							trkPtr->sector.erase(trkPtr->sector.begin()+i);
+						}
+					}
+
+					--i;
+				}
+			}
 		}
 	}
 }
