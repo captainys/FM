@@ -1265,7 +1265,7 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 			{
 				std::vector <int> duplicateIdx;
 				duplicateIdx.push_back(i);
-				for(int j=0; j<trkPtr->sector.size(); ++j)
+				for(int j=i+1; j<trkPtr->sector.size(); ++j)
 				{
 					auto &si=trkPtr->sector[i];
 					auto &sj=trkPtr->sector[j];
@@ -1316,12 +1316,16 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 					{
 						if(duplicateIdx[i]!=toLeave)
 						{
-							trkPtr->sector.erase(trkPtr->sector.begin()+i);
+							trkPtr->sector.erase(trkPtr->sector.begin()+duplicateIdx[i]);
 						}
 					}
 
 					--i;
 				}
+			}
+			for(auto &sec : trkPtr->sector)
+			{
+				sec.nSectorTrack=trkPtr->sector.size();
 			}
 		}
 	}
