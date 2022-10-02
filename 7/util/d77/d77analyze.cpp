@@ -457,6 +457,36 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 		{
 			DeleteDuplicateSector(diskId);
 		}
+		else if(3<=argv.size() && 0==strcmp("MT",subCmd.c_str()))
+		{
+			auto diskPtr=d77Ptr->GetDisk(diskId);
+			if(nullptr==diskPtr)
+			{
+				printf("No disk is open.\n");
+			}
+			else
+			{
+				if("2HD"==argv[2] || "2hd"==argv[2])
+				{
+					diskPtr->header.mediaType=0x20;
+					printf("Change media type to %s\n",argv[2].c_str());
+				}
+				else if("2D"==argv[2] || "2d"==argv[2])
+				{
+					diskPtr->header.mediaType=0;
+					printf("Change media type to %s\n",argv[2].c_str());
+				}
+				else if("2DD"==argv[2] || "2dd"==argv[2])
+				{
+					diskPtr->header.mediaType=0x10;
+					printf("Change media type to %s\n",argv[2].c_str());
+				}
+				else
+				{
+					printf("Media type needs to be 2HD, 2DD, or 2D\n");
+				}
+			}
+		}
 		else if(3<=argv.size() && 0==strcmp("DL",subCmd.c_str()))
 		{
 			auto diskPtr=d77Ptr->GetDisk(diskId);
@@ -938,6 +968,8 @@ void D77Analyzer::Help(void) const
 	printf("\tExample: X F SC 0xf7\n");
 	printf("M DS\n");
 	printf("\tRemove duplicate sectors.\n");
+	printf("M MT 2D/2DD/2HD\n");
+	printf("\tChange media type.\n");
 	printf("M DL sector\n");
 	printf("\tDelete sectors with specific sector ID.\n");
 	printf("M DL track side sector\n");
@@ -1224,7 +1256,73 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 	{
 		for(auto trkLoc : diskPtr->AllTrack())
 		{
-			diskPtr->DeleteDuplicateSector(trkLoc.track,trkLoc.side);
+			// diskPtr->DeleteDuplicateSector(trkLoc.track,trkLoc.side);
+
+			// Make it corocoro aware.
+			auto trkPtr=diskPtr->FindTrack(trkLoc.track,trkLoc.side);
+			auto &t=*trkPtr;
+			for(int i=0; i<trkPtr->sector.size(); ++i)
+			{
+				std::vector <int> duplicateIdx;
+				duplicateIdx.push_back(i);
+				for(int j=0; j<trkPtr->sector.size(); ++j)
+				{
+					auto &si=trkPtr->sector[i];
+					auto &sj=trkPtr->sector[j];
+					if(sj.cylinder==si.cylinder &&
+					   sj.head==si.head &&
+					   sj.sector==si.sector &&
+					   sj.sizeShift==si.sizeShift)
+					{
+						duplicateIdx.push_back(j);
+					}
+				}
+				if(1<duplicateIdx.size())
+				{
+					int toLeave=duplicateIdx[0];
+					// Which sector to leave?
+					if(0xF7==trkPtr->sector[i].sector)
+					{
+						for(auto idx : duplicateIdx)
+						{
+							bool corocoro=true;
+							auto &sec=trkPtr->sector[idx];
+							for(int i=0; i<20; ++i)
+							{
+								if(sec.sectorData[i]!=0xF7)
+								{
+									corocoro=false;
+									break;
+								}
+							}
+							for(int i=0; i<19; ++i)
+							{
+								if(sec.sectorData[i+24]!=0xF6)
+								{
+									corocoro=false;
+									break;
+								}
+							}
+							if(true==corocoro)
+							{
+								printf("Found Corocoro Protect V2.\n");
+								toLeave=idx;
+								break;
+							}
+						}
+					}
+
+					for(size_t i=duplicateIdx.size()-1; 0<=i && i<duplicateIdx.size(); --i)
+					{
+						if(duplicateIdx[i]!=toLeave)
+						{
+							trkPtr->sector.erase(trkPtr->sector.begin()+i);
+						}
+					}
+
+					--i;
+				}
+			}
 		}
 	}
 }
