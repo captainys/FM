@@ -51,6 +51,7 @@ public:
 	bool FormatTrack(int diskId,int track,int side,int nSec,int secSize);
 	bool UnformatTrack(int diskId,int track,int side);
 	void Compare(const std::vector <std::string> &argv) const;
+	void Franken(const std::vector <std::string> &argv);
 };
 
 D77Analyzer::D77Analyzer()
@@ -150,6 +151,10 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 		{
 			Compare(argv);
 		}
+	}
+	else if("FRANKEN"==cmd)
+	{
+		Franken(argv);
 	}
 	else if('D'==cmd[0])
 	{
@@ -947,6 +952,9 @@ void D77Analyzer::Help(void) const
 	printf("\tCompare disk image.\n");
 	printf("D track side sec\n");
 	printf("\tDump sector.\n");
+	printf("FRANKEN file.d77 file.d77 ....\n");
+	printf("\Make a franken disk by taking good sectors from specified d77 and replace bad sectors in the\n");
+	printf("\tcurrent d77.\n");
 	printf("DF track side sec filename.bin\n");
 	printf("\tDump sector to a binary file.\n");
 	printf("W\n");
@@ -1627,6 +1635,145 @@ void D77Analyzer::Compare(const std::vector <std::string> &argv) const
 			}
 		NEXTSECTOR:
 			;
+		}
+	}
+}
+
+void D77Analyzer::Franken(const std::vector <std::string> &argv)
+{
+	printf("Franken Disks\n");
+
+	if(2>argv.size())
+	{
+		fprintf(stderr,"Too few arguments.\n");
+		return;
+	}
+
+
+	for(int i=1; i<argv.size(); ++i)
+	{
+		D77File bDiskD77;
+		auto raw=FM7Lib::ReadBinaryFile(argv[i].c_str());
+		if(0<raw.size())
+		{
+			bDiskD77.SetData(raw);
+		}
+		else
+		{
+			fprintf(stderr,"Cannot open %s\n",argv[1].c_str());
+			return;
+		}
+
+		if(1>bDiskD77.GetNumDisk())
+		{
+			fprintf(stderr,"No disk in %s\n",argv[1].c_str());
+			return;
+		}
+
+		auto aDiskPtr=d77Ptr->GetDisk(diskId);
+		if(nullptr==aDiskPtr)
+		{
+			fprintf(stderr,"No disk is open.\n");
+			return;
+		}
+
+		auto &aDisk=*aDiskPtr;
+		auto &bDisk=*bDiskD77.GetDisk(0);
+
+		auto numCylA=aDisk.AllTrack().size()/2;
+		auto numCylB=bDisk.AllTrack().size()/2;
+		if(numCylA<numCylB)
+		{
+			aDisk.SetNumTrack(numCylB);
+			printf("Increased number of tracks to %d\n",numCylB);
+		}
+
+		for(int C=0; C<aDisk.AllTrack().size() ; ++C)
+		{
+			for(int H=0; H<2; ++H)
+			{
+				auto trkA=aDisk.GetTrack(C,H);
+				auto trkB=bDisk.GetTrack(C,H);
+				if(nullptr!=trkA)
+				{
+				RETRY:
+					for(int i=0; i<trkA->sector.size(); ++i)
+					{
+						auto &secI=trkA->sector[i];
+						for(int j=i+1; j<trkA->sector.size(); ++j)
+						{
+							auto &secJ=trkA->sector[j];
+							if(secI.cylinder==secJ.cylinder &&
+							   secI.head==secJ.head &&
+							   secI.sector==secJ.sector &&
+							   secI.sizeShift==secJ.sizeShift)
+							{
+								if(0==secI.crcStatus && 0!=secJ.crcStatus)
+								{
+									printf("Erase C%d H%d R%d N%d\n",
+									   secJ.cylinder,
+									   secJ.head,
+									   secJ.sector,
+									   secJ.sizeShift);
+									trkA->sector.erase(trkA->sector.begin()+j);
+									goto RETRY;
+								}
+								else if(0!=secI.crcStatus && 0==secJ.crcStatus)
+								{
+									printf("Erase C%d H%d R%d N%d\n",
+									   secI.cylinder,
+									   secI.head,
+									   secI.sector,
+									   secI.sizeShift);
+									trkA->sector.erase(trkA->sector.begin()+i);
+									goto RETRY;
+								}
+							}
+						}
+					}
+
+					if(nullptr!=trkB)
+					{
+						for(auto &secJ : trkB->sector)
+						{
+							bool foundInTrackA=false;
+							for(auto &secI : trkA->sector)
+							{
+								if(secI.cylinder==secJ.cylinder &&
+								   secI.head==secJ.head &&
+								   secI.sector==secJ.sector &&
+								   secI.sizeShift==secJ.sizeShift)
+								{
+									foundInTrackA=true;
+									if(0!=secI.crcStatus && 0==secJ.crcStatus)
+									{
+										printf("Replace C%d H%d R%d N%d\n",
+										   secI.cylinder,
+										   secI.head,
+										   secI.sector,
+										   secI.sizeShift);
+										secI=secJ;
+									}
+								}
+							}
+							if(true!=foundInTrackA)
+							{
+								printf("Added C%d H%d R%d N%d\n",
+								   secJ.cylinder,
+								   secJ.head,
+								   secJ.sector,
+								   secJ.sizeShift);
+								trkA->sector.push_back(secJ);
+							}
+						}
+					}
+
+					for(auto &sec : trkA->sector)
+					{
+						sec.nSectorTrack=trkA->sector.size();
+					}
+				}
+			}
 		}
 	}
 }
