@@ -40,6 +40,7 @@ unsigned int currentCylinder=0;
 #define FDCCMD_SEEK				0x18
 #define FDCCMD_READADDR			0xC0
 #define FDCCMD_READSECTOR		0x80
+#define FDCCMD_FORCEINTERRUPT	0xD0
 
 #define IO_FDC_CYLINDER			0x202
 #define IO_FDC_SECTOR			0x204
@@ -236,6 +237,8 @@ void Seek(unsigned int C)
 	Wait50ms();
 	unsigned char err=WaitFDCReady();
 
+	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+
 	if(0x10&err)
 	{
 		Color(2);
@@ -396,12 +399,15 @@ int ReadAddress(struct IDMARK *idMark)
 	SetUpDMA(6);
 	WaitFDCReady();
 
-	MASKIRQ();
 	UnmaskDMA(); // Memo to myself:  DMA needs to be unmasked before writing FDC command, or it will freeze.
 	_outp(IO_FDC_COMMAND,FDCCMD_READADDR);
 	unsigned int sta=WaitFDCReady();
+
+	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+
 	MaskDMA();
-	UNMASKIRQ();
+
+	_inp(IO_DMA_STATUS); // Dummy read to clear DMAE flag.
 
 	idMark->chrn[0]=DMABuffer[0]; // C
 	idMark->chrn[1]=DMABuffer[1]; // H
@@ -419,6 +425,8 @@ int ReadAddress(struct IDMARK *idMark)
 */
 int ReadSector(struct D77SectorHeader *sectorHdr,unsigned char dataBuf[],unsigned int C,unsigned int H,unsigned int R,unsigned int N)
 {
+	MASKIRQ();
+
 	SelectDrive();
 
 	InitializeD77SectorHeader(sectorHdr);
@@ -443,11 +451,16 @@ int ReadSector(struct D77SectorHeader *sectorHdr,unsigned char dataBuf[],unsigne
 	}
 	WaitFDCReady();
 
-	MASKIRQ();
 	UnmaskDMA();
 	_outp(IO_FDC_COMMAND,FDCCMD_READSECTOR);
 	unsigned int sta=WaitFDCReady();
+
+	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+
 	MaskDMA();
+
+	_inp(IO_DMA_STATUS); // Dummy read to clear DMAE flag.
+
 	UNMASKIRQ();
 
 	if(sta&IOERR_CRC)
@@ -491,11 +504,19 @@ void FormatSectorStatus(char str[4],struct D77SectorHeader *sectorHdr)
 unsigned int ReadTrack(
    int devNo,int track,int side,struct CommandParameterInfo *cpi,unsigned char d77Image[],struct D77Header *hdr,unsigned int trackTable[],unsigned char *nextTrackData)
 {
+	const int nInfoPerLine=8;
 	int FMorMFM=CTL_MFM;
 
 	Color(4);
 	printf("C:%-2d H:%d ",track,side);
 	Color(7);
+
+	Wait50ms();
+	Wait50ms();
+	Wait50ms();
+	Wait50ms();
+
+	MASKIRQ();
 
 	Seek(track);
 	WaitIndexHole(); // Need to be immediately after seek.
@@ -535,6 +556,8 @@ unsigned int ReadTrack(
 			FMorMFM=CTL_FM;
 		}
 	}
+
+	UNMASKIRQ();
 
 	// Remove Duplicates >>
 	for(i=nTrackSector-1; 0<i; --i)
@@ -579,7 +602,7 @@ unsigned int ReadTrack(
 
 
 	unsigned char *trackDataPtr=nextTrackData;
-	int nActual=0;
+	int nActual=0,nInfo=1;
 	for(i=0; i<nTrackSector; ++i)
 	{
 		int retry,ioErr=0;
@@ -596,11 +619,21 @@ unsigned int ReadTrack(
 				sectorHdr->densityFlag=0x40;
 			}
 
-			if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
+			if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
 			{
 				Color(IOErrToColor(ioErr));
 				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-				if(5==((nActual+1)%6))
+				if(0==((nActual+nInfo+1)%nInfoPerLine))
+				{
+					printf("\n");
+				}
+				++nInfo;
+			}
+			else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
+			{
+				Color(IOErrToColor(ioErr));
+				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+				if(0==((nActual+nInfo+1)%nInfoPerLine))
 				{
 					printf("\n");
 				}
@@ -639,17 +672,24 @@ unsigned int ReadTrack(
 				Color(IOErrToColor(ioErr));
 				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 
-				if(5==((nActual+1)%6))
+				if(0==((nActual+nInfo+1)%nInfoPerLine))
 				{
 					printf("\n");
 				}
 
-				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
-				++nActual;
+				if(0!=(ioErr&IOERR_LOST_DATA))
+				{
+					++nInfo;
+				}
+				else
+				{
+					trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
+					++nActual;
+				}
 			}
 		}
 	}
-	if(0!=(nActual+1)%6)
+	if(0!=(nActual+nInfo)%nInfoPerLine)
 	{
 		printf("\n");
 	}
