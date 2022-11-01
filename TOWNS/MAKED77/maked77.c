@@ -1,16 +1,202 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <conio.h>
+#include <time.h>
 #include "FMCFRB.H"
 
 
 extern void XModemSend(unsigned int dataLength,const unsigned char data[],int baud); // baud  2:38400bps  4:19200bps
+extern unsigned int TO_PHYSICAL(unsigned char *addr);
+
+
+#define BUFFER_LENGTH 4096
+unsigned char bufferSource[BUFFER_LENGTH]; // There should be 4KB continuous page within this array.
+unsigned char *DMABuffer=NULL;
+unsigned int DMABufferPhysicalAddr=0;
+
+
+unsigned int drvSel=1;    // Drive 0
+unsigned int seekStep=1;  // 2 for 2D disk.
+unsigned int controlByte=0; // To be written to I/O 0208h
+unsigned int speedByte=0;
+unsigned int currentCylinder=0;
+
+#define IO_FDC_STATUS			0x200
+#define FDCSTA_BUSY				0x01
+#define FDCSTA_INDEX			0x02
+
+#define IOERR_CRC 8
+#define IOERR_RECORD_NOT_FOUND 0x10
+#define IOERR_DELETED_DATA     0x20
+
+#define IO_FDC_COMMAND			0x200
+#define FDCCMD_RESTORE			0x00
+#define FDCCMD_SEEK				0x10
+#define FDCCMD_READADDR			0xC0
+#define FDCCMD_READSECTOR		0x80
+
+#define IO_FDC_CYLINDER			0x202
+#define IO_FDC_SECTOR			0x204
+#define IO_FDC_DATA				0x206
+
+#define IO_FDC_DRIVE_STATUS		0x0208
+#define DRIVE_STA_FREADY		0x02
+
+#define IO_FDC_DRIVE_CONTROL	0x0208
+#define IO_FDC_DRIVE_SELECT		0x020C
+
+
+#define IO_DMA_INITIALIZE		0x0A0
+#define IO_DMA_CHANNEL			0x0A1
+#define IO_DMA_COUNT_LOW		0x0A2
+#define IO_DMA_COUNT_HIGH		0x0A3
+#define IO_DMA_ADDR_LOW			0x0A4
+#define IO_DMA_ADDR_MID_LOW		0x0A5
+#define IO_DMA_ADDR_MID_HIGH	0x0A6
+#define IO_DMA_ADDR_HIGH		0x0A7
+#define IO_DMA_DEVICE_CTRL_LOW	0x0A8
+#define IO_DMA_DEVICE_CTRL_HIGH	0x0A9
+#define IO_DMA_MODE_CONTROL		0x0AA
+#define IO_DMA_STATUS			0x0AB
+#define IO_DMA_REQUEST			0x0AE
+#define IO_DMA_MASK				0x0AF
+
+struct IDMARK
+{
+	unsigned char chrn[8]; // CHRN CRC STA
+};
+
+int IOErrToColor(unsigned int ioErr)
+{
+	if(IOERR_RECORD_NOT_FOUND&ioErr)
+	{
+		return 3; // Pink
+	}
+	if((IOERR_CRC|IOERR_DELETED_DATA)==(ioErr&(IOERR_CRC|IOERR_DELETED_DATA)))
+	{
+		return 6; // Yellow (DDM+CRC)
+	}
+	if(IOERR_CRC&ioErr)
+	{
+		return 2; // Red (CRC)
+	}
+	if(IOERR_DELETED_DATA&ioErr)
+	{
+		return 1; // Blue (DDM)
+	}
+	return 7;
+}
+
+void AllocDataBuffer(void)
+{
+	// I need a physical address of a 4KB window.
+	// There should be such a window in an 8KB array, 
+
+	for(int offset=0; offset<BUFFER_LENGTH; ++offset)
+	{
+		DMABufferPhysicalAddr=TO_PHYSICAL(bufferSource+offset);
+		if(0==(0x3ff&DMABufferPhysicalAddr))
+		{
+			DMABuffer=bufferSource+offset;
+			break;
+		}
+	}
+
+	DMABuffer[0]='Y';
+	DMABuffer[1]='S';
+	printf("Read Buffer Physical Address=%08x\n",DMABufferPhysicalAddr);
+}
+
+void Color(int col)
+{
+	VDB_ATR atr;
+	VDB_rddefatr(&atr);
+	atr.color=col;
+	VDB_setdefatr(&atr);
+}
+
+void Wait50ms(void)
+{
+	// Safe to use clock() for real-time in DOS.
+	auto clk0=clock();
+	while(clk0<=clock() && clock()<=clk0+CLOCKS_PER_SEC/20)
+	{
+	}
+}
+
+void WaitIndexHole(void)
+{
+	unsigned int statusByte=0;
+	while(0==(statusByte&FDCSTA_INDEX))
+	{
+		statusByte=_inp(IO_FDC_STATUS);
+	}
+}
+
+int CheckDriveReady(void)
+{
+	_outp(IO_FDC_DRIVE_CONTROL,controlByte);
+	_outp(IO_FDC_DRIVE_SELECT,speedByte|drvSel);
+	Wait50ms();
+	unsigned int readyByte=_inp(IO_FDC_DRIVE_STATUS);
+	return (0!=(readyByte&DRIVE_STA_FREADY));
+}
+
+unsigned int WaitFDCReady(void)
+{
+	unsigned int sta=FDCSTA_BUSY;
+	while(0!=(sta&FDCSTA_BUSY))
+	{
+		sta=_inp(IO_FDC_STATUS);
+	}
+	return sta;
+}
+
+void SetUpDMA(unsigned int dataLength)
+{
+	unsigned char *dataLengthPtr=(unsigned char *)&dataLength;
+
+	_outp(IO_DMA_COUNT_LOW,dataLengthPtr[0]);
+	_outp(IO_DMA_COUNT_HIGH,dataLengthPtr[1]);
+
+	unsigned char *DMABufferPhysicalAddrPtr=(unsigned char *)&DMABufferPhysicalAddr;
+	_outp(IO_DMA_ADDR_LOW,DMABufferPhysicalAddrPtr[0]);
+	_outp(IO_DMA_ADDR_MID_LOW,DMABufferPhysicalAddrPtr[1]);
+	_outp(IO_DMA_ADDR_MID_HIGH,DMABufferPhysicalAddrPtr[2]);
+	_outp(IO_DMA_ADDR_HIGH,DMABufferPhysicalAddrPtr[3]);
+}
+
+void Restore(void)
+{
+	WaitFDCReady();
+	_outp(IO_FDC_DRIVE_CONTROL,controlByte);
+	_outp(IO_FDC_DRIVE_SELECT,speedByte|drvSel);
+	WaitFDCReady();
+	_outp(IO_FDC_COMMAND,FDCCMD_RESTORE);
+	Wait50ms();
+	WaitFDCReady();
+
+	currentCylinder=0;
+}
+
+void Seek(unsigned int C)
+{
+	WaitFDCReady();
+	_outp(IO_FDC_CYLINDER,currentCylinder);
+	_outp(IO_FDC_DATA,C*seekStep);
+	WaitFDCReady();
+	_outp(IO_FDC_COMMAND,FDCCMD_SEEK);
+
+	currentCylinder=C*seekStep;
+}
+
 
 
 struct CRCErrorLog
 {
 	struct CRCErrorLog *next;
-	DKB_SEC sector;
+	struct IDMARK sector;
 };
 struct CRCErrorLog *crcErrLog=NULL,*crcErrLogTail=NULL;
 
@@ -76,68 +262,33 @@ enum
 	MODE_2HD_1232K,// 1232K
 };
 
-#define MODE1_MFM_MODE          0x00
-#define MODE1_FM_MODE           0x80
-#define MODE1_2HD               0x00
-#define MODE1_2DD               0x10
-#define MODE1_2D                0x20
-#define MODE1_128_BYTE_PER_SEC  0x00
-#define MODE1_256_BYTE_PER_SEC  0x01
-#define MODE1_512_BYTE_PER_SEC  0x02
-#define MODE1_1024_BYTE_PER_SEC 0x03
+#define CTL_CLKSEL 0x20
+#define CTL_MOTOR  0x10
+#define CTL_SIDE   0x04
+#define CTL_MFM    0x02
+#define CTL_IRQEN  0x01
+
+#define SPD_360RPM 0x40
 
 void SetDriveMode(unsigned int drive,unsigned int mode)
 {
-	drive&=0x0F;
-	drive|=0x20;
-
+	drvSel=(1<<(drive&3));
 	switch(mode)
 	{
 	case MODE_2D:
-		DKB_setmode(drive,MODE1_MFM_MODE|MODE1_2D|MODE1_256_BYTE_PER_SEC,0x0210);
+		controlByte=CTL_CLKSEL|CTL_MOTOR;
+		speedByte=0;
+		seekStep=2;
 		break;
 	case MODE_2DD:
-		DKB_setmode(drive,MODE1_MFM_MODE|MODE1_2DD|MODE1_512_BYTE_PER_SEC,0x0208);
+		controlByte=CTL_CLKSEL|CTL_MOTOR;
+		speedByte=0;
+		seekStep=1;
 		break;
 	case MODE_2HD_1232K:
-		DKB_setmode(drive,MODE1_MFM_MODE|MODE1_2HD|MODE1_1024_BYTE_PER_SEC,0x0208);
-		break;
-	}
-}
-
-void VerifyDriveMode(unsigned int drive,unsigned int mode)
-{
-	drive&=0x0F;
-	drive|=0x20;
-
-	unsigned int mode1,mode2;
-	DKB_rdmode(drive,&mode1,&mode2);
-
-	printf("BIOS MODE1 %02x\n",mode1);
-	printf("BIOS MODE2 %04x\n",mode2);
-
-	switch(mode)
-	{
-	case MODE_2D:
-		if((mode1&0xF0)!=(MODE1_MFM_MODE|MODE1_2D))
-		{
-			printf("Error!  BIOS not set in the 2D mode.\n");
-			exit(1);
-		}
-		break;
-	case MODE_2DD:
-		if((mode1&0xF0)!=(MODE1_MFM_MODE|MODE1_2DD))
-		{
-			printf("Error!  BIOS not set in the 2D mode.\n");
-			exit(1);
-		}
-		break;
-	case MODE_2HD_1232K:
-		if((mode1&0xF0)!=(MODE1_MFM_MODE|MODE1_2HD))
-		{
-			printf("Error!  BIOS not set in the 2D mode.\n");
-			exit(1);
-		}
+		controlByte=CTL_MOTOR;
+		speedByte=SPD_360RPM;
+		seekStep=1;
 		break;
 	}
 }
@@ -169,38 +320,92 @@ struct CommandParameterInfo
 	char outFName[512];
 };
 
+void UnmaskDMA(void)
+{
+	unsigned int DMAMask=_inp(IO_DMA_MASK);
+	DMAMask&=0x0E; // Unmask chnanel 0
+	_outp(IO_DMA_MASK,DMAMask);
+}
+
+void MaskDMA(void)
+{
+	unsigned int DMAMask=_inp(IO_DMA_MASK)&0x0F;
+	DMAMask|=1; // Mask chnanel 0
+	_outp(IO_DMA_MASK,DMAMask);
+}
+
+int ReadAddress(struct IDMARK *idMark)
+{
+	SetUpDMA(6);
+	WaitFDCReady();
+	_outp(IO_FDC_COMMAND,FDCCMD_READADDR);
+
+	UnmaskDMA();
+	unsigned int sta=WaitFDCReady();
+	MaskDMA();
+
+	idMark->chrn[0]=DMABuffer[0]; // C
+	idMark->chrn[1]=DMABuffer[1]; // H
+	idMark->chrn[2]=DMABuffer[2]; // R
+	idMark->chrn[3]=DMABuffer[3]; // N
+	idMark->chrn[4]=DMABuffer[4]; // CRC
+	idMark->chrn[5]=DMABuffer[5]; // CRC
+	idMark->chrn[6]=sta;
+	idMark->chrn[7]=0;
+
+	return sta;
+}
+
 /*! Returns the BIOS error code.
 */
-int ReadSector(int devNo,DKB_SEC sector,struct D77SectorHeader *sectorHdr,char *dataBuf)
+int ReadSector(struct D77SectorHeader *sectorHdr,unsigned char dataBuf[],unsigned int C,unsigned int H,unsigned int R,unsigned int N)
 {
 	InitializeD77SectorHeader(sectorHdr);
 
-	sectorHdr->C=sector.trakno;
-	sectorHdr->H=sector.hedno;
-	sectorHdr->R=sector.secno;
-	sectorHdr->N=sector.seccnt;
+	sectorHdr->C=C;
+	sectorHdr->H=H;
+	sectorHdr->R=R;
+	sectorHdr->N=N;
 
 	sectorHdr->numSectorPerTrack=0; // Tentative.  Should be updated later.
 
 	sectorHdr->densityFlag=0;     // 0:Double Density   0x40 Single Density
-	sectorHdr->actualSectorLength=(128<<sectorHdr->N);
+	sectorHdr->actualSectorLength=(128<<(N&3));
 
-	int secnum,biosErr;
-	biosErr=DKB_read(devNo,sector.trakno,sector.hedno,sector.secno,1,dataBuf,&secnum);
+	_outp(IO_FDC_CYLINDER,C);
+	_outp(IO_FDC_SECTOR,R);
 
-	if(0!=(0x8000&biosErr))
+	SetUpDMA(128<<(N&3));
+	for(int i=0; i<(128<<(N&3)); ++i)
 	{
-		if(0!=(biosErr&BIOSERR_FLAG_DDM))
-		{
-			sectorHdr->DDM=0x10;
-		}
-		if(0!=(biosErr&BIOSERR_FLAG_CRC))
-		{
-			sectorHdr->CRCError=0xB0;
-		}
+		DMABuffer[i]=0xF7;
+	}
+	WaitFDCReady();
+	_outp(IO_FDC_COMMAND,FDCCMD_READSECTOR);
+
+	UnmaskDMA();
+	unsigned int sta=WaitFDCReady();
+	MaskDMA();
+
+	if(sta&IOERR_CRC)
+	{
+		sectorHdr->CRCError=0xB0;
+	}
+	if(sta&IOERR_RECORD_NOT_FOUND)
+	{
+		sectorHdr->CRCError=0xF0;
+	}
+	if(sta&IOERR_DELETED_DATA)
+	{
+		sectorHdr->DDM=0x10;
 	}
 
-	return biosErr;
+	for(i=0; i<(128<<N); ++i)
+	{
+		dataBuf[i]=DMABuffer[i];
+	}
+
+	return sta;
 }
 
 void FormatSectorStatus(char str[4],struct D77SectorHeader *sectorHdr)
@@ -223,14 +428,31 @@ void FormatSectorStatus(char str[4],struct D77SectorHeader *sectorHdr)
 unsigned int ReadTrack(
    int devNo,int track,int side,struct CommandParameterInfo *cpi,unsigned char d77Image[],struct D77Header *hdr,unsigned int trackTable[],unsigned char *nextTrackData)
 {
-	printf("Track:%d  Side:%d\n",track,side);
+	int FMorMFM=CTL_MFM;
+
+	Color(4);
+	printf("C:%-2d H:%d ",track,side);
+	Color(7);
+
+	clock_t clk0=clock();
+
+	Seek(track);
+	WaitIndexHole(); // Need to be immediately after seek.
+
+	_outp(IO_DMA_INITIALIZE,3);  // 16bit, Reset
+	_outp(IO_DMA_CHANNEL,0);
+	_outp(IO_DMA_DEVICE_CTRL_LOW,0x20); // Enable DMA
+
+	_outp(IO_FDC_DRIVE_SELECT,speedByte|drvSel);
+	_outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=side ? CTL_SIDE : 0)|FMorMFM);
 
 	int i;
 	int nTrackSector=0;
-	DKB_SEC sector[NUM_SECTOR_BUF];
-	for(i=0; i<NUM_SECTOR_BUF; ++i)
+	struct IDMARK idMark[NUM_SECTOR_BUF];
+	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
+	for(i=0; i<NUM_SECTOR_BUF && clk0<=clock() && clock()<=clk0+CLOCKS_PER_SEC; ++i)
 	{
-		if(0==DKB_rdsecid(devNo,track,side,sector+nTrackSector))
+		if(0==ReadAddress(&idMark[nTrackSector]))
 		{
 			++nTrackSector;
 		}
@@ -242,12 +464,12 @@ unsigned int ReadTrack(
 		int j;
 		for(j=i-1; 0<=j; --j)
 		{
-			if(sector[i].trakno==sector[j].trakno &&
-			   sector[i].hedno ==sector[j].hedno &&
-			   sector[i].secno ==sector[j].secno &&
-			   sector[i].seccnt==sector[j].seccnt)
+			if(idMark[i].chrn[0]==idMark[j].chrn[0] &&
+			   idMark[i].chrn[1]==idMark[j].chrn[1] &&
+			   idMark[i].chrn[2]==idMark[j].chrn[2] &&
+			   idMark[i].chrn[3]==idMark[j].chrn[3])
 			{
-				sector[i]=sector[nTrackSector-1];
+				idMark[i]=idMark[nTrackSector-1];
 				--nTrackSector;
 				break;
 			}
@@ -263,11 +485,11 @@ unsigned int ReadTrack(
 		{
 			for(int j=i+1; j<nTrackSector; ++j)
 			{
-				if(sector[i].secno>sector[j].secno)
+				if(idMark[i].chrn[2]>idMark[j].chrn[2])
 				{
-					DKB_SEC tmp=sector[i];
-					sector[i]=sector[j];
-					sector[j]=tmp;
+					struct IDMARK tmp=idMark[i];
+					idMark[i]=idMark[j];
+					idMark[j]=tmp;
 				}
 			}
 		}
@@ -282,19 +504,20 @@ unsigned int ReadTrack(
 	int nActual=0;
 	for(i=0; i<nTrackSector; ++i)
 	{
-		int retry,biosErr=0;
+		int retry,ioErr=0;
 		// Strategy:  First retry up to firstRetryCount and if no error, take it.
 		//            If finally it has a CRC error, always read secondRetryCount times.  Maybe a sign of KOROKORO-protect.
 		for(retry=0; retry<cpi->firstRetryCount; ++retry)
 		{
 			struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
-			char *dataBuf=(char *)(sectorHdr+1);
-			biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
+			unsigned char *dataBuf=(unsigned char *)(sectorHdr+1);
+			ioErr=ReadSector(sectorHdr,dataBuf,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 
-			if(0==(biosErr&BIOSERR_FLAG_CRC)) // No retry if no CRC error.
+			if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
 			{
-				printf("%02x%02x%02x%02x   ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
-				if(5==(nActual%6))
+				Color(IOErrToColor(ioErr));
+				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+				if(5==((nActual+1)%6))
 				{
 					printf("\n");
 				}
@@ -305,13 +528,13 @@ unsigned int ReadTrack(
 			}
 		}
 
-		if(0!=(biosErr&BIOSERR_FLAG_CRC))  // If finally I couldn't read without CRC error.
+		if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.
 		{
 			struct CRCErrorLog *newLog=(struct CRCErrorLog *)malloc(sizeof(struct CRCErrorLog));
 			if(NULL!=newLog)
 			{
 				newLog->next=NULL;
-				newLog->sector=sector[i];
+				newLog->sector=idMark[i];
 				if(NULL==crcErrLog)
 				{
 					crcErrLog=newLog;
@@ -326,17 +549,14 @@ unsigned int ReadTrack(
 
 			for(retry=0; retry<cpi->secondRetryCount; ++retry)
 			{
-				printf("%02x%02x%02x%02x",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
-
 				struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
-				char *dataBuf=(char *)(sectorHdr+1);
-				biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
+				unsigned char *dataBuf=(unsigned char *)(sectorHdr+1);
+				ioErr=ReadSector(sectorHdr,dataBuf,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 
-				char sta[4]={0,0,0,0};
-				FormatSectorStatus(sta,sectorHdr);
-				printf("%s",sta);
+				Color(IOErrToColor(ioErr));
+				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 
-				if(5==(nActual%6))
+				if(5==((nActual+1)%6))
 				{
 					printf("\n");
 				}
@@ -346,7 +566,7 @@ unsigned int ReadTrack(
 			}
 		}
 	}
-	if(0!=nActual%6)
+	if(0!=(nActual+1)%6)
 	{
 		printf("\n");
 	}
@@ -361,10 +581,13 @@ unsigned int ReadTrack(
 
 	if(updatePtr!=trackDataPtr)
 	{
+		Color(2);
 		fprintf(stderr,"Something Went Wrong in ReadTrack\n");
 		fprintf(stderr,"  trackDataPtr:%08x\n",trackDataPtr);
 		fprintf(stderr,"  updatePtr   :%08x\n",updatePtr);
 	}
+
+	Color(7);
 
 	return trackDataPtr-nextTrackData;
 }
@@ -425,11 +648,19 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 	unsigned char *trackData=(unsigned char *)(trackTable+164);
 
 
+	SetDriveMode(cpi->drive,cpi->mode);
+	if(0==CheckDriveReady())
+	{
+		fprintf(stderr,"Drive Not Ready.\n");
+		return -1;
+	}
+
+	Restore();
+
 
 	cpi->drive&=0x0F;
 	devNo=0x20|cpi->drive;
 
-	DKB_restore(devNo);
 	unsigned int driveStatus;
 	int biosError;
 	if(0!=(biosError=DKB_rdstatus(devNo,&driveStatus)))
@@ -438,20 +669,13 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 		fprintf(stderr,"  Bios Error Code 0x%02x\n",biosError);
 		return -1;
 	}
-	if(0!=CheckDiskMediaType(driveStatus,cpi->mode))
-	{
-		fprintf(stderr,"Wrong Disk Media.\n");
-		return -1;
-	}
-
-	SetDriveMode(cpi->drive,cpi->mode);
-	VerifyDriveMode(cpi->drive,cpi->mode);
 
 
 
 	int track;
 	for(track=cpi->startTrk; track<=cpi->endTrk; ++track)
 	{
+		Seek(track);
 		trackData+=ReadTrack(devNo,track,0,cpi,d77Image,d77HeaderPtr,trackTable,trackData);
 		trackData+=ReadTrack(devNo,track,1,cpi,d77Image,d77HeaderPtr,trackTable,trackData);
 	}
@@ -465,8 +689,8 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 		struct CRCErrorLog *ptr;
 		for(ptr=crcErrLog; NULL!=ptr; ptr=ptr->next)
 		{
-			printf("CRC Err at Track:%d  Side:%d  Sector:%d\n",ptr->sector.trakno,ptr->sector.hedno,ptr->sector.secno);
-			if(0xF5!=ptr->sector.secno && 0xF6!=ptr->sector.secno && 0xF7!=ptr->sector.secno)
+			printf("CRC Err at Track:%d  Side:%d  Sector:%d\n",ptr->sector.chrn[0],ptr->sector.chrn[1],ptr->sector.chrn[2]);
+			if(0xF5!=ptr->sector.chrn[2] && 0xF6!=ptr->sector.chrn[2] && 0xF7!=ptr->sector.chrn[2])
 			{
 				++nCRCErrorNotF5F6F7;
 			}
@@ -639,6 +863,9 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 
 int main(int ac,char *av[])
 {
+	AllocDataBuffer();
+
+
 	unsigned char *d77Image=(unsigned char *)malloc(BUFFERSIZE);
 	if(NULL==d77Image)
 	{
