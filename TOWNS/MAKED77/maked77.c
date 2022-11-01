@@ -8,6 +8,10 @@
 
 extern void XModemSend(unsigned int dataLength,const unsigned char data[],int baud); // baud  2:38400bps  4:19200bps
 extern unsigned int TO_PHYSICAL(unsigned char *addr);
+extern void MASKIRQ(void);
+extern void UNMASKIRQ(void);
+extern unsigned int GETFDCSTA(void); // MX BIOS reads IO 200H twice in a row.  Reason unknown.
+extern unsigned int GETDRVSTA(void); // MX BIOS reads IO 208H three times in a row.  Reason unknown.
 
 
 #define BUFFER_LENGTH 4096
@@ -29,10 +33,11 @@ unsigned int currentCylinder=0;
 #define IOERR_CRC 8
 #define IOERR_RECORD_NOT_FOUND 0x10
 #define IOERR_DELETED_DATA     0x20
+#define IOERR_LOST_DATA			0x04
 
 #define IO_FDC_COMMAND			0x200
-#define FDCCMD_RESTORE			0x00
-#define FDCCMD_SEEK				0x10
+#define FDCCMD_RESTORE			0x08
+#define FDCCMD_SEEK				0x18
 #define FDCCMD_READADDR			0xC0
 #define FDCCMD_READSECTOR		0x80
 
@@ -46,6 +51,7 @@ unsigned int currentCylinder=0;
 #define IO_FDC_DRIVE_CONTROL	0x0208
 #define IO_FDC_DRIVE_SELECT		0x020C
 
+#define IO_1US_WAIT				0x06C
 
 #define IO_DMA_INITIALIZE		0x0A0
 #define IO_DMA_CHANNEL			0x0A1
@@ -84,6 +90,14 @@ int IOErrToColor(unsigned int ioErr)
 	if(IOERR_DELETED_DATA&ioErr)
 	{
 		return 1; // Blue (DDM)
+	}
+	if(IOERR_LOST_DATA&ioErr)
+	{
+		return 5; // Cyan
+	}
+	if(0!=ioErr)
+	{
+		return 4; // Unknown Error
 	}
 	return 7;
 }
@@ -127,20 +141,47 @@ void Wait50ms(void)
 
 void WaitIndexHole(void)
 {
+	clock_t clk0=clock();
 	unsigned int statusByte=0;
 	while(0==(statusByte&FDCSTA_INDEX))
 	{
 		statusByte=_inp(IO_FDC_STATUS);
+		if(clk0+CLOCKS_PER_SEC<clock())
+		{
+			break;
+		}
 	}
+}
+
+void SelectDrive(void)
+{
+	_outp(IO_FDC_DRIVE_SELECT,speedByte);
+	_outp(IO_1US_WAIT,0);
+	_outp(IO_1US_WAIT,0);
+	_outp(IO_FDC_DRIVE_SELECT,speedByte|drvSel);
+	_outp(IO_1US_WAIT,0);
+	_outp(IO_1US_WAIT,0);
 }
 
 int CheckDriveReady(void)
 {
+	SelectDrive();
 	_outp(IO_FDC_DRIVE_CONTROL,controlByte);
-	_outp(IO_FDC_DRIVE_SELECT,speedByte|drvSel);
-	Wait50ms();
-	unsigned int readyByte=_inp(IO_FDC_DRIVE_STATUS);
-	return (0!=(readyByte&DRIVE_STA_FREADY));
+	for(int i=0; i<10; ++i)
+	{
+		Wait50ms();
+		unsigned int readyByte=GETDRVSTA();
+		unsigned int readyBit=(readyByte&DRIVE_STA_FREADY);
+		if(0!=readyBit)
+		{
+			return 1;
+		}
+		else 
+		{
+			printf("Status %02xH\n",readyByte);
+		}
+	}
+	return 0;
 }
 
 unsigned int WaitFDCReady(void)
@@ -148,7 +189,7 @@ unsigned int WaitFDCReady(void)
 	unsigned int sta=FDCSTA_BUSY;
 	while(0!=(sta&FDCSTA_BUSY))
 	{
-		sta=_inp(IO_FDC_STATUS);
+		sta=GETFDCSTA(); // MX BIOS does  IN AL,DX  twice in a row.  Reason unknown.  I just follow it.
 	}
 	return sta;
 }
@@ -156,6 +197,8 @@ unsigned int WaitFDCReady(void)
 void SetUpDMA(unsigned int dataLength)
 {
 	unsigned char *dataLengthPtr=(unsigned char *)&dataLength;
+
+	_outp(IO_DMA_MODE_CONTROL,0x44); // IO to Mem
 
 	_outp(IO_DMA_COUNT_LOW,dataLengthPtr[0]);
 	_outp(IO_DMA_COUNT_HIGH,dataLengthPtr[1]);
@@ -170,8 +213,9 @@ void SetUpDMA(unsigned int dataLength)
 void Restore(void)
 {
 	WaitFDCReady();
+	SelectDrive();
+	WaitFDCReady();
 	_outp(IO_FDC_DRIVE_CONTROL,controlByte);
-	_outp(IO_FDC_DRIVE_SELECT,speedByte|drvSel);
 	WaitFDCReady();
 	_outp(IO_FDC_COMMAND,FDCCMD_RESTORE);
 	Wait50ms();
@@ -183,10 +227,21 @@ void Restore(void)
 void Seek(unsigned int C)
 {
 	WaitFDCReady();
+	SelectDrive();
+	WaitFDCReady();
 	_outp(IO_FDC_CYLINDER,currentCylinder);
 	_outp(IO_FDC_DATA,C*seekStep);
 	WaitFDCReady();
 	_outp(IO_FDC_COMMAND,FDCCMD_SEEK);
+	Wait50ms();
+	unsigned char err=WaitFDCReady();
+
+	if(0x10&err)
+	{
+		Color(2);
+		printf("\n!!!! Seek Error !!!!\n");
+		Color(7);
+	}
 
 	currentCylinder=C*seekStep;
 }
@@ -266,9 +321,11 @@ enum
 #define CTL_MOTOR  0x10
 #define CTL_SIDE   0x04
 #define CTL_MFM    0x02
+#define CTL_FM     0x00
 #define CTL_IRQEN  0x01
 
 #define SPD_360RPM 0x40
+#define SPD_INUSE  0x10
 
 void SetDriveMode(unsigned int drive,unsigned int mode)
 {
@@ -277,17 +334,17 @@ void SetDriveMode(unsigned int drive,unsigned int mode)
 	{
 	case MODE_2D:
 		controlByte=CTL_CLKSEL|CTL_MOTOR;
-		speedByte=0;
+		speedByte=SPD_INUSE;
 		seekStep=2;
 		break;
 	case MODE_2DD:
 		controlByte=CTL_CLKSEL|CTL_MOTOR;
-		speedByte=0;
+		speedByte=SPD_INUSE;
 		seekStep=1;
 		break;
 	case MODE_2HD_1232K:
 		controlByte=CTL_MOTOR;
-		speedByte=SPD_360RPM;
+		speedByte=SPD_360RPM|SPD_INUSE;
 		seekStep=1;
 		break;
 	}
@@ -338,11 +395,13 @@ int ReadAddress(struct IDMARK *idMark)
 {
 	SetUpDMA(6);
 	WaitFDCReady();
-	_outp(IO_FDC_COMMAND,FDCCMD_READADDR);
 
-	UnmaskDMA();
+	MASKIRQ();
+	UnmaskDMA(); // Memo to myself:  DMA needs to be unmasked before writing FDC command, or it will freeze.
+	_outp(IO_FDC_COMMAND,FDCCMD_READADDR);
 	unsigned int sta=WaitFDCReady();
 	MaskDMA();
+	UNMASKIRQ();
 
 	idMark->chrn[0]=DMABuffer[0]; // C
 	idMark->chrn[1]=DMABuffer[1]; // H
@@ -360,6 +419,8 @@ int ReadAddress(struct IDMARK *idMark)
 */
 int ReadSector(struct D77SectorHeader *sectorHdr,unsigned char dataBuf[],unsigned int C,unsigned int H,unsigned int R,unsigned int N)
 {
+	SelectDrive();
+
 	InitializeD77SectorHeader(sectorHdr);
 
 	sectorHdr->C=C;
@@ -381,11 +442,13 @@ int ReadSector(struct D77SectorHeader *sectorHdr,unsigned char dataBuf[],unsigne
 		DMABuffer[i]=0xF7;
 	}
 	WaitFDCReady();
-	_outp(IO_FDC_COMMAND,FDCCMD_READSECTOR);
 
+	MASKIRQ();
 	UnmaskDMA();
+	_outp(IO_FDC_COMMAND,FDCCMD_READSECTOR);
 	unsigned int sta=WaitFDCReady();
 	MaskDMA();
+	UNMASKIRQ();
 
 	if(sta&IOERR_CRC)
 	{
@@ -434,8 +497,6 @@ unsigned int ReadTrack(
 	printf("C:%-2d H:%d ",track,side);
 	Color(7);
 
-	clock_t clk0=clock();
-
 	Seek(track);
 	WaitIndexHole(); // Need to be immediately after seek.
 
@@ -443,18 +504,35 @@ unsigned int ReadTrack(
 	_outp(IO_DMA_CHANNEL,0);
 	_outp(IO_DMA_DEVICE_CTRL_LOW,0x20); // Enable DMA
 
-	_outp(IO_FDC_DRIVE_SELECT,speedByte|drvSel);
-	_outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=side ? CTL_SIDE : 0)|FMorMFM);
+	SelectDrive();
 
 	int i;
 	int nTrackSector=0;
 	struct IDMARK idMark[NUM_SECTOR_BUF];
 	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
-	for(i=0; i<NUM_SECTOR_BUF && clk0<=clock() && clock()<=clk0+CLOCKS_PER_SEC; ++i)
+
+	int mfmTry;
+	for(mfmTry=0; mfmTry<2; ++mfmTry)
 	{
-		if(0==ReadAddress(&idMark[nTrackSector]))
+		_outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=side ? CTL_SIDE : 0)|FMorMFM);
+
+		time_t t0=time(NULL);
+		for(i=0; i<NUM_SECTOR_BUF && time(NULL)<t0+3; ++i)
 		{
-			++nTrackSector;
+			if(0==ReadAddress(&idMark[nTrackSector]))
+			{
+				++nTrackSector;
+			}
+		}
+		if(0<nTrackSector)
+		{
+			break;
+		}
+		else
+		{
+			// Unformat?  Or mayby FM codec.  (C0 H0 of FM OASYS disks are formatted in FM)
+			// Will take loooong time until switch, but be patient.
+			FMorMFM=CTL_FM;
 		}
 	}
 
@@ -512,6 +590,11 @@ unsigned int ReadTrack(
 			struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
 			unsigned char *dataBuf=(unsigned char *)(sectorHdr+1);
 			ioErr=ReadSector(sectorHdr,dataBuf,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+
+			if(FMorMFM==CTL_FM)
+			{
+				sectorHdr->densityFlag=0x40;
+			}
 
 			if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
 			{
@@ -588,6 +671,8 @@ unsigned int ReadTrack(
 	}
 
 	Color(7);
+
+	_outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=side ? CTL_SIDE : 0)|CTL_MFM);
 
 	return trackDataPtr-nextTrackData;
 }
