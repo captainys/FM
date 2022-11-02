@@ -19,6 +19,10 @@ struct CRCErrorLog *crcErrLog=NULL,*crcErrLogTail=NULL;
 
 #define BIOSERR_FLAG_DDM   4
 #define BIOSERR_FLAG_CRC   0x10
+#define BIOSERR_FLAG_RECORD_NOT_FOUND 0x08
+#define BIOSERR_FLAG_LOST_DATA  0x20
+#define BIOSERR_FLAG_TIMEOVER   0x40
+#define BIOSERR_FLAG_DMA        0x80
 
 static int sortSectors=1;
 
@@ -69,6 +73,35 @@ void InitializeD77SectorHeader(struct D77SectorHeader *hdr)
 	hdr->actualSectorLength=0;
 }
 
+void Color(int col)
+{
+	VDB_ATR atr;
+	VDB_rddefatr(&atr);
+	atr.color=col;
+	VDB_setdefatr(&atr);
+}
+
+unsigned int BIOSErrorColor(unsigned int biosErr)
+{
+	if(0!=(biosErr&BIOSERR_FLAG_DDM) && 0!=(biosErr&BIOSERR_FLAG_CRC))
+	{
+		return 3;
+	}
+	if(0!=(biosErr&BIOSERR_FLAG_DDM))
+	{
+		return 5;
+	}
+	if(0!=(biosErr&BIOSERR_FLAG_CRC))
+	{
+		return 2;
+	}
+	if(0!=(biosErr&BIOSERR_FLAG_RECORD_NOT_FOUND))
+	{
+		return 1;
+	}
+	return 7;
+}
+
 enum
 {
 	MODE_2D,       // 320K
@@ -85,6 +118,31 @@ enum
 #define MODE1_256_BYTE_PER_SEC  0x01
 #define MODE1_512_BYTE_PER_SEC  0x02
 #define MODE1_1024_BYTE_PER_SEC 0x03
+
+void GetDriveModeBytes(unsigned int modeBytes[2],unsigned int drive,unsigned int mode,unsigned int MFM,unsigned int N)
+{
+	N&=3;
+	switch(mode)
+	{
+	case MODE_2D:
+		modeBytes[0]=MODE1_2D;
+		modeBytes[1]=0x0210;
+		break;
+	case MODE_2DD:
+		modeBytes[0]=MODE1_2DD;
+		modeBytes[1]=0x0208;
+		break;
+	case MODE_2HD_1232K:
+		modeBytes[0]=MODE1_2HD;
+		modeBytes[1]=0x0208;
+		break;
+	}
+	if(0==MFM)
+	{
+		modeBytes[0]|=MODE1_FM_MODE;
+	}
+	modeBytes[0]|=N;
+}
 
 void SetDriveMode(unsigned int drive,unsigned int mode)
 {
@@ -198,6 +256,10 @@ int ReadSector(int devNo,DKB_SEC sector,struct D77SectorHeader *sectorHdr,char *
 		{
 			sectorHdr->CRCError=0xB0;
 		}
+		if(0!=(biosErr&BIOSERR_FLAG_RECORD_NOT_FOUND))
+		{
+			sectorHdr->CRCError=0xF0;
+		}
 	}
 
 	return biosErr;
@@ -221,18 +283,54 @@ void FormatSectorStatus(char str[4],struct D77SectorHeader *sectorHdr)
 }
 
 unsigned int ReadTrack(
-   int devNo,int track,int side,struct CommandParameterInfo *cpi,unsigned char d77Image[],struct D77Header *hdr,unsigned int trackTable[],unsigned char *nextTrackData)
+   unsigned int drive,unsigned int mode,int track,int side,struct CommandParameterInfo *cpi,unsigned char d77Image[],struct D77Header *hdr,unsigned int trackTable[],unsigned char *nextTrackData)
 {
-	printf("Track:%d  Side:%d\n",track,side);
+	const nInfoPerLine=8;
+	unsigned int MFMMode=1; // First try MFM mode, then FM mode.
+
+	drive&=0x0F;
+	unsigned int devNo=0x20|drive;
+
+	int nInfo=1;
+
+	Color(4);
+	printf("C:%-2d H:%d ",track,side);
+	Color(7);
 
 	int i;
-	int nTrackSector=0;
+	int nTrackSector=0,nFail=0;
 	DKB_SEC sector[NUM_SECTOR_BUF];
-	for(i=0; i<NUM_SECTOR_BUF; ++i)
+	for(int MFMorFM=0; MFMorFM<2; ++MFMorFM)
 	{
-		if(0==DKB_rdsecid(devNo,track,side,sector+nTrackSector))
+		unsigned int modeBytes[2];
+		GetDriveModeBytes(modeBytes,drive,mode,MFMMode,3);
+		unsigned int biosErr=DKB_setmode(devNo,modeBytes[0],modeBytes[1]);
+		for(i=0; i<NUM_SECTOR_BUF; ++i)
 		{
-			++nTrackSector;
+			unsigned int err=DKB_rdsecid(devNo,track,side,sector+nTrackSector);
+			if(0==err || err==BIOSERR_FLAG_CRC)
+			{
+				++nTrackSector;
+				nFail=0;
+			}
+			else
+			{
+				++nFail;
+				if(5<=nFail)
+				{
+					break;
+				}
+			}
+		}
+		if(0<nTrackSector)
+		{
+			break;
+		}
+		else if(0==MFMorFM)
+		{
+			printf("TRY MFM  ");
+			++nInfo;
+			MFMMode=0;
 		}
 	}
 
@@ -283,6 +381,10 @@ unsigned int ReadTrack(
 	for(i=0; i<nTrackSector; ++i)
 	{
 		int retry,biosErr=0;
+		unsigned int modeBytes[2];
+		GetDriveModeBytes(modeBytes,drive,mode,MFMMode,sector[i].seccnt);
+		DKB_setmode(drive,modeBytes[0],modeBytes[1]);
+
 		// Strategy:  First retry up to firstRetryCount and if no error, take it.
 		//            If finally it has a CRC error, always read secondRetryCount times.  Maybe a sign of KOROKORO-protect.
 		for(retry=0; retry<cpi->firstRetryCount; ++retry)
@@ -291,16 +393,23 @@ unsigned int ReadTrack(
 			char *dataBuf=(char *)(sectorHdr+1);
 			biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
 
+			if(0==MFMMode)
+			{
+				sectorHdr->densityFlag=0x40;
+			}
+
 			if(0==(biosErr&BIOSERR_FLAG_CRC)) // No retry if no CRC error.
 			{
-				printf("%02x%02x%02x%02x   ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
-				if(5==(nActual%6))
-				{
-					printf("\n");
-				}
+				Color(BIOSErrorColor(biosErr));
+				printf("%02x%02x%02x%02x ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
 
 				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
 				++nActual;
+
+				if(0==((nInfo+nActual)%nInfoPerLine))
+				{
+					printf("\n");
+				}
 				break;
 			}
 		}
@@ -326,27 +435,24 @@ unsigned int ReadTrack(
 
 			for(retry=0; retry<cpi->secondRetryCount; ++retry)
 			{
-				printf("%02x%02x%02x%02x",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
-
 				struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
 				char *dataBuf=(char *)(sectorHdr+1);
 				biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
 
-				char sta[4]={0,0,0,0};
-				FormatSectorStatus(sta,sectorHdr);
-				printf("%s",sta);
-
-				if(5==(nActual%6))
-				{
-					printf("\n");
-				}
+				Color(BIOSErrorColor(biosErr));
+				printf("%02x%02x%02x%02x ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
 
 				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
 				++nActual;
+
+				if(0==((nActual+nInfo)%nInfoPerLine))
+				{
+					printf("\n");
+				}
 			}
 		}
 	}
-	if(0!=nActual%6)
+	if(0!=((nActual+nInfo)%nInfoPerLine))
 	{
 		printf("\n");
 	}
@@ -452,8 +558,8 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 	int track;
 	for(track=cpi->startTrk; track<=cpi->endTrk; ++track)
 	{
-		trackData+=ReadTrack(devNo,track,0,cpi,d77Image,d77HeaderPtr,trackTable,trackData);
-		trackData+=ReadTrack(devNo,track,1,cpi,d77Image,d77HeaderPtr,trackTable,trackData);
+		trackData+=ReadTrack(cpi->drive,cpi->mode,track,0,cpi,d77Image,d77HeaderPtr,trackTable,trackData);
+		trackData+=ReadTrack(cpi->drive,cpi->mode,track,1,cpi,d77Image,d77HeaderPtr,trackTable,trackData);
 	}
 	d77HeaderPtr->diskSize=(trackData-d77Image);
 
@@ -664,7 +770,6 @@ int main(int ac,char *av[])
 		printf("    2D,320KB         2D Disk (from FM-7)\n");
 		printf("    2DD,640KB,720KB  2DD Disk\n");
 		printf("    2HD,1232KB       2HD 1232K Disk\n");
-		printf("    (1440KB not supported at this time.\n");
 		printf("  Options:\n");
 		printf("    -starttrk trackNum  Start track (Between 0 and 76 if 2HD)\n");
 		printf("    -endtrk   trackNum  End track (Between 0 and 76 if 2HD)\n");
