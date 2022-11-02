@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <conio.h>
-#include <time.h>
 #include "FMCFRB.H"
 
 
@@ -34,6 +33,10 @@ unsigned int currentCylinder=0;
 #define IOERR_RECORD_NOT_FOUND 0x10
 #define IOERR_DELETED_DATA     0x20
 #define IOERR_LOST_DATA			0x04
+
+#define IO_PIC0_IRR				0x00
+#define IO_PIC0_OCW3			0x00
+#define IRR_FDC					0x40
 
 #define IO_FDC_COMMAND			0x200
 #define FDCCMD_RESTORE			0x08
@@ -68,6 +71,8 @@ unsigned int currentCylinder=0;
 #define IO_DMA_STATUS			0x0AB
 #define IO_DMA_REQUEST			0x0AE
 #define IO_DMA_MASK				0x0AF
+
+#define TSUGARU_DEBUGBREAK				_outp(0x2386,2);
 
 struct IDMARK
 {
@@ -133,24 +138,15 @@ void Color(int col)
 
 void Wait50ms(void)
 {
-	// Safe to use clock() for real-time in DOS.
-	auto clk0=clock();
-	while(clk0<=clock() && clock()<=clk0+CLOCKS_PER_SEC/20)
-	{
-	}
+	// No clock() or time().  It enables IRQ.
 }
 
 void WaitIndexHole(void)
 {
-	clock_t clk0=clock();
 	unsigned int statusByte=0;
 	while(0==(statusByte&FDCSTA_INDEX))
 	{
 		statusByte=_inp(IO_FDC_STATUS);
-		if(clk0+CLOCKS_PER_SEC<clock())
-		{
-			break;
-		}
 	}
 }
 
@@ -162,13 +158,14 @@ void SelectDrive(void)
 	_outp(IO_FDC_DRIVE_SELECT,speedByte|drvSel);
 	_outp(IO_1US_WAIT,0);
 	_outp(IO_1US_WAIT,0);
+
+	_outp(IO_FDC_DRIVE_CONTROL,controlByte);
 }
 
 int CheckDriveReady(void)
 {
 	SelectDrive();
-	_outp(IO_FDC_DRIVE_CONTROL,controlByte);
-	for(int i=0; i<10; ++i)
+	for(int i=0; i<50; ++i)
 	{
 		Wait50ms();
 		unsigned int readyByte=GETDRVSTA();
@@ -183,6 +180,14 @@ int CheckDriveReady(void)
 		}
 	}
 	return 0;
+}
+
+void WaitFDCIRQ(void)
+{
+	_outp(IO_PIC0_OCW3,0x0A);  // pp.65 of FM TOWNS Technical Databook
+	while(0==(_inp(IO_PIC0_IRR)&IRR_FDC))
+	{
+	}
 }
 
 unsigned int WaitFDCReady(void)
@@ -213,20 +218,29 @@ void SetUpDMA(unsigned int dataLength)
 
 void Restore(void)
 {
+	MASKIRQ();
+
 	WaitFDCReady();
 	SelectDrive();
 	WaitFDCReady();
 	_outp(IO_FDC_DRIVE_CONTROL,controlByte);
 	WaitFDCReady();
+
 	_outp(IO_FDC_COMMAND,FDCCMD_RESTORE);
+	WaitFDCIRQ();
+
 	Wait50ms();
 	WaitFDCReady();
+
+	UNMASKIRQ();
 
 	currentCylinder=0;
 }
 
 void Seek(unsigned int C)
 {
+	MASKIRQ();
+
 	WaitFDCReady();
 	SelectDrive();
 	WaitFDCReady();
@@ -234,10 +248,16 @@ void Seek(unsigned int C)
 	_outp(IO_FDC_DATA,C*seekStep);
 	WaitFDCReady();
 	_outp(IO_FDC_COMMAND,FDCCMD_SEEK);
-	Wait50ms();
-	unsigned char err=WaitFDCReady();
+	WaitFDCIRQ();
+	
+	unsigned char err=_inp(IO_FDC_STATUS);
 
 	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+	_inp(IO_FDC_STATUS);
+
+	currentCylinder=C*seekStep;
+
+	UNMASKIRQ();
 
 	if(0x10&err)
 	{
@@ -245,8 +265,6 @@ void Seek(unsigned int C)
 		printf("\n!!!! Seek Error !!!!\n");
 		Color(7);
 	}
-
-	currentCylinder=C*seekStep;
 }
 
 
@@ -318,6 +336,7 @@ enum
 	MODE_2D,       // 320K
 	MODE_2DD,      // 640/720K
 	MODE_2HD_1232K,// 1232K
+	MODE_2HD_1440K,// 1440K
 };
 
 #define CTL_CLKSEL 0x20
@@ -327,6 +346,7 @@ enum
 #define CTL_FM     0x00
 #define CTL_IRQEN  0x01
 
+#define SPD_MODE_B 0x80
 #define SPD_360RPM 0x40
 #define SPD_INUSE  0x10
 
@@ -336,18 +356,23 @@ void SetDriveMode(unsigned int drive,unsigned int mode)
 	switch(mode)
 	{
 	case MODE_2D:
-		controlByte=CTL_CLKSEL|CTL_MOTOR;
+		controlByte=CTL_CLKSEL|CTL_MOTOR|CTL_IRQEN;
 		speedByte=SPD_INUSE;
 		seekStep=2;
 		break;
 	case MODE_2DD:
-		controlByte=CTL_CLKSEL|CTL_MOTOR;
+		controlByte=CTL_CLKSEL|CTL_MOTOR|CTL_IRQEN;
 		speedByte=SPD_INUSE;
 		seekStep=1;
 		break;
 	case MODE_2HD_1232K:
-		controlByte=CTL_MOTOR;
+		controlByte=CTL_MOTOR|CTL_IRQEN;
 		speedByte=SPD_360RPM|SPD_INUSE;
+		seekStep=1;
+		break;
+	case MODE_2HD_1440K:
+		controlByte=CTL_MOTOR|CTL_IRQEN;
+		speedByte=SPD_MODE_B|SPD_360RPM|SPD_INUSE;
 		seekStep=1;
 		break;
 	}
@@ -396,18 +421,25 @@ void MaskDMA(void)
 
 int ReadAddress(struct IDMARK *idMark)
 {
+	MASKIRQ();
+
+	SelectDrive();
+
 	SetUpDMA(6);
 	WaitFDCReady();
 
 	UnmaskDMA(); // Memo to myself:  DMA needs to be unmasked before writing FDC command, or it will freeze.
 	_outp(IO_FDC_COMMAND,FDCCMD_READADDR);
-	unsigned int sta=WaitFDCReady();
+	WaitFDCIRQ();
+	unsigned int sta=_inp(IO_FDC_STATUS);
 
 	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
 
 	MaskDMA();
 
 	_inp(IO_DMA_STATUS); // Dummy read to clear DMAE flag.
+
+	UNMASKIRQ();
 
 	idMark->chrn[0]=DMABuffer[0]; // C
 	idMark->chrn[1]=DMABuffer[1]; // H
@@ -453,7 +485,8 @@ int ReadSector(struct D77SectorHeader *sectorHdr,unsigned char dataBuf[],unsigne
 
 	UnmaskDMA();
 	_outp(IO_FDC_COMMAND,FDCCMD_READSECTOR);
-	unsigned int sta=WaitFDCReady();
+	WaitFDCIRQ();
+	unsigned int sta=_inp(IO_FDC_STATUS);
 
 	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
 
@@ -516,9 +549,8 @@ unsigned int ReadTrack(
 	Wait50ms();
 	Wait50ms();
 
-	MASKIRQ();
-
 	Seek(track);
+
 	WaitIndexHole(); // Need to be immediately after seek.
 
 	_outp(IO_DMA_INITIALIZE,3);  // 16bit, Reset
@@ -537,8 +569,7 @@ unsigned int ReadTrack(
 	{
 		_outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=side ? CTL_SIDE : 0)|FMorMFM);
 
-		time_t t0=time(NULL);
-		for(i=0; i<NUM_SECTOR_BUF && time(NULL)<t0+3; ++i)
+		for(i=0; i<NUM_SECTOR_BUF; ++i)
 		{
 			if(0==ReadAddress(&idMark[nTrackSector]))
 			{
@@ -557,7 +588,6 @@ unsigned int ReadTrack(
 		}
 	}
 
-	UNMASKIRQ();
 
 	// Remove Duplicates >>
 	for(i=nTrackSector-1; 0<i; --i)
