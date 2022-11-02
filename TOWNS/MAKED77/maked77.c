@@ -328,7 +328,7 @@ unsigned int ReadTrack(
 		}
 		else if(0==MFMorFM)
 		{
-			printf("TRY MFM  ");
+			printf("TRY FM   ");
 			++nInfo;
 			MFMMode=0;
 		}
