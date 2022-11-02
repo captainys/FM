@@ -472,6 +472,11 @@ unsigned int ReadTrack(
 		fprintf(stderr,"  updatePtr   :%08x\n",updatePtr);
 	}
 
+	if(0==nActual)
+	{
+		trackTable[track*2+side]=0; // Unformat
+	}
+
 	return trackDataPtr-nextTrackData;
 }
 
