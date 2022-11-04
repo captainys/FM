@@ -7,11 +7,12 @@
 
 extern void XModemSend(unsigned int dataLength,const unsigned char data[],int baud); // baud  2:38400bps  4:19200bps
 extern unsigned int TO_PHYSICAL(unsigned char *addr);
-extern void MASKIRQ(void);
-extern void UNMASKIRQ(void);
+extern void _CLI(void);
+extern void _STI(void);
 extern unsigned int GETFDCSTA(void); // MX BIOS reads IO 200H twice in a row.  Reason unknown.
 extern unsigned int GETDRVSTA(void); // MX BIOS reads IO 208H three times in a row.  Reason unknown.
 
+extern unsigned int FDC_EXEC_COMMAND(unsigned int FDCCMD);
 
 #define BUFFER_LENGTH 4096
 unsigned char bufferSource[BUFFER_LENGTH]; // There should be 4KB continuous page within this array.
@@ -192,36 +193,19 @@ unsigned int WaitFDCReady(void)
 	return sta;
 }
 
-unsigned int ShootFDCCommand(unsigned int cmd)
-{
-	_outp(IO_FDC_COMMAND,cmd);
-
-	//WaitFDCIRQ();
-	//return _inp(IO_FDC_STATUS);
-
-	if(FDCCMD_FORCEINTERRUPT!=cmd)
-	{
-		// Wait until FDC is busy.
-		while(0==(_inp(IO_FDC_STATUS)&1))
-		{
-		}
-	}
-
-	return WaitFDCReady();
-}
-
 void WaitIndexHole(void)
 {
-	MASKIRQ();
+	_CLI();
 
-	ShootFDCCommand(FDCCMD_FORCEINTERRUPT);
+	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+	WaitFDCReady();
 	unsigned int statusByte=0;
 	while(0==(statusByte&FDCSTA_INDEX))
 	{
 		statusByte=_inp(IO_FDC_STATUS);
 	}
 
-	UNMASKIRQ();
+	_STI();
 }
 
 void SetUpDMA(unsigned int dataLength)
@@ -242,45 +226,20 @@ void SetUpDMA(unsigned int dataLength)
 
 void Restore(void)
 {
-	MASKIRQ();
-
-	WaitFDCReady();
-	SelectDrive();
-	WaitFDCReady();
-	_outp(IO_FDC_DRIVE_CONTROL,controlByte);
-	WaitFDCReady();
-
-	ShootFDCCommand(FDCCMD_RESTORE);
-	WaitFDCReady(); // WaitFDCIRQ();
-
-	Wait50ms();
-	WaitFDCReady();
-
-	UNMASKIRQ();
-
+	unsigned int fdcStatus=FDC_EXEC_COMMAND(FDCCMD_RESTORE);
 	currentCylinder=0;
+	printf("RESTORE Returned %02x\n",fdcStatus);
 }
 
 void Seek(unsigned int C)
 {
-	MASKIRQ();
-
-	WaitFDCReady();
-	SelectDrive();
 	WaitFDCReady();
 	_outp(IO_FDC_CYLINDER,currentCylinder);
 	_outp(IO_FDC_DATA,C*seekStep);
-	WaitFDCReady();
-	unsigned char err=ShootFDCCommand(FDCCMD_SEEK);
-
-	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
-	_inp(IO_FDC_STATUS);
-
+	unsigned int fdcStatus=FDC_EXEC_COMMAND(FDCCMD_SEEK);
 	currentCylinder=C*seekStep;
 
-	UNMASKIRQ();
-
-	if(0x10&err)
+	if(0x10&fdcStatus)
 	{
 		Color(2);
 		printf("\n!!!! Seek Error !!!!\n");
@@ -378,22 +337,22 @@ void SetDriveMode(unsigned int drive,unsigned int mode)
 	switch(mode)
 	{
 	case MODE_2D:
-		controlByte=CTL_CLKSEL|CTL_MOTOR; // |CTL_IRQEN;
+		controlByte=CTL_CLKSEL|CTL_MOTOR|CTL_IRQEN;
 		speedByte=SPD_INUSE;
 		seekStep=2;
 		break;
 	case MODE_2DD:
-		controlByte=CTL_CLKSEL|CTL_MOTOR; // |CTL_IRQEN;
+		controlByte=CTL_CLKSEL|CTL_MOTOR|CTL_IRQEN;
 		speedByte=SPD_INUSE;
 		seekStep=1;
 		break;
 	case MODE_2HD_1232K:
-		controlByte=CTL_MOTOR; // |CTL_IRQEN;
+		controlByte=CTL_MOTOR|CTL_IRQEN;
 		speedByte=SPD_360RPM|SPD_INUSE;
 		seekStep=1;
 		break;
 	case MODE_2HD_1440K:
-		controlByte=CTL_MOTOR; // |CTL_IRQEN;
+		controlByte=CTL_MOTOR|CTL_IRQEN;
 		speedByte=SPD_MODE_B|SPD_360RPM|SPD_INUSE;
 		seekStep=1;
 		break;
@@ -444,7 +403,7 @@ void MaskDMA(void)
 
 int ReadAddress(struct IDMARK *idMark)
 {
-	MASKIRQ();
+	_CLI();
 
 	SelectDrive();
 
@@ -452,15 +411,13 @@ int ReadAddress(struct IDMARK *idMark)
 	WaitFDCReady();
 
 	UnmaskDMA(); // Memo to myself:  DMA needs to be unmasked before writing FDC command, or it will freeze.
-	unsigned int sta=ShootFDCCommand(FDCCMD_READADDR);
-
-	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+	unsigned int fdcStatus=FDC_EXEC_COMMAND(FDCCMD_READADDR);
 
 	MaskDMA();
 
 	_inp(IO_DMA_STATUS); // Dummy read to clear DMAE flag.
 
-	UNMASKIRQ();
+	_STI();
 
 	idMark->chrn[0]=DMABuffer[0]; // C
 	idMark->chrn[1]=DMABuffer[1]; // H
@@ -468,17 +425,17 @@ int ReadAddress(struct IDMARK *idMark)
 	idMark->chrn[3]=DMABuffer[3]; // N
 	idMark->chrn[4]=DMABuffer[4]; // CRC
 	idMark->chrn[5]=DMABuffer[5]; // CRC
-	idMark->chrn[6]=sta;
+	idMark->chrn[6]=fdcStatus;
 	idMark->chrn[7]=0;
 
-	return sta;
+	return fdcStatus;
 }
 
 /*! Returns the BIOS error code.
 */
 int ReadSector(struct D77SectorHeader *sectorHdr,unsigned char dataBuf[],unsigned int C,unsigned int H,unsigned int R,unsigned int N)
 {
-	MASKIRQ();
+	_CLI();
 
 	SelectDrive();
 
@@ -505,15 +462,13 @@ int ReadSector(struct D77SectorHeader *sectorHdr,unsigned char dataBuf[],unsigne
 	WaitFDCReady();
 
 	UnmaskDMA();
-	unsigned int sta=ShootFDCCommand(FDCCMD_READSECTOR);
-
-	_outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+	unsigned int sta=FDC_EXEC_COMMAND(FDCCMD_READSECTOR);
 
 	MaskDMA();
 
 	_inp(IO_DMA_STATUS); // Dummy read to clear DMAE flag.
 
-	UNMASKIRQ();
+	_STI();
 
 	if(sta&IOERR_CRC)
 	{
@@ -569,7 +524,6 @@ unsigned int ReadTrack(
 	Wait50ms();
 	Wait50ms();
 
-	Seek(track);
 	WaitIndexHole(); // Need to be immediately after seek.
 
 	_outp(IO_DMA_INITIALIZE,3);  // 16bit, Reset
@@ -839,7 +793,6 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 
 	Restore();
 
-
 	cpi->drive&=0x0F;
 	devNo=0x20|cpi->drive;
 
@@ -852,7 +805,7 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 		return -1;
 	}
 
-
+	SelectDrive(); // DKB_rdstatus will reset IRQEN flag.  Re-enable by SelectDrive.
 
 	int track;
 	for(track=cpi->startTrk; track<=cpi->endTrk; ++track)

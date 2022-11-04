@@ -1,17 +1,93 @@
+						.386p
 						ASSUME	CS:CODE,DS:DATA
 
 						PUBLIC	ALLOC_4KB_PAGE
 						PUBLIC	TO_PHYSICAL
-						PUBLIC	MASKIRQ
-						PUBLIC	UNMASKIRQ
+						PUBLIC	_CLI
+						PUBLIC	_STI
 						PUBLIC	GETFDCSTA
 						PUBLIC	GETDRVSTA
 
-						PUBLIC	TAKEOVER_INT46
-						PUBLIC	RESTORE_INT46
 						PUBLIC	GET_LAST_FDC_STATUS
 						PUBLIC	CLEAR_IRQ_FLAG
 						PUBLIC	GET_IRQ_FLAG
+
+						PUBLIC	FDC_EXEC_COMMAND
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+IO_FDC_STATUS			EQU		200h
+FDCSTA_BUSY				EQU		01h
+FDCSTA_INDEX			EQU		02h
+
+IOERR_CRC				EQU		8
+IOERR_RECORD_NOT_FOUND	EQU		10h
+IOERR_DELETED_DATA		EQU		20h
+IOERR_LOST_DATA			EQU		04h
+
+IO_PIC0_IRR				EQU		00h
+IO_PIC0_OCW3			EQU		00h
+IRR_FDC					EQU		40h
+
+IO_FDC_COMMAND			EQU		200h
+FDCCMD_RESTORE			EQU		008h
+FDCCMD_SEEK				EQU		018h
+FDCCMD_READADDR			EQU		0C0h
+FDCCMD_READSECTOR		EQU		080h
+FDCCMD_FORCEINTERRUPT	EQU		0D0h
+
+IO_FDC_CYLINDER			EQU		202h
+IO_FDC_SECTOR			EQU		204h
+IO_FDC_DATA				EQU		206h
+
+IO_FDC_DRIVE_STATUS		EQU		0208h
+DRIVE_STA_FREADY		EQU		02h
+
+IO_FDC_DRIVE_CONTROL	EQU		0208h
+IO_FDC_DRIVE_SELECT		EQU		020Ch
+
+IO_1US_WAIT				EQU		06Ch
+
+IO_DMA_INITIALIZE		EQU		0A0h
+IO_DMA_CHANNEL			EQU		0A1h
+IO_DMA_COUNT_LOW		EQU		0A2h
+IO_DMA_COUNT_HIGH		EQU		0A3h
+IO_DMA_ADDR_LOW			EQU		0A4h
+IO_DMA_ADDR_MID_LOW		EQU		0A5h
+IO_DMA_ADDR_MID_HIGH	EQU		0A6h
+IO_DMA_ADDR_HIGH		EQU		0A7h
+IO_DMA_DEVICE_CTRL_LOW	EQU		0A8h
+IO_DMA_DEVICE_CTRL_HIGH	EQU		0A9h
+IO_DMA_MODE_CONTROL		EQU		0AAh
+IO_DMA_STATUS			EQU		0ABh
+IO_DMA_REQUEST			EQU		0AEh
+IO_DMA_MASK				EQU		0AFh
+
+TSUGARU_DEBUG_BREAK		MACRO
+						PUSH	EAX
+						PUSH	EDX
+						MOV		DX,2386H
+						MOV		AL,2
+						OUT		DX,AL
+						POP		EDX
+						POP		EAX
+						RET
+						ENDM
+
+SET_PIC_POLLING_MODE	MACRO
+						MOV		DX,IO_PIC0_OCW3
+						MOV		AL,0Eh
+						OUT		DX,AL		; Set POLLING mode, REG0 is IRR
+						OUT		DX,AL		; Set POLLING mode, REG0 is IRR
+						ENDM
+
+CLEAR_PIC_POLLING_MODE	MACRO
+						MOV		DX,IO_PIC0_OCW3
+						MOV		AL,0Ah
+						OUT		DX,AL		; Clear POLLING mode.
+						OUT		DX,AL		; Clear POLLING mode.
+						ENDM
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -93,16 +169,16 @@ TO_PHYSICAL				PROC
 TO_PHYSICAL				ENDP
 
 
-MASKIRQ					PROC
+_CLI					PROC
 						CLI
 						RET
-MASKIRQ					ENDP
+_CLI					ENDP
 
 
-UNMASKIRQ				PROC
+_STI					PROC
 						STI
 						RET
-UNMASKIRQ				ENDP
+_STI					ENDP
 
 
 GETFDCSTA				PROC
@@ -136,83 +212,78 @@ GETDRVSTA				ENDP
 
 
 ; Input
-;   Pointer to eip
-;   Pointer to segment selector
-;   Pointer to real-mode handler
-; Return
-;   Segment and eip of the previous IRQ Handler
-TAKEOVER_INT46			PROC
-						PUSH	EBP
-						MOV		EBP,ESP
-						PUSH	ECX
+;   First Param		FDC Command
+FDC_EXEC_COMMAND		PROC
+; [ESP]		EFLAGS
+; [ESP+4]	EDX
+; [ESP+8]	EIP
+; [ESP+12]	FDC COMMAND
 						PUSH	EDX
-						PUSH	EDI
-						PUSH	DS
-						PUSH	ES
+						PUSHFD
+						CLI
 
-						MOV		CL,46H	; INT 46H FDC
-						MOV		AX,2502H	; Get Protected-mode INT vector
-						INT		21H
+						SET_PIC_POLLING_MODE
 
-						MOV		EDI,[EBP+8]
-						MOV		[EDI],EBX
-						MOV		EDI,[EBP+12]
-						MOV		[EDI],ES
+						CALL	FDC_WAIT_READY
 
-						MOV		CL,46H	; INT 46H FDC
-						MOV		AX,2503h	; Get Real-mode INT vector
-						INT		21H
+						MOV		DX,IO_FDC_COMMAND
+						MOV		AL,[ESP+12]
+						OUT		DX,AL
 
-						MOV		EDI,[EBP+16]
-						MOV		[EDI],EBX
+						CALL	FDC_WAIT_IRQ
 
+						MOV		DX,IO_FDC_STATUS
+						IN		AL,DX
+						MOVZX	EAX,AL
 
-						MOV		CL,46H
-						PUSH	CS
-						POP		DS
-						MOV		EDX,OFFSET HANDLE_INT46
-						MOV		AX,2506H	; Native Mode Handle, even when INT happened in real mode.
-						INT		21H
+						PUSH	EAX
 
-						POP		ES
-						POP		DS
-						POP		EDI
+						MOV		DX,IO_FDC_COMMAND
+						MOV		AL,FDCCMD_FORCEINTERRUPT
+						OUT		DX,AL
+
+						CALL	FDC_WAIT_READY
+
+						CLEAR_PIC_POLLING_MODE
+
+						POP		EAX
+
+						POPFD
 						POP		EDX
-						POP		ECX
-						POP		EBP
 						RET
-TAKEOVER_INT46			ENDP
+FDC_EXEC_COMMAND		ENDP
+
+
+
+; Return
+;   AL  FDC Status when BUSY flag is off
+;	DX  IO_FDC_STATUS
+FDC_WAIT_READY			PROC
+						MOV		DX,IO_FDC_STATUS
+
+FDC_WAIT_READY_LOOP:	IN		AL,DX
+						AND		AL,1
+						JNE		FDC_WAIT_READY_LOOP
+
+						RET
+FDC_WAIT_READY			ENDP
+
+
 
 ; Input
-;   eip
-;   SEG
-;   Real-Mode Handler
-RESTORE_INT46			PROC
-						PUSH	EBP
-						MOV		EBP,ESP
-						PUSH	ECX
-						PUSH	EDX
-						PUSH	EDI
-						PUSH	DS
+;   PIC must be set to the polling mode.
+; Return
+;   AL  IRR
+;	DX  IO_PIC0_IRR
+FDC_WAIT_IRQ			PROC
 
-						MOV		EDX,[EBP+8]
-						MOV		DS,[EBP+12]
-						MOV		CL,46H
-						MOV		AX,2504H
-						INT		21H
+						MOV		DX,IO_PIC0_IRR
+						IN		AL,DX
+						AND		AL,IRR_FDC
+						JE		FDC_WAIT_IRQ
 
-						MOV		EBX,[EBP+16]
-						MOV		CL,46H
-						MOV		AX,2505h
-						INT		21H
-
-						POP		DS
-						POP		EDI
-						POP		EDX
-						POP		ECX
-						POP		EBP
 						RET
-RESTORE_INT46			ENDP
+FDC_WAIT_IRQ			ENDP
 
 
 
