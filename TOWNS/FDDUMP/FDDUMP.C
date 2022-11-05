@@ -107,21 +107,9 @@ enum
 #define FDC_INT	0x46
 
 volatile unsigned char INT46_DID_COME_IN=0;
+volatile unsigned char lastFDCStatus=0;
 
 void interrupt (*Default_INT46H_Handler)(void);
-
-void interrupt Handle_INT46H(void)
-{
-	INT46_DID_COME_IN=1;
-}
-
-void CtrlC(int err)
-{
-	_dos_setvect(FDC_INT,Default_INT46H_Handler);
-	printf("Intercepted Ctrl+C\n");
-	exit(1);
-}
-
 
 // Watcom C inline assembly
 void STI();
@@ -129,6 +117,51 @@ void STI();
 
 void CLI();
 #pragma aux CLI="cli";
+
+void interrupt Handle_INT46H(void)
+{
+	INT46_DID_COME_IN=1;
+
+//03A4:00000D9B 68FD0C                    PUSH    WORD PTR 0CFDH
+//03A4:00000D9E 1F                        POP     DS
+//03A4:00000D9F A05704                    MOV     AL,[0457H]  Drive?
+//03A4:00000DA2 E8A0F7                    CALL    00000545
+//	03A4:00000545 B402                      MOV     AH,02H
+//	03A4:00000547 F6E4                      MUL     AH
+//	03A4:00000549 05D204                    ADD     AX,04D2H
+//	03A4:0000054C 8BF8                      MOV     DI,AX
+//	03A4:0000054E 8B35                      MOV     SI,[DI]
+//	03A4:00000550 C3                        RET
+//03A4:00000DA5 E895FE                    CALL    00000C3D
+//	03A4:00000C3D E8A6FF                    CALL    00000BE6
+//		03A4:00000BE6 BA0002                    MOV     DX,0200H
+//		03A4:00000BE9 EC                        IN      AL,DX
+//		03A4:00000BEA C3                        RET
+//	03A4:00000C40 32E4                      XOR     AH,AH
+//	03A4:00000C42 A35304                    MOV     [0453H],AX
+//	03A4:00000C45 C606870400                MOV     BYTE PTR [0487H],00H
+//	03A4:00000C4A BA0002                    MOV     DX,0200H
+//	03A4:00000C4D B0D0                      MOV     AL,D0H
+//	03A4:00000C4F EE                        OUT     DX,AL
+//	03A4:00000C50 9C                        PUSHF
+//	03A4:00000C51 FA                        CLI    Is it necessary?
+//	03A4:00000C52 E89100                    CALL    00000CE6
+//		03A4:00000CE6 E4AF                      IN      AL,AFH (DMAC_MASK)
+//		03A4:00000CE8 0C01                      OR      AL,01H
+//		03A4:00000CEA E6AF                      OUT     AFH,AL (DMAC_MASK)
+//		03A4:00000CEC C3                        RET
+//	03A4:00000C55 9D                        POPF
+//	03A4:00000C56 C3                        RET
+//03A4:00000DA8 CB                        RETF
+
+	lastFDCStatus=inp(IO_FDC_STATUS);
+	outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+
+	CLI(); // Is it necessary?
+	outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
+
+	inp(IO_FDC_STATUS); // Dummy read so that Force Interrupt won't cause indefinite IRQ.
+}
 
 ////////////////////////////////////////////////////////////
 // Console
@@ -161,6 +194,14 @@ void Color(unsigned int c)
 	VDB_rddefatr(&atr);
 	atr.color=c;
 	VDB_setdefatr(&atr);
+}
+
+void CtrlC(int err)
+{
+	Color(7);
+	_dos_setvect(FDC_INT,Default_INT46H_Handler);
+	printf("Intercepted Ctrl+C\n");
+	exit(1);
 }
 
 ////////////////////////////////////////////////////////////
@@ -243,6 +284,31 @@ int CheckDriveReady(void)
 	return 0;
 }
 
+void FDC_WaitReady(void)
+{
+	while(inp(IO_FDC_STATUS)&FDCSTA_BUSY)
+	{
+	}
+}
+
+unsigned char FDC_Restore(void)
+{
+	CLI();
+	INT46_DID_COME_IN=0;
+
+	FDC_WaitReady();
+	STI();
+	outp(IO_FDC_COMMAND,FDCCMD_RESTORE);
+	while(0==INT46_DID_COME_IN)
+	{
+	}
+	STI();
+
+	currentCylinder=0;
+	printf("RESTORE Returned %02x\n",lastFDCStatus);
+
+	return (lastFDCStatus&~FDCSTA_BUSY);
+}
 
 ////////////////////////////////////////////////////////////
 
@@ -464,7 +530,9 @@ int main(int ac,char *av[])
 	}
 
 	Default_INT46H_Handler=_dos_getvect(FDC_INT);
+	TSUGARU_DEBUGBREAK;
 	_dos_setvect(FDC_INT,Handle_INT46H);
+	TSUGARU_DEBUGBREAK;
 	signal(SIGINT,CtrlC);
 
 	if(0==FreeRunTimerAvailable())
@@ -482,6 +550,14 @@ int main(int ac,char *av[])
 	{
 		Color(2);
 		printf("Drive Not Ready.\n");
+		Color(7);
+		return 1;
+	}
+
+	if(0!=FDC_Restore())
+	{
+		Color(2);
+		printf("Restore command failed.\n");
 		Color(7);
 		return 1;
 	}
