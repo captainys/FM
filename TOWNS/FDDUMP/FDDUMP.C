@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <dos.h>
 #include <conio.h>
 #include <signal.h>
@@ -35,6 +36,30 @@ unsigned int controlByte=0; // To be written to I/O 0208h
 unsigned int speedByte=0;
 unsigned int currentCylinder=0;
 
+unsigned char far *trackBuf=NULL;
+#define DMABUF_SIZE (20*1024)
+unsigned char DMABuf[DMABUF_SIZE];
+
+
+struct IDMARK
+{
+	unsigned char chrn[8]; // CHRN CRC STA
+};
+#define IDBUF_SIZE 160
+struct IDMARK idMark[IDBUF_SIZE];
+
+#define ERRORLOG_TYPE_NONE	0
+#define ERRORLOG_TYPE_CRC	1
+#define ERRORLOG_TYPE_RECORD_NOT_FOUND	2
+#define ERRORLOG_TYPE_LOSTDATA	3
+struct ErrorLog
+{
+	struct ErrorLog *next;
+	unsigned char errType;
+	unsigned char CHRN[4];
+};
+struct ErrorLog far *errLog=NULL,*errLogTail=NULL;
+
 #define IO_FDC_STATUS			0x200
 #define FDCSTA_BUSY				0x01
 #define FDCSTA_INDEX			0x02
@@ -45,10 +70,13 @@ unsigned int currentCylinder=0;
 #define IOERR_LOST_DATA			0x04
 
 #define IO_PIC0_IRR				0x00
-#define IO_PIC0_OCW3			0x00
+#define IO_PIC0_ISR				0x00
+#define IO_PIC0_OCW2			0x00	// bit 3 & 4 zero
+#define IO_PIC0_OCW3			0x00	// bit 3=1, bit4=0
 #define IRR_FDC					0x40
 
 #define IO_FDC_COMMAND			0x200
+#define FDCCMD_RESTORE_HEAD_UNLOAD  0x00
 #define FDCCMD_RESTORE			0x08
 #define FDCCMD_SEEK				0x18
 #define FDCCMD_READADDR			0xC0
@@ -83,6 +111,8 @@ unsigned int currentCylinder=0;
 #define IO_DMA_MASK				0x0AF
 
 #define IO_FUNCTION_ID			0x24
+
+#define IO_FREERUN_TIMER		0x26
 
 #define TSUGARU_DEBUGBREAK				outp(0x2386,2);
 
@@ -161,6 +191,8 @@ void interrupt Handle_INT46H(void)
 	outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
 
 	inp(IO_FDC_STATUS); // Dummy read so that Force Interrupt won't cause indefinite IRQ.
+
+	outp(IO_PIC0_OCW2,0x20); // End Of Interrupt
 }
 
 ////////////////////////////////////////////////////////////
@@ -262,6 +294,20 @@ void SelectDrive(void)
 	outp(IO_FDC_DRIVE_CONTROL,controlByte);
 }
 
+void Wait10ms(void)
+{
+	uint16_t t0,accum=0;
+	t0=inpw(IO_FREERUN_TIMER);
+	while(accum<10000)
+	{
+		uint16_t t,diff;
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		accum+=diff;
+		t0=t;
+	}
+}
+
 int CheckDriveReady(void)
 {
 	int i;
@@ -291,6 +337,23 @@ void FDC_WaitReady(void)
 	}
 }
 
+void FDC_WaitIndexHole(void)
+{
+	unsigned int statusByte;
+
+	CLI();
+
+	outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+	FDC_WaitReady();
+	statusByte=0;
+	while(0==(statusByte&FDCSTA_INDEX))
+	{
+		statusByte=inp(IO_FDC_STATUS); // This read will clear IRR.
+	}
+
+	STI();
+}
+
 unsigned char FDC_Restore(void)
 {
 	CLI();
@@ -308,6 +371,42 @@ unsigned char FDC_Restore(void)
 	printf("RESTORE Returned %02x\n",lastFDCStatus);
 
 	return (lastFDCStatus&~FDCSTA_BUSY);
+}
+
+unsigned char FDC_Seek(unsigned char C)
+{
+	FDC_WaitReady();
+	outp(IO_FDC_CYLINDER,currentCylinder);
+	outp(IO_FDC_DATA,C*seekStep);
+
+	CLI();
+	INT46_DID_COME_IN=0;
+
+	FDC_WaitReady();
+	STI();
+	outp(IO_FDC_COMMAND,FDCCMD_SEEK);
+	while(0==INT46_DID_COME_IN)
+	{
+	}
+	STI();
+
+	if(0x10&lastFDCStatus)
+	{
+		Color(2);
+		printf("\n!!!! Seek Error !!!!\n");
+		Color(7);
+	}
+
+	return (lastFDCStatus&~FDCSTA_BUSY);
+}
+
+void CleanUp(void)
+{
+	_dos_setvect(FDC_INT,Default_INT46H_Handler);
+	SelectDrive();
+	outp(IO_FDC_COMMAND,FDCCMD_RESTORE_HEAD_UNLOAD);
+	outp(IO_FDC_DRIVE_SELECT,speedByte&~SPD_INUSE);
+	Color(7);
 }
 
 ////////////////////////////////////////////////////////////
@@ -489,8 +588,283 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 	return 0;
 }
 
+void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
+{
+	unsigned char lineCounter=0;
+	int FMorMFM=CTL_MFM;
+	int i;
+	int nTrackSector=0;
+	unsigned char lostDataReadAddr=0;
+	unsigned char lostDataReadData=0;
+	unsigned char mfmTry,nFail=0;
+
+	STI();
+	Color(4);
+	printf("C%-2d H%d ",C,H);
+	fflush(stdout);
+	Color(7);
+
+	Wait10ms();
+	Wait10ms();
+	Wait10ms();
+	Wait10ms();
+
+	SelectDrive();
+
+	FDC_WaitIndexHole(); // Need to be immediately after seek.
+
+	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
+
+/*	for(mfmTry=0; mfmTry<2; ++mfmTry)
+	{
+		controlByte&=(~CTL_MFM);
+		controlByte|=FMorMFM;
+
+		nFail=0;
+		for(i=0; i<IDBUF_SIZE; ++i)
+		{
+			unsigned int sta=ReadAddress(&idMark[nTrackSector]);
+			if(0==sta || IOERR_CRC==sta)
+			{
+				++nTrackSector;
+			}
+			else
+			{
+				++nFail;
+				if(5<=nFail)
+				{
+					break;
+				}
+			}
+			if(IOERR_LOST_DATA&sta)
+			{
+				lostDataReadAddr=1;
+			}
+		}
+		if(0<nTrackSector)
+		{
+			break;
+		}
+		else
+		{
+			// Unformat?  Or mayby FM codec.  (C0 H0 of FM OASYS disks are formatted in FM)
+			// Will take loooong time until switch, but be patient.
+			FMorMFM=0;
+		}
+	} */
+
+
+	// Remove Duplicates >>
+	for(i=nTrackSector-1; 0<i; --i)
+	{
+		int j;
+		for(j=i-1; 0<=j; --j)
+		{
+			if(idMark[i].chrn[0]==idMark[j].chrn[0] &&
+			   idMark[i].chrn[1]==idMark[j].chrn[1] &&
+			   idMark[i].chrn[2]==idMark[j].chrn[2] &&
+			   idMark[i].chrn[3]==idMark[j].chrn[3])
+			{
+				idMark[i]=idMark[nTrackSector-1];
+				--nTrackSector;
+				break;
+			}
+		}
+	}
+	// Remove Duplicates <<
+
+
+	// Sort sectors >>
+	if(cpi->sortSectors)
+	{
+		int i,j;
+		for(i=0; i<nTrackSector; ++i)
+		{
+			for(j=i+1; j<nTrackSector; ++j)
+			{
+				if(idMark[i].chrn[2]>idMark[j].chrn[2])
+				{
+					struct IDMARK tmp=idMark[i];
+					idMark[i]=idMark[j];
+					idMark[j]=tmp;
+				}
+			}
+		}
+	}
+	// Sort sectors <<
+
+
+//	numSectorTrackLog[track*2+side]=nTrackSector;
+//	trackTable[track*2+side]=(nextTrackData-d77Image);
+/*
+	int nActual=0;
+	for(i=0; i<nTrackSector; ++i)
+	{
+		int retry,ioErr=0;
+		// Strategy:  First retry up to firstRetryCount and if no error, take it.
+		//            If finally it has a CRC error, always read secondRetryCount times.  Maybe a sign of KOROKORO-protect.
+		for(retry=0; retry<cpi->firstRetryCount; ++retry)
+		{
+			struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
+			unsigned char *dataBuf=(unsigned char *)(sectorHdr+1);
+			ioErr=ReadSector(sectorHdr,dataBuf,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+
+			if(FMorMFM!=CTL_MFM)
+			{
+				sectorHdr->densityFlag=0x40;
+			}
+
+			if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
+			{
+				lostDataLog[track*2+side]|=2;
+				Color(IOErrToColor(ioErr));
+				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+				if(0==((nActual+nInfo+1)%nInfoPerLine))
+				{
+					printf("\n");
+				}
+				++nInfo;
+			}
+			else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
+			{
+				Color(IOErrToColor(ioErr));
+				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+				if(0==((nActual+nInfo+1)%nInfoPerLine))
+				{
+					printf("\n");
+				}
+
+				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
+				++nActual;
+				break;
+			}
+		}
+
+		if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.
+		{
+			struct CRCErrorLog *newLog=(struct CRCErrorLog *)malloc(sizeof(struct CRCErrorLog));
+			if(NULL!=newLog)
+			{
+				newLog->next=NULL;
+				newLog->sector=idMark[i];
+				if(NULL==crcErrLog)
+				{
+					crcErrLog=newLog;
+					crcErrLogTail=newLog;
+				}
+				else
+				{
+					crcErrLogTail->next=newLog;
+					crcErrLogTail=newLog;
+				}
+			}
+
+			for(retry=0; retry<cpi->secondRetryCount; ++retry)
+			{
+				struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
+				unsigned char *dataBuf=(unsigned char *)(sectorHdr+1);
+				ioErr=ReadSector(sectorHdr,dataBuf,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+
+				Color(IOErrToColor(ioErr));
+				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+
+				if(0==((nActual+nInfo+1)%nInfoPerLine))
+				{
+					printf("\n");
+				}
+
+				if(0!=(ioErr&IOERR_LOST_DATA))
+				{
+					++nInfo;
+				}
+				else
+				{
+					trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
+					++nActual;
+				}
+			}
+		}
+	}
+	if(0!=(nActual+nInfo)%nInfoPerLine)
+	{
+		printf("\n");
+	}
+
+	unsigned char *updatePtr=nextTrackData;
+	for(i=0; i<nActual; ++i)
+	{
+		struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)updatePtr;
+		sectorHdr->numSectorPerTrack=nActual;
+		updatePtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
+	}
+
+	if(updatePtr!=trackDataPtr)
+	{
+		Color(2);
+		fprintf(stderr,"Something Went Wrong in ReadTrack\n");
+		fprintf(stderr,"  trackDataPtr:%08x\n",trackDataPtr);
+		fprintf(stderr,"  updatePtr   :%08x\n",updatePtr);
+	}
+*/
+	Color(7);
+
+	outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=H ? CTL_SIDE : 0)|CTL_MFM);
+}
+
 void ReadDisk(struct CommandParameterInfo *cpi)
 {
+	int C;
+	for(C=cpi->startTrk; C<=cpi->endTrk; ++C)
+	{
+		FDC_Seek(C);
+		ReadTrack(C,0,cpi);
+		ReadTrack(C,1,cpi);
+	}
+
+	/* if(NULL!=errLog)
+	{
+		printf("Error Summary\n");
+		int nCRCError=0,nCRCErrorNotF5F6F7=0;;
+		struct CRCErrorLog *ptr;
+		for(ptr=crcErrLog; NULL!=ptr; ptr=ptr->next)
+		{
+			printf("CRC Err at Track:%d  Side:%d  Sector:%d\n",ptr->sector.chrn[0],ptr->sector.chrn[1],ptr->sector.chrn[2]);
+			if(0xF5!=ptr->sector.chrn[2] && 0xF6!=ptr->sector.chrn[2] && 0xF7!=ptr->sector.chrn[2])
+			{
+				++nCRCErrorNotF5F6F7;
+			}
+			++nCRCError;
+		}
+		printf("%d CRC Errors.\n",nCRCError);
+		printf("%d CRC Errors in not F5,F6,F7 sectors.\n",nCRCErrorNotF5F6F7);
+	}
+	else
+	{
+		printf("No CRC Error.\n");
+	}
+
+	{
+		for(int track=cpi->startTrk; track<=cpi->endTrk; ++track)
+		{
+			for(int side=0; side<2; ++side)
+			{
+				unsigned char t=track*2+side;
+				if(lostDataLog[t]&1)
+				{
+					printf("Lost Data (ReadAddr) at C:%d H:%d\n",track,side);
+				}
+				if(lostDataLog[t]&2)
+				{
+					printf("Lost Data (Data    ) at C:%d H:%d\n",track,side);
+				}
+
+				if(0==numSectorTrackLog[t])
+				{
+					printf("Unformat C:%d H:%d\n",track,side);
+				}
+			}
+		}
+	} */
 }
 
 unsigned char FreeRunTimerAvailable(void)
@@ -501,12 +875,17 @@ unsigned char FreeRunTimerAvailable(void)
 
 int main(int ac,char *av[])
 {
+	unsigned char RestoreState=0;
 	struct CommandParameterInfo cpi;
+
+	Color(4);
+	printf("FDDUMP for FM TOWNS\n");
+	Color(7);
+	printf("  by CaptainYS\n");
+
 	InitializeCommandParameterInfo(&cpi);
 	if(ac<3 || 0!=RecognizeCommandParameter(&cpi,ac,av))
 	{
-		printf("Make D77 file and send to RS232C via XMODEM\n");
-		printf("  by CaptainYS\n");
 		printf("Usage:\n");
 		printf("  RUN386 MAKED77 A: 1232KB [options]\n");
 		printf("    A:      Drive\n");
@@ -530,9 +909,7 @@ int main(int ac,char *av[])
 	}
 
 	Default_INT46H_Handler=_dos_getvect(FDC_INT);
-	TSUGARU_DEBUGBREAK;
 	_dos_setvect(FDC_INT,Handle_INT46H);
-	TSUGARU_DEBUGBREAK;
 	signal(SIGINT,CtrlC);
 
 	if(0==FreeRunTimerAvailable())
@@ -551,27 +928,32 @@ int main(int ac,char *av[])
 		Color(2);
 		printf("Drive Not Ready.\n");
 		Color(7);
+		CleanUp();
 		return 1;
 	}
 
-	if(0!=FDC_Restore())
+	RestoreState=FDC_Restore(); // Can check write-protect
+	if(RestoreState&0x80)
 	{
 		Color(2);
-		printf("Restore command failed.\n");
+		printf("Restore command failed (Not Ready).\n");
 		Color(7);
+		CleanUp();
+		return 1;
+	}
+	if(RestoreState&0x10)
+	{
+		Color(2);
+		printf("Restore command failed (Seek Error).\n");
+		Color(7);
+		CleanUp();
 		return 1;
 	}
 
-	TSUGARU_DEBUGBREAK;
+	remove(cpi.outFName);
+	ReadDisk(&cpi);
 
-	Color(4);
-	printf("Green\n");
-
-	TSUGARU_DEBUGBREAK;
-
-	Color(7);
-	printf("White\n");
-
+	CleanUp();
 
 	return 0;
 }
