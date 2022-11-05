@@ -4,6 +4,27 @@
 #include <conio.h>
 #include "FMCFRB.H"
 
+#include <signal.h>
+
+
+
+void (*DefaultCtrlC)(int err);
+
+unsigned int PREV_INT46_HANDLER[3];
+void TAKEOVER_INT46(unsigned int int46hHandler[3]);
+void RESTORE_INT46(unsigned int int46hHandler[3]);
+
+void CtrlC(int err)
+{
+	RESTORE_INT46(PREV_INT46_HANDLER);
+
+	printf("Intercept Ctrl+C\n");
+	signal(SIGINT,DefaultCtrlC);
+	DefaultCtrlC(err);
+	exit(err);
+}
+
+
 
 extern void XModemSend(unsigned int dataLength,const unsigned char data[],int baud); // baud  2:38400bps  4:19200bps
 extern unsigned int TO_PHYSICAL(unsigned char *addr);
@@ -1080,7 +1101,14 @@ int main(int ac,char *av[])
 	}
 
 
+
+	DefaultCtrlC=signal(SIGINT,CtrlC);
+	TAKEOVER_INT46(PREV_INT46_HANDLER);
+
 	int d77Size=ReadDisk(&cpi,d77Image);
+
+	RESTORE_INT46(PREV_INT46_HANDLER);
+	signal(SIGINT,DefaultCtrlC);
 
 
 	if(d77Size<0)

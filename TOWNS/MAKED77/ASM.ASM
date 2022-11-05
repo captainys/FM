@@ -14,6 +14,9 @@
 
 						PUBLIC	FDC_EXEC_COMMAND
 
+						PUBLIC	TAKEOVER_INT46
+						PUBLIC	RESTORE_INT46
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -72,7 +75,6 @@ TSUGARU_DEBUG_BREAK		MACRO
 						OUT		DX,AL
 						POP		EDX
 						POP		EAX
-						RET
 						ENDM
 
 SET_PIC_POLLING_MODE	MACRO
@@ -222,15 +224,19 @@ FDC_EXEC_COMMAND		PROC
 						PUSHFD
 						CLI
 
-						SET_PIC_POLLING_MODE
+						TSUGARU_DEBUG_BREAK
 
 						CALL	FDC_WAIT_READY
 
 						MOV		DX,IO_FDC_COMMAND
 						MOV		AL,[ESP+12]
+						MOV		DWORD PTR [IRQ_DID_COME_IN],0
+						STI
 						OUT		DX,AL
 
-						CALL	FDC_WAIT_IRQ
+FDC_EXEC_COMMAND_LOOP1:
+						CMP		DWORD PTR [IRQ_DID_COME_IN],0
+						JE		FDC_EXEC_COMMAND_LOOP1
 
 						MOV		DX,IO_FDC_STATUS
 						IN		AL,DX
@@ -238,13 +244,19 @@ FDC_EXEC_COMMAND		PROC
 
 						PUSH	EAX
 
+						CLI
+						MOV		DWORD PTR [IRQ_DID_COME_IN],0
 						MOV		DX,IO_FDC_COMMAND
 						MOV		AL,FDCCMD_FORCEINTERRUPT
+
+						STI
 						OUT		DX,AL
 
-						CALL	FDC_WAIT_READY
+FDC_EXEC_COMMAND_LOOP2:
+						CMP		DWORD PTR [IRQ_DID_COME_IN],0
+						JE		FDC_EXEC_COMMAND_LOOP2
 
-						CLEAR_PIC_POLLING_MODE
+						CALL	FDC_WAIT_READY
 
 						POP		EAX
 
@@ -327,7 +339,7 @@ GET_LAST_FDC_STATUS		ENDP
 ;	03A4:00000C55 9D                        POPF
 ;	03A4:00000C56 C3                        RET
 ;03A4:00000DA8 CB                        RETF
-HANDLE_INT46			PROC
+DONTHANDLE_INT46			PROC
 						PUSH	EAX
 						PUSH	EDX
 						PUSH	DS
@@ -354,7 +366,7 @@ HANDLE_INT46			PROC
 						POP		EDX
 						POP		EAX
 						IRET
-HANDLE_INT46			ENDP
+DONTHANDLE_INT46			ENDP
 
 
 
@@ -370,6 +382,123 @@ GET_IRQ_FLAG			PROC
 						MOV		EAX,[IRQ_DID_COME_IN]
 						RET
 GET_IRQ_FLAG			ENDP
+
+
+
+
+
+
+TAKEOVER_INT46			PROC
+; EBP+8	Pointer (unsigned int INT46[3])
+
+						TSUGARU_DEBUG_BREAK
+
+						PUSH	EBP
+						MOV		EBP,ESP
+						PUSH	EAX
+						PUSH	EDX
+						PUSH	ECX
+						PUSH	EDI
+						PUSH	ES
+						PUSH	DS
+						PUSHF
+
+						CLI
+
+						MOV		CL,046H
+						MOV		AX,2502H	; Get Native-Mode INT Handler
+						INT		21H
+
+						MOV		EDI,[EBP+8]
+						MOV		[EDI],ES
+						MOV		[EDI+4],EBX
+
+						MOV		CL,046H
+						MOV		AX,2503H	; Get Real-Mode INT Handler
+						INT		21H
+
+						MOV		EDI,[EBP+8]
+						MOV		[EDI+8],EBX
+
+						MOV		CL,046H
+						PUSH	CS
+						POP		DS
+						MOV		EDX,OFFSET HANDLE_INT46
+						MOV		AX,2506H
+						INT		21H
+
+						POPF
+						POP		DS
+						POP		ES
+						POP		EDI
+						POP		ECX
+						POP		EDX
+						POP		EAX
+						POP		EBP
+
+						TSUGARU_DEBUG_BREAK
+
+						RET
+TAKEOVER_INT46			ENDP
+
+
+
+
+
+RESTORE_INT46			PROC
+; EBP+8	Pointer (unsigned int INT46[3])
+						PUSH	EBP
+						MOV		EBP,ESP
+						PUSH	EAX
+						PUSH	EDX
+						PUSH	ECX
+						PUSH	EDI
+						PUSH	DS
+						PUSHF
+
+						CLI
+
+						MOV		CL,046H
+						MOV		EDI,[EBP+8]
+						MOV		DS,[EDI]
+						MOV		EDX,[EDI+4]
+						MOV		AX,2504H
+						INT		21H		; Set Native Mode INT Vector
+
+						MOV		CL,046H
+						MOV		EDI,[EBP+8]
+						MOV		EBX,[EDI+8]
+						MOV		AX,2505H
+						INT		21H		; Set Real Mode INT Vector
+
+						POPF
+						POP		DS
+						POP		EDI
+						POP		ECX
+						POP		EDX
+						POP		EAX
+						POP		EBP
+						RET
+RESTORE_INT46			ENDP
+
+
+
+
+
+HANDLE_INT46			PROC	FAR
+
+						TSUGARU_DEBUG_BREAK
+
+						PUSH	DS
+						PUSH	0014H
+						POP		DS
+						MOV		DS:[IRQ_DID_COME_IN],1
+						POP		DS
+
+						RET	; Looks like it is a re-direct from DOS-Extender, which should return by RETF instead of IRET.
+HANDLE_INT46			ENDP
+
+
 
 
 
