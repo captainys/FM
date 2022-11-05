@@ -38,7 +38,7 @@ unsigned int currentCylinder=0;
 
 unsigned char far *trackBuf=NULL;
 #define DMABUF_SIZE (20*1024)
-unsigned char DMABuf[DMABUF_SIZE];
+unsigned char DMABuf[DMABUF_SIZE]="DMABUFFER";
 
 
 struct IDMARK
@@ -116,6 +116,9 @@ struct ErrorLog far *errLog=NULL,*errLogTail=NULL;
 
 #define TSUGARU_DEBUGBREAK				outp(0x2386,2);
 
+#define READADDR_TIMEOUT		1000000
+#define READADDR_TRACK_TIMEOUT  3000000
+
 enum
 {
 	MODE_2D,       // 320K
@@ -141,6 +144,16 @@ volatile unsigned char lastFDCStatus=0;
 
 void interrupt (*Default_INT46H_Handler)(void);
 
+
+void Palette(unsigned char code,unsigned char r,unsigned char g,unsigned char b)
+{
+	outp(0xFD90,code);
+	outp(0xFD92,b&0xF0);
+	outp(0xFD94,r&0xF0);
+	outp(0xFD96,g&0xF0);
+}
+
+
 // Watcom C inline assembly
 void STI();
 #pragma aux STI="sti";
@@ -150,6 +163,8 @@ void CLI();
 
 void interrupt Handle_INT46H(void)
 {
+	Palette(7,255,0,0);
+
 	INT46_DID_COME_IN=1;
 
 //03A4:00000D9B 68FD0C                    PUSH    WORD PTR 0CFDH
@@ -191,8 +206,11 @@ void interrupt Handle_INT46H(void)
 	outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
 
 	inp(IO_FDC_STATUS); // Dummy read so that Force Interrupt won't cause indefinite IRQ.
+	inp(IO_DMA_STATUS); // BIOS Dummy reads
 
-	outp(IO_PIC0_OCW2,0x20); // End Of Interrupt
+	outp(IO_PIC0_OCW2,0x66); // Specific End Of Interrupt, Level=6
+
+	Palette(7,255,255,255);
 }
 
 ////////////////////////////////////////////////////////////
@@ -330,11 +348,19 @@ int CheckDriveReady(void)
 	return 0;
 }
 
-void FDC_WaitReady(void)
+uint32_t FDC_WaitReady(void)
 {
+	uint32_t accum=0;
+	uint16_t t0,t,diff;
+	t0=inpw(IO_FREERUN_TIMER);
 	while(inp(IO_FDC_STATUS)&FDCSTA_BUSY)
 	{
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		accum+=diff;
+		t0=t;
 	}
+	return accum;
 }
 
 void FDC_WaitIndexHole(void)
@@ -353,6 +379,47 @@ void FDC_WaitIndexHole(void)
 
 	STI();
 }
+
+// A1  Channel
+// A2  Count
+// AA  Mode/Control
+void SetUpDMA(unsigned char *DMABuf,unsigned int count);
+#pragma aux SetUpDMA=\
+"pushf"\
+"cli"\
+"xor  al,al"\
+"out  0A1h,al"\
+"push dx"\
+"mov  ax,cx"\
+"mov  cx,ds"\
+"xor  dx,dx"\
+"shl  cx,1"\
+"rcl  dx,1"\
+"shl  cx,1"\
+"rcl  dx,1"\
+"shl  cx,1"\
+"rcl  dx,1"\
+"shl  cx,1"\
+"rcl  dx,1"\
+"add  ax,cx"\
+"adc  dx,0"\
+"out  0A4h,ax"\
+"mov  al,dl"\
+"out  0A6h,al"\
+"mov  al,dh"\
+"out  0A7h,al"\
+"in   al,0afh"\
+"and  al,0feh"\
+"out  0afh,al"\
+"pop  ax"\
+"dec  ax"\
+"out  0A2h,ax"\
+"mov  al,44h"\
+"out  0AAh,al"\
+"popf"\
+parm [ cx ] [ dx ] \
+modify[ dx cx ]
+
 
 unsigned char FDC_Restore(void)
 {
@@ -375,6 +442,8 @@ unsigned char FDC_Restore(void)
 
 unsigned char FDC_Seek(unsigned char C)
 {
+	Palette(7,0,0,255);
+
 	FDC_WaitReady();
 	outp(IO_FDC_CYLINDER,currentCylinder);
 	outp(IO_FDC_DATA,C*seekStep);
@@ -382,19 +451,65 @@ unsigned char FDC_Seek(unsigned char C)
 	CLI();
 	INT46_DID_COME_IN=0;
 
+	Palette(7,0,255,0);
+
 	FDC_WaitReady();
+
+	Palette(7,255,0,0);
+
 	STI();
 	outp(IO_FDC_COMMAND,FDCCMD_SEEK);
 	while(0==INT46_DID_COME_IN)
 	{
+		Palette(7,rand(),rand(),rand());
 	}
 	STI();
+
+	Palette(7,255,255,255);
 
 	if(0x10&lastFDCStatus)
 	{
 		Color(2);
 		printf("\n!!!! Seek Error !!!!\n");
 		Color(7);
+	}
+
+	return (lastFDCStatus&~FDCSTA_BUSY);
+}
+
+unsigned char FDC_ReadAddress(uint32_t *accumTime)
+{
+	uint16_t t0,t,diff;
+
+	*accumTime=0;
+
+	CLI();
+	SelectDrive();
+
+	SetUpDMA(DMABuf,6);
+
+	CLI();
+	INT46_DID_COME_IN=0;
+
+	FDC_WaitReady();
+	STI();
+
+	outp(IO_FDC_COMMAND,FDCCMD_READADDR);
+	t0=inpw(IO_FREERUN_TIMER);
+
+	// Memo: Make sure to write 44H to I/O AAh.
+	//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
+	while(0==INT46_DID_COME_IN && *accumTime<READADDR_TIMEOUT)
+	{
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		*accumTime+=diff;
+		t0=t;
+	}
+
+	if(READADDR_TIMEOUT<=*accumTime)
+	{
+		return 0xFF;
 	}
 
 	return (lastFDCStatus&~FDCSTA_BUSY);
@@ -590,7 +705,8 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 
 void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 {
-	unsigned char lineCounter=0;
+	const int nInfoPerLine=8;
+	unsigned char nInfo=0;
 	int FMorMFM=CTL_MFM;
 	int i;
 	int nTrackSector=0;
@@ -612,29 +728,31 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	SelectDrive();
 
 	FDC_WaitIndexHole(); // Need to be immediately after seek.
-
 	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
 
-/*	for(mfmTry=0; mfmTry<2; ++mfmTry)
+	for(mfmTry=0; mfmTry<2; ++mfmTry)
 	{
+		uint32_t accumTime=0;
+		uint16_t nFail=0;
+
 		controlByte&=(~CTL_MFM);
 		controlByte|=FMorMFM;
 
-		nFail=0;
-		for(i=0; i<IDBUF_SIZE; ++i)
+		for(i=0; i<IDBUF_SIZE && accumTime<READADDR_TRACK_TIMEOUT; ++i)
 		{
-			unsigned int sta=ReadAddress(&idMark[nTrackSector]);
+			uint32_t passedTime;
+			unsigned int sta;
+			sta=FDC_ReadAddress(&passedTime);
+			accumTime+=passedTime;
 			if(0==sta || IOERR_CRC==sta)
 			{
+				idMark[nTrackSector].chrn[0]=DMABuf[0];
+				idMark[nTrackSector].chrn[1]=DMABuf[1];
+				idMark[nTrackSector].chrn[2]=DMABuf[2];
+				idMark[nTrackSector].chrn[3]=DMABuf[3];
+				idMark[nTrackSector].chrn[4]=DMABuf[4];
+				idMark[nTrackSector].chrn[5]=DMABuf[5];
 				++nTrackSector;
-			}
-			else
-			{
-				++nFail;
-				if(5<=nFail)
-				{
-					break;
-				}
 			}
 			if(IOERR_LOST_DATA&sta)
 			{
@@ -651,7 +769,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 			// Will take loooong time until switch, but be patient.
 			FMorMFM=0;
 		}
-	} */
+	}
 
 
 	// Remove Duplicates >>
@@ -692,6 +810,29 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		}
 	}
 	// Sort sectors <<
+
+
+	STI();
+	for(i=0; i<nTrackSector; ++i)
+	{
+		if(0<i && 0==nInfo)
+		{
+			printf("       ");
+		}
+
+		printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+		++nInfo;
+
+		if(nInfoPerLine==nInfo)
+		{
+			printf("\n");
+			nInfo=0;
+		}
+	}
+	if(0!=nInfo)
+	{
+		printf("\n");
+	}
 
 
 //	numSectorTrackLog[track*2+side]=nTrackSector;
@@ -806,6 +947,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		fprintf(stderr,"  updatePtr   :%08x\n",updatePtr);
 	}
 */
+
 	Color(7);
 
 	outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=H ? CTL_SIDE : 0)|CTL_MFM);
@@ -816,9 +958,13 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 	int C;
 	for(C=cpi->startTrk; C<=cpi->endTrk; ++C)
 	{
+Palette(4,0,0,255);
 		FDC_Seek(C);
+Palette(4,255,0,0);
 		ReadTrack(C,0,cpi);
+Palette(4,255,255,255);
 		ReadTrack(C,1,cpi);
+Palette(4,0,255,0);
 	}
 
 	/* if(NULL!=errLog)
