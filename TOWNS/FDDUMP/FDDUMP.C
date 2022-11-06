@@ -676,6 +676,8 @@ unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,u
 	INT46_DID_COME_IN=0;
 
 	FDC_WaitReady();
+	outp(IO_FDC_CYLINDER,C);
+	outp(IO_FDC_SECTOR,R);
 	STI();
 
 	Palette(COLOR_DEBUG_READADDR,0,0,255);
@@ -1034,6 +1036,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 				lostDataReadData=1;
 				Color(IOErrToColor(ioErr));
 				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+				fflush(stdout);
 				++nInfo;
 
 				if(nInfoPerLine==nInfo)
@@ -1046,6 +1049,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 			{
 				Color(IOErrToColor(ioErr));
 				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+				fflush(stdout);
 				++nInfo;
 
 				if(nInfoPerLine==nInfo)
@@ -1091,6 +1095,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 					Color(IOErrToColor(ioErr));
 					printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+					fflush(stdout);
 
 					if(nInfoPerLine==nInfo)
 					{
