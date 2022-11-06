@@ -35,10 +35,18 @@ unsigned int seekStep=1;  // 2 for 2D disk.
 unsigned int controlByte=0; // To be written to I/O 0208h
 unsigned int speedByte=0;
 unsigned int currentCylinder=0;
+unsigned int lastFDCCommand=0;
 
 unsigned char far *trackBuf=NULL;
 #define DMABUF_SIZE (20*1024)
 unsigned char DMABuf[DMABUF_SIZE]="DMABUFFER";
+
+
+#define COLOR_DEBUG_HANDLER	1
+#define COLOR_DEBUG_SEEK    2
+#define COLOR_DEBUG_READADDR 3
+#define COLOR_DEBUG_READDISK 5
+#define COLOR_DEBUG_READTRACK 6
 
 
 struct IDMARK
@@ -163,7 +171,7 @@ void CLI();
 
 void interrupt Handle_INT46H(void)
 {
-	Palette(7,255,0,0);
+	Palette(COLOR_DEBUG_HANDLER,255,0,0);
 
 	INT46_DID_COME_IN=1;
 
@@ -200,17 +208,29 @@ void interrupt Handle_INT46H(void)
 //03A4:00000DA8 CB                        RETF
 
 	lastFDCStatus=inp(IO_FDC_STATUS);
-	outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+	if(FDCCMD_RESTORE!=lastFDCCommand && FDCCMD_SEEK!=lastFDCCommand)
+	{
+		// Looks like if I force-interrupt for seek commands, FDC stops before the head actually moved.
+		outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
 
-	CLI(); // Is it necessary?
-	outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
+		CLI(); // Is it necessary?
+		outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
+	}
+	else
+	{
+		while(inp(IO_FDC_STATUS)&1)
+		{
+		}
+	}
+
+	Palette(COLOR_DEBUG_HANDLER,0,255,0);
 
 	inp(IO_FDC_STATUS); // Dummy read so that Force Interrupt won't cause indefinite IRQ.
 	inp(IO_DMA_STATUS); // BIOS Dummy reads
 
-	outp(IO_PIC0_OCW2,0x66); // Specific End Of Interrupt, Level=6
+	outp(IO_PIC0_OCW2,0x20);
 
-	Palette(7,255,255,255);
+	Palette(COLOR_DEBUG_HANDLER,0,0,255);
 }
 
 ////////////////////////////////////////////////////////////
@@ -225,18 +245,43 @@ struct VDB_ATR
 void VDB_rddefatr(struct VDB_ATR *atr);
 #pragma aux VDB_rddefatr=\
 "push ax" \
-"mov ah,12h\n" \
-"int 91h\n" \
+"mov ah,12h" \
+"int 91h" \
 "pop ax" \
 parm[di]\
 
 void VDB_setdefatr(struct VDB_ATR *atr);
 #pragma aux VDB_setdefatr=\
 "push ax" \
-"mov ah,11h\n" \
-"int 91h\n" \
+"mov ah,11h" \
+"int 91h" \
 "pop ax" \
 parm[di]\
+
+unsigned int VDB_rdposcus(void);
+#pragma aux VDB_rdposcus=\
+"mov ah,0Eh"\
+"int 91h"\
+value [dx]
+
+void VDB_setposcus(int dx);
+#pragma aux VDB_setposcus=\
+"mov ah,0Dh"\
+"int 91h"\
+parm [ dx ]
+
+
+void VDB_wtsysline(int AL,int CX,unsigned int DX,void *DI);
+#pragma aux VDB_wtsysline=\
+"mov [DI+2],DS"\
+"mov [DI+6],DS"\
+"mov ah,1Fh"\
+"int 91h"\
+parm [ AX ] [ CX ] [ DX ] [ DI ]
+
+unsigned int sysCharBufPtr[4];
+struct VDB_ATR sysChrAttr[8];
+
 
 void Color(unsigned int c)
 {
@@ -363,13 +408,19 @@ uint32_t FDC_WaitReady(void)
 	return accum;
 }
 
+void FDC_Command(unsigned char cmd)
+{
+	lastFDCCommand=cmd;
+	outp(IO_FDC_COMMAND,cmd);
+}
+
 void FDC_WaitIndexHole(void)
 {
 	unsigned int statusByte;
 
 	CLI();
 
-	outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
+	FDC_Command(FDCCMD_FORCEINTERRUPT);
 	FDC_WaitReady();
 	statusByte=0;
 	while(0==(statusByte&FDCSTA_INDEX))
@@ -428,7 +479,7 @@ unsigned char FDC_Restore(void)
 
 	FDC_WaitReady();
 	STI();
-	outp(IO_FDC_COMMAND,FDCCMD_RESTORE);
+	FDC_Command(FDCCMD_RESTORE);
 	while(0==INT46_DID_COME_IN)
 	{
 	}
@@ -442,30 +493,71 @@ unsigned char FDC_Restore(void)
 
 unsigned char FDC_Seek(unsigned char C)
 {
-	Palette(7,0,0,255);
+//03A4:00000C0F Write IO8:[020C] 50(FDC_DRIVE_SELECT)
+//03A4:00000C15 Write IO8:[020C] 51(FDC_DRIVE_SELECT)
+//03A4:00000C0F Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C15 Write IO8:[020C] 41(FDC_DRIVE_SELECT)
+//03A4:00000C5A Write IO8:[0202] 00(FDC_TRACK)
+//03A4:00000C1D Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C1F Write IO8:[020C] 41(FDC_DRIVE_SELECT)
+//03A4:00000C22 Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C1D Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C1F Write IO8:[020C] 42(FDC_DRIVE_SELECT)
+//03A4:00000C22 Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C1D Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C1F Write IO8:[020C] 44(FDC_DRIVE_SELECT)
+//03A4:00000C22 Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C1D Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C1F Write IO8:[020C] 48(FDC_DRIVE_SELECT)
+//03A4:00000C22 Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C07 Write IO8:[0208] 12(FDC_DRIVE_STATUS_CONTROL)
+//03A4:00000C0F Write IO8:[020C] 40(FDC_DRIVE_SELECT)
+//03A4:00000C15 Write IO8:[020C] 41(FDC_DRIVE_SELECT)
+//03A4:00000BEE Read IO8:[0208] 8E(FDC_DRIVE_STATUS_CONTROL)
+//03A4:00000BEF Read IO8:[0208] 8E(FDC_DRIVE_STATUS_CONTROL)
+//03A4:00000BF0 Read IO8:[0208] 8E(FDC_DRIVE_STATUS_CONTROL)
+//03A4:00000C0F Write IO8:[020C] 50(FDC_DRIVE_SELECT)
+//03A4:00000C15 Write IO8:[020C] 51(FDC_DRIVE_SELECT)
+//03A4:00000BEE Read IO8:[0208] 8E(FDC_DRIVE_STATUS_CONTROL)
+//03A4:00000BEF Read IO8:[0208] 8E(FDC_DRIVE_STATUS_CONTROL)
+//03A4:00000BF0 Read IO8:[0208] 8E(FDC_DRIVE_STATUS_CONTROL)
+//03A4:00000C5F Write IO8:[0206] 14(FDC_DATA)
+//03A4:00000BE9 Read IO8:[0200] 20(FDC_STATUS_COMMAND)
+//03A4:00000C07 Write IO8:[0208] 13(FDC_DRIVE_STATUS_CONTROL)
+//03A4:00000C3B Write IO8:[0200] 18(FDC_STATUS_COMMAND)
+//FDC Command Write 18 Seek
+//03A4:00000BE9 Read IO8:[0200] 00(FDC_STATUS_COMMAND)
+//03A4:00000C4F Write IO8:[0200] D0(FDC_STATUS_COMMAND)
+//FDC Command Write D0 Force_Interrupt
+//03A4:00000C07 Write IO8:[0208] 12(FDC_DRIVE_STATUS_CONTROL)
+
+	Palette(COLOR_DEBUG_SEEK,255,0,0);
 
 	FDC_WaitReady();
+	CLI();
+
+	SelectDrive();
 	outp(IO_FDC_CYLINDER,currentCylinder);
 	outp(IO_FDC_DATA,C*seekStep);
+	currentCylinder=C*seekStep;
 
-	CLI();
+	Palette(COLOR_DEBUG_SEEK,0,255,0);
+
 	INT46_DID_COME_IN=0;
-
-	Palette(7,0,255,0);
 
 	FDC_WaitReady();
 
-	Palette(7,255,0,0);
+	Palette(COLOR_DEBUG_SEEK,0,0,255);
 
 	STI();
-	outp(IO_FDC_COMMAND,FDCCMD_SEEK);
+	FDC_Command(FDCCMD_SEEK);
 	while(0==INT46_DID_COME_IN)
 	{
-		Palette(7,rand(),rand(),rand());
+		Palette(COLOR_DEBUG_SEEK,rand(),rand(),rand());
 	}
 	STI();
 
-	Palette(7,255,255,255);
+	Palette(COLOR_DEBUG_SEEK,0,255,255);
 
 	if(0x10&lastFDCStatus)
 	{
@@ -474,12 +566,16 @@ unsigned char FDC_Seek(unsigned char C)
 		Color(7);
 	}
 
+	Palette(COLOR_DEBUG_SEEK,255,255,255);
+
 	return (lastFDCStatus&~FDCSTA_BUSY);
 }
 
 unsigned char FDC_ReadAddress(uint32_t *accumTime)
 {
 	uint16_t t0,t,diff;
+
+	Palette(COLOR_DEBUG_READADDR,255,0,0);
 
 	*accumTime=0;
 
@@ -488,27 +584,40 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 
 	SetUpDMA(DMABuf,6);
 
+	Palette(COLOR_DEBUG_READADDR,0,255,0);
+
 	CLI();
 	INT46_DID_COME_IN=0;
 
 	FDC_WaitReady();
 	STI();
 
-	outp(IO_FDC_COMMAND,FDCCMD_READADDR);
+	Palette(COLOR_DEBUG_READADDR,0,0,255);
+
+	FDC_Command(FDCCMD_READADDR);
 	t0=inpw(IO_FREERUN_TIMER);
+
+	Palette(COLOR_DEBUG_READADDR,0,255,255);
 
 	// Memo: Make sure to write 44H to I/O AAh.
 	//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
 	while(0==INT46_DID_COME_IN && *accumTime<READADDR_TIMEOUT)
 	{
+		Palette(COLOR_DEBUG_READADDR,rand(),rand(),rand());
 		t=inpw(IO_FREERUN_TIMER);
 		diff=t-t0;
 		*accumTime+=diff;
 		t0=t;
 	}
 
+	Palette(COLOR_DEBUG_READADDR,255,255,255);
+
 	if(READADDR_TIMEOUT<=*accumTime)
 	{
+		// It does happen in real hardware, and unless Force Interrupt, FDC will never be ready again.
+		Palette(COLOR_DEBUG_READADDR,255,0,255);
+		FDC_Command(FDCCMD_FORCEINTERRUPT);
+		outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
 		return 0xFF;
 	}
 
@@ -519,7 +628,7 @@ void CleanUp(void)
 {
 	_dos_setvect(FDC_INT,Default_INT46H_Handler);
 	SelectDrive();
-	outp(IO_FDC_COMMAND,FDCCMD_RESTORE_HEAD_UNLOAD);
+	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
 	outp(IO_FDC_DRIVE_SELECT,speedByte&~SPD_INUSE);
 	Color(7);
 }
@@ -714,6 +823,8 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	unsigned char lostDataReadData=0;
 	unsigned char mfmTry,nFail=0;
 
+	Palette(COLOR_DEBUG_READTRACK,0,0,255);
+
 	STI();
 	Color(4);
 	printf("C%-2d H%d ",C,H);
@@ -725,10 +836,22 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	Wait10ms();
 	Wait10ms();
 
+	if(0==H)
+	{
+		controlByte&=~CTL_SIDE;
+	}
+	else
+	{
+		controlByte|=CTL_SIDE;
+	}
 	SelectDrive();
+
+	Palette(COLOR_DEBUG_READTRACK,0,255,0);
 
 	FDC_WaitIndexHole(); // Need to be immediately after seek.
 	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
+
+	Palette(COLOR_DEBUG_READTRACK,255,0,0);
 
 	for(mfmTry=0; mfmTry<2; ++mfmTry)
 	{
@@ -771,6 +894,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		}
 	}
 
+	Palette(COLOR_DEBUG_READTRACK,255,255,0);
 
 	// Remove Duplicates >>
 	for(i=nTrackSector-1; 0<i; --i)
@@ -811,6 +935,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	}
 	// Sort sectors <<
 
+	Palette(COLOR_DEBUG_READTRACK,255,0,255);
 
 	STI();
 	for(i=0; i<nTrackSector; ++i)
@@ -834,6 +959,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		printf("\n");
 	}
 
+	Palette(COLOR_DEBUG_READTRACK,0,255,255);
 
 //	numSectorTrackLog[track*2+side]=nTrackSector;
 //	trackTable[track*2+side]=(nextTrackData-d77Image);
@@ -951,6 +1077,30 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	Color(7);
 
 	outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=H ? CTL_SIDE : 0)|CTL_MFM);
+
+	Palette(COLOR_DEBUG_READTRACK,255,255,255);
+}
+
+void PrintSysCharWord(char str[],unsigned int X,unsigned int color)
+{
+	int L;
+	for(L=0; L<8 && 0!=str[L]; ++L)
+	{
+		VDB_rddefatr(&sysChrAttr[L]);
+		sysChrAttr[L].color=color;
+	}
+	sysCharBufPtr[0]=(unsigned int)str;
+	sysCharBufPtr[2]=(unsigned int)sysChrAttr;
+	VDB_wtsysline(1,L,X,sysCharBufPtr);
+}
+
+void PrintDebugLine(void)
+{
+	PrintSysCharWord("[IRQ]",1,COLOR_DEBUG_HANDLER);
+	PrintSysCharWord("[HEAD]",6,COLOR_DEBUG_READDISK);
+	PrintSysCharWord("[SEEK]",12,COLOR_DEBUG_SEEK);
+	PrintSysCharWord("[ADDR]",18,COLOR_DEBUG_READADDR);
+	PrintSysCharWord("[TRK]",24,COLOR_DEBUG_READTRACK);
 }
 
 void ReadDisk(struct CommandParameterInfo *cpi)
@@ -958,13 +1108,14 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 	int C;
 	for(C=cpi->startTrk; C<=cpi->endTrk; ++C)
 	{
-Palette(4,0,0,255);
+		PrintDebugLine();
+		Palette(COLOR_DEBUG_READDISK,0,0,255);
 		FDC_Seek(C);
-Palette(4,255,0,0);
+		Palette(COLOR_DEBUG_READDISK,255,0,0);
 		ReadTrack(C,0,cpi);
-Palette(4,255,255,255);
+		Palette(COLOR_DEBUG_READDISK,255,255,255);
 		ReadTrack(C,1,cpi);
-Palette(4,0,255,0);
+		Palette(COLOR_DEBUG_READDISK,0,255,0);
 	}
 
 	/* if(NULL!=errLog)
