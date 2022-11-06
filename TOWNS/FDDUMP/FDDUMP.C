@@ -6,25 +6,27 @@
 #include <dos.h>
 #include <conio.h>
 #include <signal.h>
+#include <malloc.h>
 
 // Output Data Data Format (.TD1)
 // Begin Disk
-// 00 00 wp mt 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+// 00 wp mt 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 // (32 bytes name, 0 padded
 //    wp  0 write enabled  1 write protected
 //    mt  media type
 // Begin Track
-// 01 00 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+// 01 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 // ID Mark
-// 02 00 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00
-// 02 00 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00
-// 02 00 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00
+// 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
+// 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
+// 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
 //     :
 // Data
-// 03 00 cc hh rr nn st 00 00 00 <time><Real Size>
+// 03 cc hh rr nn st 00 00 00 00 <time  > <nBytes>
+//     st  MB8877 status, bit0=density instead of BUSY flag(0:MFM 1:FM)
 // (Bytes padded to 16*N bytes)
 // Track Read
-// 04 00 00 00 00 00 00 00 00 00 00 00 <Real Size>
+// 04 00 00 00 00 00 00 00 00 00 00 00 00 <nBytes>
 // (Bytes padded to 16*N bytes)
 
 // Next Track
@@ -48,6 +50,13 @@ unsigned char DMABuf[DMABUF_SIZE]="DMABUFFER";
 #define COLOR_DEBUG_READDISK 5
 #define COLOR_DEBUG_READTRACK 6
 
+#define COLOR_ERR_CRC_AND_DDM 3
+#define COLOR_ERR_CRC 2
+#define COLOR_ERR_DDM 4
+#define COLOR_ERR_RECORD_NOT_FOUND 5
+#define COLOR_ERR_MISC 6
+#define COLOR_NO_ERROR 7
+
 
 struct IDMARK
 {
@@ -62,11 +71,11 @@ struct IDMARK idMark[IDBUF_SIZE];
 #define ERRORLOG_TYPE_LOSTDATA	3
 struct ErrorLog
 {
-	struct ErrorLog *next;
+	struct ErrorLog far *next;
 	unsigned char errType;
-	unsigned char CHRN[4];
+	struct IDMARK idMark;
 };
-struct ErrorLog far *errLog=NULL,*errLogTail=NULL;
+struct ErrorLog far *errLog=NULL,far *errLogTail=NULL;
 
 #define IO_FDC_STATUS			0x200
 #define FDCSTA_BUSY				0x01
@@ -161,6 +170,30 @@ void Palette(unsigned char code,unsigned char r,unsigned char g,unsigned char b)
 	outp(0xFD96,g&0xF0);
 }
 
+unsigned char IOErrToColor(uint8_t ioErr)
+{
+	if(0!=(ioErr&IOERR_CRC) && 0!=(ioErr&IOERR_DELETED_DATA))
+	{
+		return COLOR_ERR_CRC_AND_DDM;
+	}
+	if(0!=(ioErr&IOERR_CRC))
+	{
+		return COLOR_ERR_CRC;
+	}
+	if(0!=(ioErr&IOERR_DELETED_DATA))
+	{
+		return COLOR_ERR_DDM;
+	}
+	if(0!=(ioErr&IOERR_RECORD_NOT_FOUND))
+	{
+		return COLOR_ERR_RECORD_NOT_FOUND;
+	}
+	if(0!=ioErr)
+	{
+		return COLOR_ERR_MISC;
+	}
+	return COLOR_NO_ERROR;
+}
 
 // Watcom C inline assembly
 void STI();
@@ -624,6 +657,50 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 	return (lastFDCStatus&~FDCSTA_BUSY);
 }
 
+unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,uint8_t N)
+{
+	uint16_t t0,t,diff;
+
+	Palette(COLOR_DEBUG_READADDR,255,0,0);
+
+	*accumTime=0;
+
+	CLI();
+	SelectDrive();
+
+	SetUpDMA(DMABuf,128<<(N&3));
+
+	Palette(COLOR_DEBUG_READADDR,0,255,0);
+
+	CLI();
+	INT46_DID_COME_IN=0;
+
+	FDC_WaitReady();
+	STI();
+
+	Palette(COLOR_DEBUG_READADDR,0,0,255);
+
+	FDC_Command(FDCCMD_READSECTOR);
+	t0=inpw(IO_FREERUN_TIMER);
+
+	Palette(COLOR_DEBUG_READADDR,0,255,255);
+
+	// Memo: Make sure to write 44H to I/O AAh.
+	//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
+	while(0==INT46_DID_COME_IN)
+	{
+		Palette(COLOR_DEBUG_READADDR,rand(),rand(),rand());
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		*accumTime+=diff;
+		t0=t;
+	}
+
+	Palette(COLOR_DEBUG_READADDR,255,255,255);
+
+	return (lastFDCStatus&~FDCSTA_BUSY);
+}
+
 void CleanUp(void)
 {
 	_dos_setvect(FDC_INT,Default_INT46H_Handler);
@@ -940,18 +1017,88 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	STI();
 	for(i=0; i<nTrackSector; ++i)
 	{
-		if(0<i && 0==nInfo)
+		uint8_t retry,ioErr=0;
+
+		for(retry=0; retry<cpi->firstRetryCount; ++retry)
 		{
-			printf("       ");
+			uint32_t readTime;
+			ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+
+			if(0<i && 0==nInfo)
+			{
+				printf("       ");
+			}
+
+			if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
+			{
+				lostDataReadData=1;
+				Color(IOErrToColor(ioErr));
+				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+				++nInfo;
+
+				if(nInfoPerLine==nInfo)
+				{
+					printf("\n");
+					nInfo=0;
+				}
+			}
+			else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
+			{
+				Color(IOErrToColor(ioErr));
+				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+				++nInfo;
+
+				if(nInfoPerLine==nInfo)
+				{
+					printf("\n");
+					nInfo=0;
+				}
+				break;
+			}
 		}
 
-		printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-		++nInfo;
-
-		if(nInfoPerLine==nInfo)
+		if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.
 		{
-			printf("\n");
-			nInfo=0;
+			struct ErrorLog far *newLog=(struct ErrorLog far *)_fmalloc(sizeof(struct ErrorLog));
+			if(NULL!=newLog)
+			{
+				newLog->next=NULL;
+				newLog->errType=ERRORLOG_TYPE_CRC;
+				newLog->idMark=idMark[i];
+				if(NULL==errLog)
+				{
+					errLog=newLog;
+					errLogTail=newLog;
+				}
+				else
+				{
+					errLogTail->next=newLog;
+					errLogTail=newLog;
+				}
+			}
+
+			for(retry=0; retry<cpi->secondRetryCount; ++retry)
+			{
+				uint32_t readTime;
+				ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+
+				if(0==(ioErr&IOERR_LOST_DATA)) // && different from previous)
+				{
+					if(0<i && 0==nInfo)
+					{
+						printf("       ");
+					}
+
+					Color(IOErrToColor(ioErr));
+					printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+
+					if(nInfoPerLine==nInfo)
+					{
+						printf("\n");
+						nInfo=0;
+					}
+				}
+			}
 		}
 	}
 	if(0!=nInfo)
@@ -960,119 +1107,6 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	}
 
 	Palette(COLOR_DEBUG_READTRACK,0,255,255);
-
-//	numSectorTrackLog[track*2+side]=nTrackSector;
-//	trackTable[track*2+side]=(nextTrackData-d77Image);
-/*
-	int nActual=0;
-	for(i=0; i<nTrackSector; ++i)
-	{
-		int retry,ioErr=0;
-		// Strategy:  First retry up to firstRetryCount and if no error, take it.
-		//            If finally it has a CRC error, always read secondRetryCount times.  Maybe a sign of KOROKORO-protect.
-		for(retry=0; retry<cpi->firstRetryCount; ++retry)
-		{
-			struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
-			unsigned char *dataBuf=(unsigned char *)(sectorHdr+1);
-			ioErr=ReadSector(sectorHdr,dataBuf,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-			if(FMorMFM!=CTL_MFM)
-			{
-				sectorHdr->densityFlag=0x40;
-			}
-
-			if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
-			{
-				lostDataLog[track*2+side]|=2;
-				Color(IOErrToColor(ioErr));
-				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-				if(0==((nActual+nInfo+1)%nInfoPerLine))
-				{
-					printf("\n");
-				}
-				++nInfo;
-			}
-			else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
-			{
-				Color(IOErrToColor(ioErr));
-				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-				if(0==((nActual+nInfo+1)%nInfoPerLine))
-				{
-					printf("\n");
-				}
-
-				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
-				++nActual;
-				break;
-			}
-		}
-
-		if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.
-		{
-			struct CRCErrorLog *newLog=(struct CRCErrorLog *)malloc(sizeof(struct CRCErrorLog));
-			if(NULL!=newLog)
-			{
-				newLog->next=NULL;
-				newLog->sector=idMark[i];
-				if(NULL==crcErrLog)
-				{
-					crcErrLog=newLog;
-					crcErrLogTail=newLog;
-				}
-				else
-				{
-					crcErrLogTail->next=newLog;
-					crcErrLogTail=newLog;
-				}
-			}
-
-			for(retry=0; retry<cpi->secondRetryCount; ++retry)
-			{
-				struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
-				unsigned char *dataBuf=(unsigned char *)(sectorHdr+1);
-				ioErr=ReadSector(sectorHdr,dataBuf,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-				Color(IOErrToColor(ioErr));
-				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-				if(0==((nActual+nInfo+1)%nInfoPerLine))
-				{
-					printf("\n");
-				}
-
-				if(0!=(ioErr&IOERR_LOST_DATA))
-				{
-					++nInfo;
-				}
-				else
-				{
-					trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
-					++nActual;
-				}
-			}
-		}
-	}
-	if(0!=(nActual+nInfo)%nInfoPerLine)
-	{
-		printf("\n");
-	}
-
-	unsigned char *updatePtr=nextTrackData;
-	for(i=0; i<nActual; ++i)
-	{
-		struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)updatePtr;
-		sectorHdr->numSectorPerTrack=nActual;
-		updatePtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
-	}
-
-	if(updatePtr!=trackDataPtr)
-	{
-		Color(2);
-		fprintf(stderr,"Something Went Wrong in ReadTrack\n");
-		fprintf(stderr,"  trackDataPtr:%08x\n",trackDataPtr);
-		fprintf(stderr,"  updatePtr   :%08x\n",updatePtr);
-	}
-*/
 
 	Color(7);
 
