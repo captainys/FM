@@ -291,10 +291,10 @@ unsigned int ReadTrack(
 	drive&=0x0F;
 	unsigned int devNo=0x20|drive;
 
-	int nInfo=1;
+	int nInfo=0;
 
 	Color(4);
-	printf("C:%-2d H:%d ",track,side);
+	printf("C%-2d H%d ",track,side);
 	Color(7);
 
 	int i;
@@ -382,6 +382,7 @@ unsigned int ReadTrack(
 	{
 		int retry,biosErr=0;
 		unsigned int modeBytes[2];
+		char *prevDataBuf=NULL;
 		GetDriveModeBytes(modeBytes,drive,mode,MFMMode,sector[i].seccnt);
 		DKB_setmode(drive,modeBytes[0],modeBytes[1]);
 
@@ -392,6 +393,7 @@ unsigned int ReadTrack(
 			struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
 			char *dataBuf=(char *)(sectorHdr+1);
 			biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
+			prevDataBuf=dataBuf;
 
 			if(0==MFMMode)
 			{
@@ -400,15 +402,22 @@ unsigned int ReadTrack(
 
 			if(0==(biosErr&BIOSERR_FLAG_CRC)) // No retry if no CRC error.
 			{
+				if(0<i && 0==nInfo)
+				{
+					printf("       ");
+				}
+
 				Color(BIOSErrorColor(biosErr));
 				printf("%02x%02x%02x%02x ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
 
 				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
 				++nActual;
+				++nInfo;
 
-				if(0==((nInfo+nActual)%nInfoPerLine))
+				if(nInfoPerLine<=nInfo)
 				{
 					printf("\n");
+					nInfo=0;
 				}
 				break;
 			}
@@ -435,24 +444,53 @@ unsigned int ReadTrack(
 
 			for(retry=0; retry<cpi->secondRetryCount; ++retry)
 			{
+				unsigned int len=128<<(sector[i].seccnt&3);
+
 				struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
 				char *dataBuf=(char *)(sectorHdr+1);
 				biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
 
-				Color(BIOSErrorColor(biosErr));
-				printf("%02x%02x%02x%02x ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
-
-				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
-				++nActual;
-
-				if(0==((nActual+nInfo)%nInfoPerLine))
+				unsigned char different=0;
+				int j;
+				for(j=0; j<len; ++j)
 				{
-					printf("\n");
+					if(prevDataBuf[j]!=dataBuf[j])
+					{
+						different=1;
+					}
+				}
+
+				if(different || 0==(biosErr&BIOSERR_FLAG_CRC))
+				{
+					if(0<i && 0==nInfo)
+					{
+						printf("       ");
+					}
+
+					Color(BIOSErrorColor(biosErr));
+					printf("%02x%02x%02x%02x ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
+
+					trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
+					++nActual;
+					++nInfo;
+
+					if(nInfoPerLine<=nInfo)
+					{
+						printf("\n");
+						nInfo=0;
+					}
+
+					prevDataBuf=dataBuf;
+				}
+
+				if(0==(biosErr&BIOSERR_FLAG_CRC))
+				{
+					break;
 				}
 			}
 		}
 	}
-	if(0!=((nActual+nInfo)%nInfoPerLine))
+	if(0==nTrackSector || 0!=nInfo)
 	{
 		printf("\n");
 	}
@@ -606,7 +644,7 @@ void InitializeCommandParameterInfo(struct CommandParameterInfo *cpi)
 	cpi->baudRate=0;
 	cpi->outFName[0]=0;
 	cpi->firstRetryCount=8;
-	cpi->secondRetryCount=3;
+	cpi->secondRetryCount=12;
 }
 
 int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header *hdr,int ac,char *av[])
