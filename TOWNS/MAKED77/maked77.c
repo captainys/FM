@@ -461,7 +461,7 @@ unsigned int ReadTrack(
 					}
 				}
 
-				if(different || 0==(biosErr&BIOSERR_FLAG_CRC))
+				if(0==retry || different || 0==(biosErr&BIOSERR_FLAG_CRC))
 				{
 					if(0<i && 0==nInfo)
 					{
