@@ -457,6 +457,7 @@ unsigned int ReadTrack(
 					if(prevDataBuf[j]!=dataBuf[j])
 					{
 						different=1;
+						break;
 					}
 				}
 
