@@ -8,12 +8,14 @@
 #include <signal.h>
 #include <malloc.h>
 
-// Output Data Data Format (.TD1)
+// RDD Output Data Data Format (.RDD  Real Disk Dump)
 // Begin Disk
-// 00 wp mt 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
-// (32 bytes name, 0 padded
-//    wp  0 write enabled  1 write protected
+// 00 vr mt fl 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+//    vr  Version 
 //    mt  media type
+//    fl  flags
+//        bit0  1:Write Protected  0:Write Enabled
+// (32 bytes name, 0 padded
 // Begin Track
 // 01 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 // ID Mark
@@ -22,11 +24,11 @@
 // 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
 //     :
 // Data
-// 03 cc hh rr nn st 00 00 00 00 <time  > <nBytes>
+// 03 cc hh rr nn st 00 00 00 00 00 <time  > <Length>
 //     st  MB8877 status, bit0=density instead of BUSY flag(0:MFM 1:FM)
 // (Bytes padded to 16*N bytes)
 // Track Read
-// 04 00 00 00 00 00 00 00 00 00 00 00 00 <nBytes>
+// 04 cc hh 00 00 00 00 00 00 00 00 00 00 <nBytes>
 // (Bytes padded to 16*N bytes)
 
 // Next Track
@@ -42,6 +44,8 @@ unsigned int lastFDCCommand=0;
 unsigned char far *trackBuf=NULL;
 #define DMABUF_SIZE (20*1024)
 unsigned char DMABuf[DMABUF_SIZE]="DMABUFFER";
+#define SECTORCOPyBUF_SIZE 1024
+unsigned char sectorDataCopy[SECTORCOPyBUF_SIZE];
 
 
 #define COLOR_DEBUG_HANDLER	1
@@ -97,6 +101,7 @@ struct ErrorLog far *errLog=NULL,far *errLogTail=NULL;
 #define FDCCMD_RESTORE			0x08
 #define FDCCMD_SEEK				0x18
 #define FDCCMD_READADDR			0xC0
+#define FDCCMD_READTRACK		0xE0
 #define FDCCMD_READSECTOR		0x80
 #define FDCCMD_FORCEINTERRUPT	0xD0
 
@@ -135,6 +140,7 @@ struct ErrorLog far *errLog=NULL,far *errLogTail=NULL;
 
 #define READADDR_TIMEOUT		1000000
 #define READADDR_TRACK_TIMEOUT  3000000
+#define READTRACK_TIMEOUT		3000000
 
 enum
 {
@@ -158,6 +164,8 @@ enum
 
 volatile unsigned char INT46_DID_COME_IN=0;
 volatile unsigned char lastFDCStatus=0;
+volatile unsigned int lastDMACount=0;
+
 
 void interrupt (*Default_INT46H_Handler)(void);
 
@@ -202,6 +210,9 @@ void STI();
 void CLI();
 #pragma aux CLI="cli";
 
+unsigned int GetDMACount();
+#pragma aux GetDMACount="in ax,0A2H" value [ AX ];
+
 void interrupt Handle_INT46H(void)
 {
 	Palette(COLOR_DEBUG_HANDLER,255,0,0);
@@ -240,6 +251,7 @@ void interrupt Handle_INT46H(void)
 //	03A4:00000C56 C3                        RET
 //03A4:00000DA8 CB                        RETF
 
+	lastDMACount=GetDMACount();
 	lastFDCStatus=inp(IO_FDC_STATUS);
 	if(FDCCMD_RESTORE!=lastFDCCommand && FDCCMD_SEEK!=lastFDCCommand)
 	{
@@ -265,6 +277,7 @@ void interrupt Handle_INT46H(void)
 
 	Palette(COLOR_DEBUG_HANDLER,0,0,255);
 }
+
 
 ////////////////////////////////////////////////////////////
 // Console
@@ -331,6 +344,208 @@ void CtrlC(int err)
 	printf("Intercepted Ctrl+C\n");
 	exit(1);
 }
+
+////////////////////////////////////////////////////////////
+
+
+#define RDD_VERSION 0
+
+// Begin Disk
+// 00 vr mt fl 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+//    vr  Version 
+//    mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
+//    fl  flags
+//        bit0  1:Write Protected  0:Write Enabled
+void RDD_MakeDiskHeader(unsigned char data[48],uint8_t restoreState,uint8_t mediaType,const char label[])
+{
+	int i;
+	for(i=0; i<48; ++i)
+	{
+		data[i]=0;
+	}
+	data[0]=0x00; // Begin Disk
+	data[1]=RDD_VERSION; //
+	data[2]=mediaType;
+	data[3]|=((restoreState&0x40) ? 1 : 0);
+	strncpy(data+16,label,32);
+}
+
+unsigned int RDD_WriteDiskHeader(const char fName[],uint8_t restoreState,uint8_t mediaType,const char label[])
+{
+	unsigned char data[48];
+	FILE *ofp;
+
+	RDD_MakeDiskHeader(data,restoreState,mediaType,label);
+
+	ofp=fopen(fName,"ab");
+	if(NULL==ofp)
+	{
+		Color(2);
+		fprintf(stderr,"Cannot open output file.\n");
+		Color(7);
+		return 1;
+	}
+	fwrite(data,1,48,ofp);
+	fclose(ofp);
+	return 0;
+}
+
+// Begin Track
+// 01 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+unsigned int RDD_WriteTrackHeader(const char fName[],uint8_t C,uint8_t H)
+{
+	FILE *ofp;
+	unsigned char data[16];
+	int i;
+	for(i=0; i<16; ++i)
+	{
+		data[i]=0;
+	}
+	data[0]=1;
+	data[1]=C;
+	data[2]=H;
+
+	ofp=fopen(fName,"ab");
+	if(NULL==ofp)
+	{
+		Color(2);
+		fprintf(stderr,"Cannot open output file.\n");
+		Color(7);
+		return 1;
+	}
+	fwrite(data,1,16,ofp);
+	fclose(ofp);
+	return 0;
+}
+
+// ID Mark
+// 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
+unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct IDMARK idMark[])
+{
+	FILE *ofp;
+	unsigned char data[16];
+	int i;
+	for(i=0; i<16; ++i)
+	{
+		data[i]=0;
+	}
+	data[0]=2;
+
+	ofp=fopen(fName,"ab");
+	if(NULL==ofp)
+	{
+		Color(2);
+		fprintf(stderr,"Cannot open output file.\n");
+		Color(7);
+		return 1;
+	}
+
+	for(i=0; i<numIDMarks; ++i)
+	{
+		data[1]=idMark[i].chrn[0]; // C
+		data[1]=idMark[i].chrn[1]; // H
+		data[2]=idMark[i].chrn[2]; // R
+		data[3]=idMark[i].chrn[3]; // N
+		data[4]=idMark[i].chrn[4]; // CRC
+		data[6]=idMark[i].chrn[5]; // CRC
+		fwrite(data,1,16,ofp);
+	}
+	fclose(ofp);
+	return 0;
+}
+
+// Data
+// 03 cc hh rr nn st 00 00 00 00 <time  > <nBytes>
+//     st  MB8877 status, bit0=density instead of BUSY flag(0:MFM 1:FM)
+// (Bytes padded to 16*N bytes)
+unsigned int RDD_WriteSectorData(const char fName[],const uint8_t CHRN[4],uint8_t FDCSta,uint32_t readTime)
+{
+	FILE *ofp;
+	unsigned int actualSize=0; // MB8877 always reads 128<<N anyway.
+	unsigned char *actualSizePtr,*readTimePtr;
+	unsigned char data[16];
+	int i;
+	for(i=0; i<16; ++i)
+	{
+		data[i]=0;
+	}
+	data[0]=3;
+	data[1]=CHRN[0];
+	data[2]=CHRN[1];
+	data[3]=CHRN[2];
+	data[4]=CHRN[3];
+	data[5]=FDCSta;
+
+	readTimePtr=(unsigned char *)&readTime;
+	data[11]=readTimePtr[0];
+	data[12]=readTimePtr[1];
+	data[13]=readTimePtr[2];
+
+	actualSize=(128<<(CHRN[3]&3));
+	actualSizePtr=(unsigned char *)&actualSize;
+	data[14]=actualSizePtr[0];
+	data[15]=actualSizePtr[1];
+
+	ofp=fopen(fName,"ab");
+	if(NULL==ofp)
+	{
+		Color(2);
+		fprintf(stderr,"Cannot open output file.\n");
+		Color(7);
+		return 1;
+	}
+
+	fwrite(data,1,16,ofp);
+	fwrite(DMABuf,1,actualSize,ofp);
+
+	fclose(ofp);
+	return 0;
+}
+
+// Track Read
+// 04 cc hh 00 00 00 00 00 00 00 00 00 00 <nBytes>
+unsigned int RDD_WriteTrack(const char outFName[],uint8_t C,uint8_t H,uint16_t readSize)
+{
+	FILE *ofp;
+	unsigned int writeSize=0;
+	unsigned char *readSizePtr;
+	unsigned char data[16];
+	int i;
+	for(i=0; i<16; ++i)
+	{
+		data[i]=0;
+	}
+	data[0]=4;
+	data[1]=C;
+	data[2]=H;
+
+
+	readSizePtr=(unsigned char *)&readSize;
+	data[14]=readSizePtr[0];
+	data[15]=readSizePtr[1];
+
+	ofp=fopen(outFName,"ab");
+	if(NULL==ofp)
+	{
+		Color(2);
+		fprintf(stderr,"Cannot open output file.\n");
+		Color(7);
+		return 1;
+	}
+
+	writeSize=(readSize+15)&~0x000F;
+	for(i=readSize; i<writeSize; ++i)
+	{
+		DMABuf[i]=0;
+	}
+
+	fwrite(data,1,16,ofp);
+	fwrite(DMABuf,1,writeSize,ofp);
+
+	fclose(ofp);
+	return 0;
+}
+
 
 ////////////////////////////////////////////////////////////
 // Disk
@@ -703,6 +918,77 @@ unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,u
 	return (lastFDCStatus&~FDCSTA_BUSY);
 }
 
+unsigned char FDC_ReadTrack(uint16_t *readSize)
+{
+	int retry=0;
+	for(retry=0; retry<2; ++retry)
+	{
+		uint16_t t0,t,diff;
+		uint32_t accumTime=0;
+
+		Palette(COLOR_DEBUG_READADDR,255,0,0);
+
+		CLI();
+		SelectDrive();
+
+		SetUpDMA(DMABuf,DMABUF_SIZE);
+
+		Palette(COLOR_DEBUG_READADDR,0,255,0);
+
+		CLI();
+		INT46_DID_COME_IN=0;
+
+		FDC_WaitReady();
+		STI();
+
+		Palette(COLOR_DEBUG_READADDR,0,0,255);
+
+		FDC_Command(FDCCMD_READTRACK);
+		t0=inpw(IO_FREERUN_TIMER);
+
+		Palette(COLOR_DEBUG_READADDR,0,255,255);
+
+		// Memo: Make sure to write 44H to I/O AAh.
+		//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
+		while(0==INT46_DID_COME_IN && accumTime<READTRACK_TIMEOUT)
+		{
+			Palette(COLOR_DEBUG_READTRACK,rand(),rand(),rand());
+			t=inpw(IO_FREERUN_TIMER);
+			diff=t-t0;
+			accumTime+=diff;
+			t0=t;
+		}
+
+		Palette(COLOR_DEBUG_READADDR,255,255,255);
+
+		if(READTRACK_TIMEOUT<=accumTime)
+		{
+			int i;
+			// It does happen in real hardware, and unless Force Interrupt, FDC will never be ready again.
+			Palette(COLOR_DEBUG_READADDR,255,0,255);
+			FDC_Command(FDCCMD_FORCEINTERRUPT);
+			outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
+			for(i=0; i<50; ++i)
+			{
+				Wait10ms();
+			}
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	{
+		uint16_t DMACount;
+		DMACount=lastDMACount;
+		++DMACount;
+		*readSize=DMABUF_SIZE-DMACount;
+	}
+
+	return (lastFDCStatus&~FDCSTA_BUSY);
+}
+
 void CleanUp(void)
 {
 	_dos_setvect(FDC_INT,Default_INT46H_Handler);
@@ -891,6 +1177,8 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 	return 0;
 }
 
+#define PrintIDMark(idMark)
+
 void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 {
 	const int nInfoPerLine=8;
@@ -909,6 +1197,8 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	printf("C%-2d H%d ",C,H);
 	fflush(stdout);
 	Color(7);
+
+	RDD_WriteTrackHeader(cpi->outFName,C,H);
 
 	Wait10ms();
 	Wait10ms();
@@ -954,6 +1244,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 				idMark[nTrackSector].chrn[3]=DMABuf[3];
 				idMark[nTrackSector].chrn[4]=DMABuf[4];
 				idMark[nTrackSector].chrn[5]=DMABuf[5];
+
 				++nTrackSector;
 			}
 			if(IOERR_LOST_DATA&sta)
@@ -1017,6 +1308,8 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	Palette(COLOR_DEBUG_READTRACK,255,0,255);
 
 	STI();
+	RDD_WriteIDMark(cpi->outFName,nTrackSector,idMark);
+
 	for(i=0; i<nTrackSector; ++i)
 	{
 		uint8_t retry,ioErr=0;
@@ -1052,6 +1345,9 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 				fflush(stdout);
 				++nInfo;
 
+				STI();
+				RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime);
+
 				if(nInfoPerLine==nInfo)
 				{
 					printf("\n");
@@ -1063,6 +1359,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 		if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.
 		{
+			int j,len;
 			struct ErrorLog far *newLog=(struct ErrorLog far *)_fmalloc(sizeof(struct ErrorLog));
 			if(NULL!=newLog)
 			{
@@ -1081,26 +1378,49 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 				}
 			}
 
+			len=(128<<(idMark[i].chrn[3]&3));
 			for(retry=0; retry<cpi->secondRetryCount; ++retry)
 			{
 				uint32_t readTime;
+
+				for(j=0; j<len; ++j)
+				{
+					sectorDataCopy[i]=DMABuf[i];
+				}
 				ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 
 				if(0==(ioErr&IOERR_LOST_DATA)) // && different from previous)
 				{
-					if(0<i && 0==nInfo)
+					unsigned int different=0;
+					for(j=0; j<len; ++j)
 					{
-						printf("       ");
+						if(sectorDataCopy[i]!=DMABuf[i])
+						{
+							different=1;
+							break;
+						}
 					}
 
-					Color(IOErrToColor(ioErr));
-					printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-					fflush(stdout);
-
-					if(nInfoPerLine==nInfo)
+					if(0!=different)
 					{
-						printf("\n");
-						nInfo=0;
+						if(0<i && 0==nInfo)
+						{
+							printf("       ");
+						}
+
+						Color(IOErrToColor(ioErr));
+						printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+						fflush(stdout);
+						++nInfo;
+
+						STI();
+						RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime);
+
+						if(nInfoPerLine==nInfo)
+						{
+							printf("\n");
+							nInfo=0;
+						}
 					}
 				}
 			}
@@ -1110,6 +1430,18 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	{
 		printf("\n");
 	}
+
+	// Read Track
+	{
+		uint8_t ioErr=0;
+		uint16_t readSize=0;
+
+		ioErr=FDC_ReadTrack(&readSize);
+
+		STI();
+		RDD_WriteTrack(cpi->outFName,C,H,readSize);
+	}
+
 
 	Palette(COLOR_DEBUG_READTRACK,0,255,255);
 
@@ -1203,6 +1535,9 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 	} */
 }
 
+////////////////////////////////////////////////////////////
+
+
 unsigned char FreeRunTimerAvailable(void)
 {
 	unsigned char flags=inp(IO_FUNCTION_ID);
@@ -1244,10 +1579,6 @@ int main(int ac,char *av[])
 		return 1;
 	}
 
-	Default_INT46H_Handler=_dos_getvect(FDC_INT);
-	_dos_setvect(FDC_INT,Handle_INT46H);
-	signal(SIGINT,CtrlC);
-
 	if(0==FreeRunTimerAvailable())
 	{
 		Color(2);
@@ -1264,9 +1595,12 @@ int main(int ac,char *av[])
 		Color(2);
 		printf("Drive Not Ready.\n");
 		Color(7);
-		CleanUp();
 		return 1;
 	}
+
+	Default_INT46H_Handler=_dos_getvect(FDC_INT);
+	_dos_setvect(FDC_INT,Handle_INT46H);
+	signal(SIGINT,CtrlC);
 
 	RestoreState=FDC_Restore(); // Can check write-protect
 	if(RestoreState&0x80)
@@ -1274,22 +1608,30 @@ int main(int ac,char *av[])
 		Color(2);
 		printf("Restore command failed (Not Ready).\n");
 		Color(7);
-		CleanUp();
-		return 1;
+		goto ERREND;
 	}
 	if(RestoreState&0x10)
 	{
 		Color(2);
 		printf("Restore command failed (Seek Error).\n");
 		Color(7);
-		CleanUp();
-		return 1;
+		goto ERREND;
 	}
 
 	remove(cpi.outFName);
+
+	if(0!=RDD_WriteDiskHeader(cpi.outFName,RestoreState,cpi.mediaType,cpi.diskName))
+	{
+		goto ERREND;
+	}
+
 	ReadDisk(&cpi);
 
 	CleanUp();
 
 	return 0;
+
+ERREND:
+	CleanUp();
+	return 1;
 }
