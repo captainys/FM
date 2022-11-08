@@ -167,8 +167,6 @@ volatile unsigned char lastFDCStatus=0;
 volatile unsigned int lastDMACount=0;
 
 
-void interrupt (*Default_INT46H_Handler)(void);
-
 
 void Palette(unsigned char code,unsigned char r,unsigned char g,unsigned char b)
 {
@@ -213,7 +211,7 @@ void CLI();
 unsigned int GetDMACount();
 #pragma aux GetDMACount="in ax,0A2H" value [ AX ];
 
-void interrupt Handle_INT46H(void)
+void far Handle_INT46H(void)
 {
 	Palette(COLOR_DEBUG_HANDLER,255,0,0);
 
@@ -273,10 +271,60 @@ void interrupt Handle_INT46H(void)
 	inp(IO_FDC_STATUS); // Dummy read so that Force Interrupt won't cause indefinite IRQ.
 	inp(IO_DMA_STATUS); // BIOS Dummy reads
 
-	outp(IO_PIC0_OCW2,0x20);
-
 	Palette(COLOR_DEBUG_HANDLER,0,0,255);
 }
+
+
+
+////////////////////////////////////////////////////////////
+// Interrupt
+
+struct INT_DATA_BLOCK
+{
+	unsigned char zero[2];
+	void far (*func)(void);
+};
+
+uint16_t default_INT46H_HandlerPtr[2];
+
+// Note: INT number is from PIC point of view.  46H from CPU point of view is 06H from PIC point of view.
+void INT46_SaveHandler(uint16_t *ptr);
+#pragma aux INT46_SaveHandler=\
+"push ds"\
+"push es"\
+"push ds"\
+"push si"\
+"mov dl,06h"\
+"mov ah,01h"\
+"int 0aeh"\
+"pop si"\
+"pop es"\
+"mov es:[si],di"\
+"mov es:[si+2],ds"\
+"pop es"\
+"pop ds"\
+parm [ SI ] modify [ DI DX ]
+
+void INT46_RestoreHandler(uint16_t *ptr);
+#pragma aux INT46_RestoreHandler=\
+"push ds"\
+"push di"\
+"push dx"\
+"mov dl,06h"\
+"lds di,ds:[di]"\
+"xor ah,ah"\
+"int 0aeh"\
+"pop dx"\
+"pop di"\
+"pop ds"\
+parm [ DI ]
+
+void INT46_RegisterHandler(struct INT_DATA_BLOCK *ptr);
+#pragma aux INT46_RegisterHandler=\
+"mov dl,06h"\
+"xor ah,ah"\
+"int 0aeh"\
+parm [ DI ]
 
 
 ////////////////////////////////////////////////////////////
@@ -340,7 +388,7 @@ void Color(unsigned int c)
 void CtrlC(int err)
 {
 	Color(7);
-	_dos_setvect(FDC_INT,Default_INT46H_Handler);
+	INT46_RestoreHandler(default_INT46H_HandlerPtr);
 	printf("Intercepted Ctrl+C\n");
 	exit(1);
 }
@@ -991,7 +1039,7 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 
 void CleanUp(void)
 {
-	_dos_setvect(FDC_INT,Default_INT46H_Handler);
+	INT46_RestoreHandler(default_INT46H_HandlerPtr);
 	SelectDrive();
 	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
 	outp(IO_FDC_DRIVE_SELECT,speedByte&~SPD_INUSE);
@@ -1598,8 +1646,15 @@ int main(int ac,char *av[])
 		return 1;
 	}
 
-	Default_INT46H_Handler=_dos_getvect(FDC_INT);
-	_dos_setvect(FDC_INT,Handle_INT46H);
+	TSUGARU_DEBUGBREAK;
+	INT46_SaveHandler(default_INT46H_HandlerPtr);
+	{
+		struct INT_DATA_BLOCK datablock;
+		datablock.zero[0]=0;
+		datablock.zero[1]=0;
+		datablock.func=Handle_INT46H;
+		INT46_RegisterHandler(&datablock);
+	}
 	signal(SIGINT,CtrlC);
 
 	RestoreState=FDC_Restore(); // Can check write-protect
