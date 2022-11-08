@@ -675,7 +675,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 	{
 		cpi->mode=MODE_2D;
 		cpi->startTrk=0;
-		cpi->endTrk=39;
+		cpi->endTrk=40;
 		hdr->mediaType=0;
 	}
 	else if(0==strcmp(av[2],"2DD") || 0==strcmp(av[2],"2dd") ||
@@ -684,7 +684,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 	{
 		cpi->mode=MODE_2DD;
 		cpi->startTrk=0;
-		cpi->endTrk=79;
+		cpi->endTrk=80;
 		hdr->mediaType=0x10;
 	}
 	else if(0==strcmp(av[2],"2HD") || 0==strcmp(av[2],"2hd") ||
@@ -692,7 +692,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 	{
 		cpi->mode=MODE_2HD_1232K;
 		cpi->startTrk=0;
-		cpi->endTrk=76;
+		cpi->endTrk=80;
 		hdr->mediaType=0x20;
 	}
 	else
