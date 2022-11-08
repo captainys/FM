@@ -565,7 +565,6 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 	struct D77Header *d77HeaderPtr=(struct D77Header *)d77Image;
 	unsigned int *trackTable=(unsigned int *)(d77Image+0x20);
 
-	InitializeD77Header(d77HeaderPtr);
 
 	for(i=0; i<164; ++i)
 	{
@@ -799,6 +798,7 @@ int main(int ac,char *av[])
 	}
 	struct D77Header *hdr=(struct D77Header *)d77Image;
 
+	InitializeD77Header(hdr);
 
 	struct CommandParameterInfo cpi;
 	InitializeCommandParameterInfo(&cpi);
