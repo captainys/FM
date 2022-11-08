@@ -291,10 +291,10 @@ unsigned int ReadTrack(
 	drive&=0x0F;
 	unsigned int devNo=0x20|drive;
 
-	int nInfo=1;
+	int nInfo=0;
 
 	Color(4);
-	printf("C:%-2d H:%d ",track,side);
+	printf("C%-2d H%d ",track,side);
 	Color(7);
 
 	int i;
@@ -304,7 +304,7 @@ unsigned int ReadTrack(
 	{
 		unsigned int modeBytes[2];
 		GetDriveModeBytes(modeBytes,drive,mode,MFMMode,3);
-		unsigned int biosErr=DKB_setmode(devNo,modeBytes[0],modeBytes[1]);
+		DKB_setmode(devNo,modeBytes[0],modeBytes[1]);
 		for(i=0; i<NUM_SECTOR_BUF; ++i)
 		{
 			unsigned int err=DKB_rdsecid(devNo,track,side,sector+nTrackSector);
@@ -382,6 +382,7 @@ unsigned int ReadTrack(
 	{
 		int retry,biosErr=0;
 		unsigned int modeBytes[2];
+		char *prevDataBuf=NULL;
 		GetDriveModeBytes(modeBytes,drive,mode,MFMMode,sector[i].seccnt);
 		DKB_setmode(drive,modeBytes[0],modeBytes[1]);
 
@@ -392,6 +393,7 @@ unsigned int ReadTrack(
 			struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
 			char *dataBuf=(char *)(sectorHdr+1);
 			biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
+			prevDataBuf=dataBuf;
 
 			if(0==MFMMode)
 			{
@@ -400,15 +402,22 @@ unsigned int ReadTrack(
 
 			if(0==(biosErr&BIOSERR_FLAG_CRC)) // No retry if no CRC error.
 			{
+				if(0<i && 0==nInfo)
+				{
+					printf("       ");
+				}
+
 				Color(BIOSErrorColor(biosErr));
 				printf("%02x%02x%02x%02x ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
 
 				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
 				++nActual;
+				++nInfo;
 
-				if(0==((nInfo+nActual)%nInfoPerLine))
+				if(nInfoPerLine<=nInfo)
 				{
 					printf("\n");
+					nInfo=0;
 				}
 				break;
 			}
@@ -435,24 +444,54 @@ unsigned int ReadTrack(
 
 			for(retry=0; retry<cpi->secondRetryCount; ++retry)
 			{
+				unsigned int len=128<<(sector[i].seccnt&3);
+
 				struct D77SectorHeader *sectorHdr=(struct D77SectorHeader *)trackDataPtr;
 				char *dataBuf=(char *)(sectorHdr+1);
 				biosErr=ReadSector(devNo,sector[i],sectorHdr,dataBuf);
 
-				Color(BIOSErrorColor(biosErr));
-				printf("%02x%02x%02x%02x ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
-
-				trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
-				++nActual;
-
-				if(0==((nActual+nInfo)%nInfoPerLine))
+				unsigned char different=0;
+				int j;
+				for(j=0; j<len; ++j)
 				{
-					printf("\n");
+					if(prevDataBuf[j]!=dataBuf[j])
+					{
+						different=1;
+						break;
+					}
+				}
+
+				if(0==retry || different || 0==(biosErr&BIOSERR_FLAG_CRC))
+				{
+					if(0<i && 0==nInfo)
+					{
+						printf("       ");
+					}
+
+					Color(BIOSErrorColor(biosErr));
+					printf("%02x%02x%02x%02x ",sector[i].trakno,sector[i].hedno,sector[i].secno,sector[i].seccnt);
+
+					trackDataPtr+=sizeof(struct D77SectorHeader)+sectorHdr->actualSectorLength;
+					++nActual;
+					++nInfo;
+
+					if(nInfoPerLine<=nInfo)
+					{
+						printf("\n");
+						nInfo=0;
+					}
+
+					prevDataBuf=dataBuf;
+				}
+
+				if(0==(biosErr&BIOSERR_FLAG_CRC))
+				{
+					break;
 				}
 			}
 		}
 	}
-	if(0!=((nActual+nInfo)%nInfoPerLine))
+	if(0==nTrackSector || 0!=nInfo)
 	{
 		printf("\n");
 	}
@@ -526,7 +565,6 @@ int ReadDisk(struct CommandParameterInfo *cpi,unsigned char d77Image[])
 	struct D77Header *d77HeaderPtr=(struct D77Header *)d77Image;
 	unsigned int *trackTable=(unsigned int *)(d77Image+0x20);
 
-	InitializeD77Header(d77HeaderPtr);
 
 	for(i=0; i<164; ++i)
 	{
@@ -606,7 +644,7 @@ void InitializeCommandParameterInfo(struct CommandParameterInfo *cpi)
 	cpi->baudRate=0;
 	cpi->outFName[0]=0;
 	cpi->firstRetryCount=8;
-	cpi->secondRetryCount=3;
+	cpi->secondRetryCount=12;
 }
 
 int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header *hdr,int ac,char *av[])
@@ -637,7 +675,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 	{
 		cpi->mode=MODE_2D;
 		cpi->startTrk=0;
-		cpi->endTrk=39;
+		cpi->endTrk=40;
 		hdr->mediaType=0;
 	}
 	else if(0==strcmp(av[2],"2DD") || 0==strcmp(av[2],"2dd") ||
@@ -646,7 +684,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 	{
 		cpi->mode=MODE_2DD;
 		cpi->startTrk=0;
-		cpi->endTrk=79;
+		cpi->endTrk=80;
 		hdr->mediaType=0x10;
 	}
 	else if(0==strcmp(av[2],"2HD") || 0==strcmp(av[2],"2hd") ||
@@ -654,7 +692,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,struct D77Header 
 	{
 		cpi->mode=MODE_2HD_1232K;
 		cpi->startTrk=0;
-		cpi->endTrk=76;
+		cpi->endTrk=80;
 		hdr->mediaType=0x20;
 	}
 	else
@@ -760,6 +798,7 @@ int main(int ac,char *av[])
 	}
 	struct D77Header *hdr=(struct D77Header *)d77Image;
 
+	InitializeD77Header(hdr);
 
 	struct CommandParameterInfo cpi;
 	InitializeCommandParameterInfo(&cpi);
