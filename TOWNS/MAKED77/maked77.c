@@ -304,7 +304,7 @@ unsigned int ReadTrack(
 	{
 		unsigned int modeBytes[2];
 		GetDriveModeBytes(modeBytes,drive,mode,MFMMode,3);
-		unsigned int biosErr=DKB_setmode(devNo,modeBytes[0],modeBytes[1]);
+		DKB_setmode(devNo,modeBytes[0],modeBytes[1]);
 		for(i=0; i<NUM_SECTOR_BUF; ++i)
 		{
 			unsigned int err=DKB_rdsecid(devNo,track,side,sector+nTrackSector);
