@@ -141,6 +141,8 @@ struct ErrorLog far *errLog=NULL,far *errLogTail=NULL;
 #define READADDR_TIMEOUT		1000000
 #define READADDR_TRACK_TIMEOUT  3000000
 #define READTRACK_TIMEOUT		3000000
+#define READSECTOR_TIMEOUT		3000000
+#define AFTER_SCSI_WAIT         1000000	// 100ms
 
 enum
 {
@@ -326,6 +328,15 @@ void INT46_RegisterHandler(struct INT_DATA_BLOCK *ptr);
 "int 0aeh"\
 parm [ DI ]
 
+void INT46_TakeOver(void)
+{
+	static struct INT_DATA_BLOCK datablock;
+	datablock.zero[0]=0;
+	datablock.zero[1]=0;
+	datablock.func=Handle_INT46H;
+	INT46_RegisterHandler(&datablock);
+}
+
 
 ////////////////////////////////////////////////////////////
 // Console
@@ -393,6 +404,35 @@ void CtrlC(int err)
 	exit(1);
 }
 
+void Wait10ms(void)
+{
+	uint16_t t0,accum=0;
+	t0=inpw(IO_FREERUN_TIMER);
+	while(accum<10000)
+	{
+		uint16_t t,diff;
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		accum+=diff;
+		t0=t;
+	}
+}
+
+void WaitMicrosec(uint32_t microsec)
+{
+	uint16_t t0;
+	uint32_t accum=0;
+	t0=inpw(IO_FREERUN_TIMER);
+	while(accum<microsec)
+	{
+		uint16_t t,diff;
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		accum+=diff;
+		t0=t;
+	}
+}
+
 ////////////////////////////////////////////////////////////
 
 
@@ -435,6 +475,9 @@ unsigned int RDD_WriteDiskHeader(const char fName[],uint8_t restoreState,uint8_t
 	}
 	fwrite(data,1,48,ofp);
 	fclose(ofp);
+
+	WaitMicrosec(AFTER_SCSI_WAIT);
+
 	return 0;
 }
 
@@ -463,6 +506,9 @@ unsigned int RDD_WriteTrackHeader(const char fName[],uint8_t C,uint8_t H)
 	}
 	fwrite(data,1,16,ofp);
 	fclose(ofp);
+
+	WaitMicrosec(AFTER_SCSI_WAIT);
+
 	return 0;
 }
 
@@ -499,6 +545,9 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 		fwrite(data,1,16,ofp);
 	}
 	fclose(ofp);
+
+	WaitMicrosec(AFTER_SCSI_WAIT);
+
 	return 0;
 }
 
@@ -547,6 +596,9 @@ unsigned int RDD_WriteSectorData(const char fName[],const uint8_t CHRN[4],uint8_
 	fwrite(DMABuf,1,actualSize,ofp);
 
 	fclose(ofp);
+
+	WaitMicrosec(AFTER_SCSI_WAIT);
+
 	return 0;
 }
 
@@ -591,6 +643,9 @@ unsigned int RDD_WriteTrack(const char outFName[],uint8_t C,uint8_t H,uint16_t r
 	fwrite(DMABuf,1,writeSize,ofp);
 
 	fclose(ofp);
+
+	WaitMicrosec(AFTER_SCSI_WAIT);
+
 	return 0;
 }
 
@@ -603,22 +658,22 @@ void SetDriveMode(unsigned int drive,unsigned int mode)
 	switch(mode)
 	{
 	case MODE_2D:
-		controlByte=CTL_CLKSEL|CTL_MOTOR|CTL_IRQEN;
+		controlByte=CTL_CLKSEL|CTL_MOTOR;
 		speedByte=SPD_INUSE;
 		seekStep=2;
 		break;
 	case MODE_2DD:
-		controlByte=CTL_CLKSEL|CTL_MOTOR|CTL_IRQEN;
+		controlByte=CTL_CLKSEL|CTL_MOTOR;
 		speedByte=SPD_INUSE;
 		seekStep=1;
 		break;
 	case MODE_2HD_1232K:
-		controlByte=CTL_MOTOR|CTL_IRQEN;
+		controlByte=CTL_MOTOR;
 		speedByte=SPD_360RPM|SPD_INUSE;
 		seekStep=1;
 		break;
 	case MODE_2HD_1440K:
-		controlByte=CTL_MOTOR|CTL_IRQEN;
+		controlByte=CTL_MOTOR;
 		speedByte=SPD_MODE_B|SPD_360RPM|SPD_INUSE;
 		seekStep=1;
 		break;
@@ -649,33 +704,33 @@ void SelectDrive(void)
 	outp(IO_FDC_DRIVE_SELECT,speedByte|drvSel);
 	outp(IO_1US_WAIT,0);
 	outp(IO_1US_WAIT,0);
-
-	outp(IO_FDC_DRIVE_CONTROL,controlByte);
 }
 
-void Wait10ms(void)
+void WriteDriveControl(uint8_t IRQEN)
 {
-	uint16_t t0,accum=0;
-	t0=inpw(IO_FREERUN_TIMER);
-	while(accum<10000)
-	{
-		uint16_t t,diff;
-		t=inpw(IO_FREERUN_TIMER);
-		diff=t-t0;
-		accum+=diff;
-		t0=t;
-	}
+	outp(IO_FDC_DRIVE_CONTROL,controlByte|IRQEN);
 }
+
+// For unknown reason Disk BIOS reads status three times in a row.
+uint8_t ReadDriveStatusIO(void);
+#pragma aux ReadDriveStatusIO=\
+"mov dx,0208h"\
+"in al,dx"\
+"in al,dx"\
+"in al,dx"\
+"movzx ax,al"\
+value [ al ]
 
 int CheckDriveReady(void)
 {
 	int i;
 	const int nRepeat=500;
 	SelectDrive();
+	WriteDriveControl(0);
 	for(i=0; i<nRepeat; ++i)
 	{
 		unsigned int readyByte,readyBit;
-		readyByte=inp(IO_FDC_DRIVE_STATUS);
+		readyByte=ReadDriveStatusIO();
 		readyBit=(readyByte&DRIVE_STA_FREADY);
 		if(0!=readyBit)
 		{
@@ -771,14 +826,19 @@ modify[ dx cx ]
 unsigned char FDC_Restore(void)
 {
 	CLI();
+	SelectDrive();
+	WriteDriveControl(0);
+
 	INT46_DID_COME_IN=0;
 
 	FDC_WaitReady();
 	STI();
 	FDC_Command(FDCCMD_RESTORE);
+	WriteDriveControl(CTL_IRQEN);
 	while(0==INT46_DID_COME_IN)
 	{
 	}
+	WriteDriveControl(0);
 	STI();
 
 	currentCylinder=0;
@@ -833,6 +893,7 @@ unsigned char FDC_Seek(unsigned char C)
 	CLI();
 
 	SelectDrive();
+	WriteDriveControl(0);
 	outp(IO_FDC_CYLINDER,currentCylinder);
 	outp(IO_FDC_DATA,C*seekStep);
 	currentCylinder=C*seekStep;
@@ -846,11 +907,13 @@ unsigned char FDC_Seek(unsigned char C)
 	Palette(COLOR_DEBUG_SEEK,0,0,255);
 
 	STI();
+	WriteDriveControl(CTL_IRQEN);
 	FDC_Command(FDCCMD_SEEK);
 	while(0==INT46_DID_COME_IN)
 	{
 		Palette(COLOR_DEBUG_SEEK,rand(),rand(),rand());
 	}
+	WriteDriveControl(0);
 	STI();
 
 	Palette(COLOR_DEBUG_SEEK,0,255,255);
@@ -877,6 +940,7 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 
 	CLI();
 	SelectDrive();
+	WriteDriveControl(0);
 
 	SetUpDMA(DMABuf,6);
 
@@ -890,6 +954,7 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 
 	Palette(COLOR_DEBUG_READADDR,0,0,255);
 
+	WriteDriveControl(CTL_IRQEN);
 	FDC_Command(FDCCMD_READADDR);
 	t0=inpw(IO_FREERUN_TIMER);
 
@@ -905,6 +970,7 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 		*accumTime+=diff;
 		t0=t;
 	}
+	WriteDriveControl(0);
 
 	Palette(COLOR_DEBUG_READADDR,255,255,255);
 
@@ -930,6 +996,7 @@ unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,u
 
 	CLI();
 	SelectDrive();
+	WriteDriveControl(0);
 
 	SetUpDMA(DMABuf,128<<(N&3));
 
@@ -945,6 +1012,7 @@ unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,u
 
 	Palette(COLOR_DEBUG_READADDR,0,0,255);
 
+	WriteDriveControl(CTL_IRQEN);
 	FDC_Command(FDCCMD_READSECTOR);
 	t0=inpw(IO_FREERUN_TIMER);
 
@@ -952,13 +1020,23 @@ unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,u
 
 	// Memo: Make sure to write 44H to I/O AAh.
 	//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
-	while(0==INT46_DID_COME_IN)
+	while(0==INT46_DID_COME_IN && *accumTime<READSECTOR_TIMEOUT)
 	{
 		Palette(COLOR_DEBUG_READADDR,rand(),rand(),rand());
 		t=inpw(IO_FREERUN_TIMER);
 		diff=t-t0;
 		*accumTime+=diff;
 		t0=t;
+	}
+	WriteDriveControl(0);
+
+	if(READSECTOR_TIMEOUT<=*accumTime)
+	{
+		// It does happen in real hardware, and unless Force Interrupt, FDC will never be ready again.
+		Palette(COLOR_DEBUG_READADDR,255,0,255);
+		FDC_Command(FDCCMD_FORCEINTERRUPT);
+		outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
+		return 0xFF;
 	}
 
 	Palette(COLOR_DEBUG_READADDR,255,255,255);
@@ -978,6 +1056,7 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 
 		CLI();
 		SelectDrive();
+		WriteDriveControl(0);
 
 		SetUpDMA(DMABuf,DMABUF_SIZE);
 
@@ -991,6 +1070,7 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 
 		Palette(COLOR_DEBUG_READADDR,0,0,255);
 
+		WriteDriveControl(CTL_IRQEN);
 		FDC_Command(FDCCMD_READTRACK);
 		t0=inpw(IO_FREERUN_TIMER);
 
@@ -1006,6 +1086,7 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 			accumTime+=diff;
 			t0=t;
 		}
+		WriteDriveControl(0);
 
 		Palette(COLOR_DEBUG_READADDR,255,255,255);
 
@@ -1248,11 +1329,6 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 	RDD_WriteTrackHeader(cpi->outFName,C,H);
 
-	Wait10ms();
-	Wait10ms();
-	Wait10ms();
-	Wait10ms();
-
 	if(0==H)
 	{
 		controlByte&=~CTL_SIDE;
@@ -1262,6 +1338,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		controlByte|=CTL_SIDE;
 	}
 	SelectDrive();
+	WriteDriveControl(0);
 
 	Palette(COLOR_DEBUG_READTRACK,0,255,0);
 
@@ -1648,13 +1725,7 @@ int main(int ac,char *av[])
 
 	TSUGARU_DEBUGBREAK;
 	INT46_SaveHandler(default_INT46H_HandlerPtr);
-	{
-		struct INT_DATA_BLOCK datablock;
-		datablock.zero[0]=0;
-		datablock.zero[1]=0;
-		datablock.func=Handle_INT46H;
-		INT46_RegisterHandler(&datablock);
-	}
+	INT46_TakeOver();
 	signal(SIGINT,CtrlC);
 
 	RestoreState=FDC_Restore(); // Can check write-protect
