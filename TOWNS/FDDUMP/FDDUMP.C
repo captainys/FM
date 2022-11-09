@@ -1534,16 +1534,15 @@ Thexder Protected Track
 
 unsigned int IsLeafInTheForest(int nIDMarks,const struct IDMARK idMark[],uint16_t readTrackSize)
 {
-	uint32_t prevDataMark=~0;
 	int i;
 	int nSec=0;
 
 	// Sign of Leaf-In-The-Forest protect (1) all same C,H,R
 	for(i=1; i<nIDMarks; ++i)
 	{
-		if(idMark[i].CHRN[0]!=idMark[0].CHRN[0] ||
-		   idMark[i].CHRN[1]!=idMark[0].CHRN[1] ||
-		   idMark[i].CHRN[2]!=idMark[0].CHRN[2])
+		if(idMark[i].chrn[0]!=idMark[0].chrn[0] ||
+		   idMark[i].chrn[1]!=idMark[0].chrn[1] ||
+		   idMark[i].chrn[2]!=idMark[0].chrn[2])
 		{
 			return 0;
 		}
@@ -1555,9 +1554,9 @@ unsigned int IsLeafInTheForest(int nIDMarks,const struct IDMARK idMark[],uint16_
 		if(DMABuf[i  ]==0xA1 &&
 		   DMABuf[i+1]==0xA1 &&
 		   DMABuf[i+2]==0xFE &&
-		   DMABuf[i+3]==idMark[0].CHRN[0] &&
-		   DMABuf[i+4]==idMark[0].CHRN[1] &&
-		   DMABuf[i+5]==idMark[0].CHRN[2]) // ID Mark
+		   DMABuf[i+3]==idMark[0].chrn[0] &&
+		   DMABuf[i+4]==idMark[0].chrn[1] &&
+		   DMABuf[i+5]==idMark[0].chrn[2]) // ID Mark
 		{
 			++nSec;
 		}
@@ -1578,6 +1577,8 @@ unsigned int IsLeafInTheForest(int nIDMarks,const struct IDMARK idMark[],uint16_
 	return 0;
 }
 
+#define nInfoPerLine 8
+
 // Data
 // 03 cc hh rr nn st fl 00 00 00 00 <time  > <Length>
 //    +1  cc  Cylinder
@@ -1592,7 +1593,7 @@ unsigned int IsLeafInTheForest(int nIDMarks,const struct IDMARK idMark[],uint16_
 void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t mediaType)
 {
 	// Looks like FM TOWNS's FDC is reliable in Read Track command.
-	uint8_t header[16];
+	uint8_t header[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	uint16_t ptr;
 	uint16_t addrMarkPtr=0,dataMarkPtr=0;
 	uint16_t prevAddrMarkPtr,prevDataMarkPtr;
@@ -1616,7 +1617,7 @@ void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t me
 			uint16_t dataPtr;
 
 			prevDataMarkPtr=dataMarkPtr;
-			daraMarkPtr=ptr;
+			dataMarkPtr=ptr;
 			dataPtr=ptr+3;
 
 			C=DMABuf[addrMarkPtr+3];
@@ -1649,7 +1650,6 @@ void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t me
 			}
 			header[0x0B]=microsec&0xFF;
 			header[0x0C]=(microsec>>8)&0xFF;
-			header[0x0C]=(microsec>>16)&0xFF;
 
 			if(dataPtr+len<=readTrackSize)
 			{
@@ -1732,10 +1732,6 @@ void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t me
 		}
 	}
 }
-
-
-#define PrintIDMark(idMark)
-#define nInfoPerLine 8
 
 void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 {
@@ -1873,14 +1869,14 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		ioErr=FDC_ReadTrack(&readTrackSize);
 
 		STI();
-		RDD_WriteTrack(cpi->outFName,C,H,readSize,ioErr);
+		RDD_WriteTrack(cpi->outFName,C,H,readTrackSize,ioErr);
 	}
 
 
 	// If Hidden-Leaf protect, do differently.
 	if(IsLeafInTheForest(nTrackSector,idMark,readTrackSize))
 	{
-		DoHiddenLeaf(cpi.outFName,nInfo,readTrackSize,cpi->mediaType);
+		DoHiddenLeaf(cpi->outFName,nInfo,readTrackSize,cpi->mediaType);
 		return;
 	}
 
