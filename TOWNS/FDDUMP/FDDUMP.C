@@ -1,3 +1,19 @@
+/* LICENSE>>
+Copyright 2022 Soji Yamakawa (CaptainYS, http://www.ysflight.com)
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+<< LICENSE */
+
+
 // For Open Watcom C
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,26 +25,47 @@
 #include <malloc.h>
 
 // RDD Output Data Data Format (.RDD  Real Disk Dump)
+// Signature (First 16 bytes)
+// 'R' 'E' 'A' 'L' 'D' 'I' 'S' 'K' 'D' 'U' 'M' 'P' 0 0 0 0 
 // Begin Disk
 // 00 vr mt fl 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
-//    vr  Version 
-//    mt  media type
-//    fl  flags
-//        bit0  1:Write Protected  0:Write Enabled
+//    +1  vr  Version 
+//    +2  mt  media type
+//    +3  fl  flags
+//            bit0  1:Write Protected  0:Write Enabled
 // (32 bytes name, 0 padded
 // Begin Track
 // 01 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+//    +1  cc  Cylinder
+//    +2  hh  Head
 // ID Mark
 // 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
 // 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
 // 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
 //     :
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +3  rr  Sector Number
+//    +4  nn  Length=128<<(n&3)
+//    +5  CRC  CRC of the address mark (not for the data)
+//    +6  CRC  CRC of the address mark (not for the data)
 // Data
-// 03 cc hh rr nn st 00 00 00 00 00 <time  > <Length>
-//     st  MB8877 status, bit0=density instead of BUSY flag(0:MFM 1:FM)
+// 03 cc hh rr nn st fl 00 00 00 00 <time  > <Length>
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +3  rr  Sector Number
+//    +4  nn  Length=128<<(n&3)
+//    +5  st  MB8877 status
+//    +6  fl  bit0=density flag(0:MFM 1:FM)
+//            bit1=resample flag(1 means Resample for unstable bytes)
+//    +B  (3 bytes) Microseconds for reading the sector.
+//    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
 // (Bytes padded to 16*N bytes)
 // Track Read
 // 04 cc hh 00 00 00 00 00 00 00 00 00 00 <nBytes>
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +E  (2 bytes) Number of bytes returned from Track Read.
 // (Bytes padded to 16*N bytes)
 
 // Next Track
@@ -142,7 +179,7 @@ struct ErrorLog far *errLog=NULL,far *errLogTail=NULL;
 #define READADDR_TRACK_TIMEOUT  3000000
 #define READTRACK_TIMEOUT		3000000
 #define READSECTOR_TIMEOUT		3000000
-#define AFTER_SCSI_WAIT         1000000	// 100ms
+#define AFTER_SCSI_WAIT          100000	// 100ms
 
 enum
 {
@@ -458,6 +495,27 @@ void RDD_MakeDiskHeader(unsigned char data[48],uint8_t restoreState,uint8_t medi
 	strncpy(data+16,label,32);
 }
 
+unsigned int RDD_WriteSignature(const char fName[])
+{
+	char signature[16];
+	int i;
+	FILE *ofp;
+
+	for(i=0; i<16; ++i)
+	{
+		signature[i]=0;
+	}
+	strcpy(signature,"REALDISKDUMP");
+
+	ofp=fopen(fName,"wb");
+	fwrite(signature,1,16,ofp);
+	fclose(ofp);
+
+	WaitMicrosec(AFTER_SCSI_WAIT);
+
+	return 0;
+}
+
 unsigned int RDD_WriteDiskHeader(const char fName[],uint8_t restoreState,uint8_t mediaType,const char label[])
 {
 	unsigned char data[48];
@@ -552,16 +610,28 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 }
 
 // Data
-// 03 cc hh rr nn st 00 00 00 00 <time  > <nBytes>
-//     st  MB8877 status, bit0=density instead of BUSY flag(0:MFM 1:FM)
-// (Bytes padded to 16*N bytes)
-unsigned int RDD_WriteSectorData(const char fName[],const uint8_t CHRN[4],uint8_t FDCSta,uint32_t readTime)
+// 03 cc hh rr nn st fl 00 00 00 00 <time  > <Length>
+//     st  MB8877 status
+//     fl  bit0=density flag(0:MFM 1:FM)
+//         bit1=resample flag(1 means Resample for unstable bytes)
+unsigned int RDD_WriteSectorData(const char fName[],const uint8_t CHRN[4],uint8_t FDCSta,uint32_t readTime,uint8_t FMorMFM,uint8_t isResample)
 {
 	FILE *ofp;
 	unsigned int actualSize=0; // MB8877 always reads 128<<N anyway.
 	unsigned char *actualSizePtr,*readTimePtr;
 	unsigned char data[16];
 	int i;
+	uint8_t flags=0;
+
+	if(CTL_MFM!=FMorMFM) // If single-density
+	{
+		flags|=1;
+	}
+	if(0!=isResample)
+	{
+		flags|=2;
+	}
+
 	for(i=0; i<16; ++i)
 	{
 		data[i]=0;
@@ -986,29 +1056,30 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 	return (lastFDCStatus&~FDCSTA_BUSY);
 }
 
-unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,uint8_t N)
+unsigned char FDC_ReadSectorReal(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,uint8_t N)
 {
-	uint16_t t0,t,diff;
+	uint16_t t0,t,diff,initDMACounter;
 
 	Palette(COLOR_DEBUG_READADDR,255,0,0);
 
 	*accumTime=0;
 
-	CLI();
 	SelectDrive();
 	WriteDriveControl(0);
 
-	SetUpDMA(DMABuf,128<<(N&3));
+	CLI();
+	initDMACounter=128<<(N&3);
+	SetUpDMA(DMABuf,initDMACounter);
+	--initDMACounter;
+	STI();
 
 	Palette(COLOR_DEBUG_READADDR,0,255,0);
 
-	CLI();
 	INT46_DID_COME_IN=0;
 
-	FDC_WaitReady();
 	outp(IO_FDC_CYLINDER,C);
 	outp(IO_FDC_SECTOR,R);
-	STI();
+	FDC_WaitReady();
 
 	Palette(COLOR_DEBUG_READADDR,0,0,255);
 
@@ -1020,6 +1091,21 @@ unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,u
 
 	// Memo: Make sure to write 44H to I/O AAh.
 	//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
+	// First loop until the DMA counter starts moving.
+	while(0==INT46_DID_COME_IN && *accumTime<READSECTOR_TIMEOUT)
+	{
+		Palette(COLOR_DEBUG_READADDR,rand(),rand(),rand());
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		*accumTime+=diff;
+		if(inpw(IO_DMA_COUNT_LOW)!=initDMACounter)
+		{
+			*accumTime=0;
+			break;
+		}
+		t0=t;
+	}
+	// Second loop for measuring how long it takes to read a sector.
 	while(0==INT46_DID_COME_IN && *accumTime<READSECTOR_TIMEOUT)
 	{
 		Palette(COLOR_DEBUG_READADDR,rand(),rand(),rand());
@@ -1041,7 +1127,23 @@ unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,u
 
 	Palette(COLOR_DEBUG_READADDR,255,255,255);
 
-	return (lastFDCStatus&~FDCSTA_BUSY);
+	return lastFDCStatus;
+}
+
+unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,uint8_t N)
+{
+	int i;
+	uint8_t res;
+	for(i=0; i<3; ++i)
+	{
+		res=FDC_ReadSectorReal(accumTime,C,H,R,N);
+		if(0xFF!=res)
+		{
+			break;
+		}
+		// Time Out!  Try Again!
+	}
+	return res;
 }
 
 unsigned char FDC_ReadTrack(uint16_t *readSize)
@@ -1121,9 +1223,11 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 void CleanUp(void)
 {
 	INT46_RestoreHandler(default_INT46H_HandlerPtr);
+	controlByte&=~CTL_MOTOR;
+	speedByte&=~SPD_INUSE;
 	SelectDrive();
 	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
-	outp(IO_FDC_DRIVE_SELECT,speedByte&~SPD_INUSE);
+	outp(IO_FDC_DRIVE_SELECT,speedByte);
 	Color(7);
 }
 
@@ -1471,7 +1575,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 				++nInfo;
 
 				STI();
-				RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime);
+				RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,0);
 
 				if(nInfoPerLine==nInfo)
 				{
@@ -1539,7 +1643,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 						++nInfo;
 
 						STI();
-						RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime);
+						RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,1);
 
 						if(nInfoPerLine==nInfo)
 						{
@@ -1690,11 +1794,11 @@ int main(int ac,char *av[])
 		printf("    2D,320KB         2D Disk (from FM-7)\n");
 		printf("    2DD,640KB,720KB  2DD Disk\n");
 		printf("    2HD,1232KB       2HD 1232K Disk\n");
-		printf("    (1440KB not supported at this time.\n");
+		printf("    (For 1440KB, use 2HD.)\n");
 		printf("  Options:\n");
 		printf("    -starttrk trackNum  Start track (Between 0 and 76 if 2HD)\n");
 		printf("    -endtrk   trackNum  End track (Between 0 and 76 if 2HD)\n");
-		printf("    -listonly           List track info only.  No RS232C transmission\n");
+		//printf("    -listonly           List track info only.  No RS232C transmission\n");
 		printf("    -out filename.d77   Save image to .d77 file.\n");
 		//printf("    -19200bps           Transmit the image at 19200bps\n");
 		//printf("    -38400bps           Transmit the image at 38400bps\n");
@@ -1744,7 +1848,10 @@ int main(int ac,char *av[])
 		goto ERREND;
 	}
 
-	remove(cpi.outFName);
+	if(0!=RDD_WriteSignature(cpi.outFName))
+	{
+		goto ERREND;
+	}
 
 	if(0!=RDD_WriteDiskHeader(cpi.outFName,RestoreState,cpi.mediaType,cpi.diskName))
 	{
