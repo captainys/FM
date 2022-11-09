@@ -85,11 +85,7 @@ unsigned char DMABuf[DMABUF_SIZE]="DMABUFFER";
 unsigned char sectorDataCopy[SECTORCOPyBUF_SIZE];
 
 
-#define COLOR_DEBUG_HANDLER	1
-#define COLOR_DEBUG_SEEK    2
-#define COLOR_DEBUG_READADDR 3
-#define COLOR_DEBUG_READDISK 5
-#define COLOR_DEBUG_READTRACK 6
+#define COLOR_DEBUG 1
 
 #define COLOR_ERR_CRC_AND_DDM 3
 #define COLOR_ERR_CRC 2
@@ -252,7 +248,7 @@ unsigned int GetDMACount();
 
 void far Handle_INT46H(void)
 {
-	Palette(COLOR_DEBUG_HANDLER,255,0,0);
+	Palette(COLOR_DEBUG,255,0,0);
 
 	INT46_DID_COME_IN=1;
 
@@ -305,12 +301,12 @@ void far Handle_INT46H(void)
 		}
 	}
 
-	Palette(COLOR_DEBUG_HANDLER,0,255,0);
+	Palette(COLOR_DEBUG,0,255,0);
 
 	inp(IO_FDC_STATUS); // Dummy read so that Force Interrupt won't cause indefinite IRQ.
 	inp(IO_DMA_STATUS); // BIOS Dummy reads
 
-	Palette(COLOR_DEBUG_HANDLER,0,0,255);
+	Palette(COLOR_DEBUG,255,255,255);
 }
 
 
@@ -431,6 +427,24 @@ void Color(unsigned int c)
 	VDB_rddefatr(&atr);
 	atr.color=c;
 	VDB_setdefatr(&atr);
+}
+
+void PrintSysCharWord(char str[],unsigned int X,unsigned int color)
+{
+	int L;
+	for(L=0; L<8 && 0!=str[L]; ++L)
+	{
+		VDB_rddefatr(&sysChrAttr[L]);
+		sysChrAttr[L].color=color;
+	}
+	sysCharBufPtr[0]=(unsigned int)str;
+	sysCharBufPtr[2]=(unsigned int)sysChrAttr;
+	VDB_wtsysline(1,L,X,sysCharBufPtr);
+}
+
+void PrintDebugLine(void)
+{
+	PrintSysCharWord("[ACT]",1,COLOR_DEBUG);
 }
 
 void CtrlC(int err)
@@ -957,8 +971,6 @@ unsigned char FDC_Seek(unsigned char C)
 //FDC Command Write D0 Force_Interrupt
 //03A4:00000C07 Write IO8:[0208] 12(FDC_DRIVE_STATUS_CONTROL)
 
-	Palette(COLOR_DEBUG_SEEK,255,0,0);
-
 	FDC_WaitReady();
 	CLI();
 
@@ -968,25 +980,25 @@ unsigned char FDC_Seek(unsigned char C)
 	outp(IO_FDC_DATA,C*seekStep);
 	currentCylinder=C*seekStep;
 
-	Palette(COLOR_DEBUG_SEEK,0,255,0);
+	Palette(COLOR_DEBUG,0,255,0);
 
 	INT46_DID_COME_IN=0;
 
 	FDC_WaitReady();
 
-	Palette(COLOR_DEBUG_SEEK,0,0,255);
+	Palette(COLOR_DEBUG,0,0,255);
 
 	STI();
 	WriteDriveControl(CTL_IRQEN);
 	FDC_Command(FDCCMD_SEEK);
 	while(0==INT46_DID_COME_IN)
 	{
-		Palette(COLOR_DEBUG_SEEK,rand(),rand(),rand());
+		Palette(COLOR_DEBUG,rand(),rand(),rand());
 	}
 	WriteDriveControl(0);
 	STI();
 
-	Palette(COLOR_DEBUG_SEEK,0,255,255);
+	Palette(COLOR_DEBUG,0,255,255);
 
 	if(0x10&lastFDCStatus)
 	{
@@ -995,7 +1007,7 @@ unsigned char FDC_Seek(unsigned char C)
 		Color(7);
 	}
 
-	Palette(COLOR_DEBUG_SEEK,255,255,255);
+	Palette(COLOR_DEBUG,255,255,255);
 
 	return (lastFDCStatus&~FDCSTA_BUSY);
 }
@@ -1004,7 +1016,7 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 {
 	uint16_t t0,t,diff;
 
-	Palette(COLOR_DEBUG_READADDR,255,0,0);
+	Palette(COLOR_DEBUG,255,0,0);
 
 	*accumTime=0;
 
@@ -1014,7 +1026,7 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 
 	SetUpDMA(DMABuf,6);
 
-	Palette(COLOR_DEBUG_READADDR,0,255,0);
+	Palette(COLOR_DEBUG,0,255,0);
 
 	CLI();
 	INT46_DID_COME_IN=0;
@@ -1022,19 +1034,19 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 	FDC_WaitReady();
 	STI();
 
-	Palette(COLOR_DEBUG_READADDR,0,0,255);
+	Palette(COLOR_DEBUG,0,0,255);
 
 	WriteDriveControl(CTL_IRQEN);
 	FDC_Command(FDCCMD_READADDR);
 	t0=inpw(IO_FREERUN_TIMER);
 
-	Palette(COLOR_DEBUG_READADDR,0,255,255);
+	Palette(COLOR_DEBUG,0,255,255);
 
 	// Memo: Make sure to write 44H to I/O AAh.
 	//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
 	while(0==INT46_DID_COME_IN && *accumTime<READADDR_TIMEOUT)
 	{
-		Palette(COLOR_DEBUG_READADDR,rand(),rand(),rand());
+		Palette(COLOR_DEBUG,rand(),rand(),rand());
 		t=inpw(IO_FREERUN_TIMER);
 		diff=t-t0;
 		*accumTime+=diff;
@@ -1042,12 +1054,11 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 	}
 	WriteDriveControl(0);
 
-	Palette(COLOR_DEBUG_READADDR,255,255,255);
+	Palette(COLOR_DEBUG,255,255,255);
 
 	if(READADDR_TIMEOUT<=*accumTime)
 	{
 		// It does happen in real hardware, and unless Force Interrupt, FDC will never be ready again.
-		Palette(COLOR_DEBUG_READADDR,255,0,255);
 		FDC_Command(FDCCMD_FORCEINTERRUPT);
 		outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
 		return 0xFF;
@@ -1060,7 +1071,7 @@ unsigned char FDC_ReadSectorReal(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t
 {
 	uint16_t t0,t,diff,initDMACounter;
 
-	Palette(COLOR_DEBUG_READADDR,255,0,0);
+	Palette(COLOR_DEBUG,255,0,0);
 
 	*accumTime=0;
 
@@ -1073,7 +1084,7 @@ unsigned char FDC_ReadSectorReal(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t
 	--initDMACounter;
 	STI();
 
-	Palette(COLOR_DEBUG_READADDR,0,255,0);
+	Palette(COLOR_DEBUG,0,255,0);
 
 	INT46_DID_COME_IN=0;
 
@@ -1081,20 +1092,20 @@ unsigned char FDC_ReadSectorReal(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t
 	outp(IO_FDC_SECTOR,R);
 	FDC_WaitReady();
 
-	Palette(COLOR_DEBUG_READADDR,0,0,255);
+	Palette(COLOR_DEBUG,0,0,255);
 
 	WriteDriveControl(CTL_IRQEN);
 	FDC_Command(FDCCMD_READSECTOR);
 	t0=inpw(IO_FREERUN_TIMER);
 
-	Palette(COLOR_DEBUG_READADDR,0,255,255);
+	Palette(COLOR_DEBUG,0,255,255);
 
 	// Memo: Make sure to write 44H to I/O AAh.
 	//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
 	// First loop until the DMA counter starts moving.
 	while(0==INT46_DID_COME_IN && *accumTime<READSECTOR_TIMEOUT)
 	{
-		Palette(COLOR_DEBUG_READADDR,rand(),rand(),rand());
+		Palette(COLOR_DEBUG,rand(),rand(),rand());
 		t=inpw(IO_FREERUN_TIMER);
 		diff=t-t0;
 		*accumTime+=diff;
@@ -1108,7 +1119,7 @@ unsigned char FDC_ReadSectorReal(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t
 	// Second loop for measuring how long it takes to read a sector.
 	while(0==INT46_DID_COME_IN && *accumTime<READSECTOR_TIMEOUT)
 	{
-		Palette(COLOR_DEBUG_READADDR,rand(),rand(),rand());
+		Palette(COLOR_DEBUG,rand(),rand(),rand());
 		t=inpw(IO_FREERUN_TIMER);
 		diff=t-t0;
 		*accumTime+=diff;
@@ -1116,16 +1127,15 @@ unsigned char FDC_ReadSectorReal(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t
 	}
 	WriteDriveControl(0);
 
+	Palette(COLOR_DEBUG,255,255,255);
+
 	if(READSECTOR_TIMEOUT<=*accumTime)
 	{
 		// It does happen in real hardware, and unless Force Interrupt, FDC will never be ready again.
-		Palette(COLOR_DEBUG_READADDR,255,0,255);
 		FDC_Command(FDCCMD_FORCEINTERRUPT);
 		outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
 		return 0xFF;
 	}
-
-	Palette(COLOR_DEBUG_READADDR,255,255,255);
 
 	return lastFDCStatus;
 }
@@ -1149,12 +1159,12 @@ unsigned char FDC_ReadSector(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,u
 unsigned char FDC_ReadTrack(uint16_t *readSize)
 {
 	int retry=0;
-	for(retry=0; retry<2; ++retry)
+	for(retry=0; retry<3; ++retry)
 	{
 		uint16_t t0,t,diff;
 		uint32_t accumTime=0;
 
-		Palette(COLOR_DEBUG_READADDR,255,0,0);
+		Palette(COLOR_DEBUG,255,0,0);
 
 		CLI();
 		SelectDrive();
@@ -1162,7 +1172,7 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 
 		SetUpDMA(DMABuf,DMABUF_SIZE);
 
-		Palette(COLOR_DEBUG_READADDR,0,255,0);
+		Palette(COLOR_DEBUG,0,255,0);
 
 		CLI();
 		INT46_DID_COME_IN=0;
@@ -1170,19 +1180,19 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 		FDC_WaitReady();
 		STI();
 
-		Palette(COLOR_DEBUG_READADDR,0,0,255);
+		Palette(COLOR_DEBUG,0,0,255);
 
 		WriteDriveControl(CTL_IRQEN);
 		FDC_Command(FDCCMD_READTRACK);
 		t0=inpw(IO_FREERUN_TIMER);
 
-		Palette(COLOR_DEBUG_READADDR,0,255,255);
+		Palette(COLOR_DEBUG,0,255,255);
 
 		// Memo: Make sure to write 44H to I/O AAh.
 		//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
 		while(0==INT46_DID_COME_IN && accumTime<READTRACK_TIMEOUT)
 		{
-			Palette(COLOR_DEBUG_READTRACK,rand(),rand(),rand());
+			Palette(COLOR_DEBUG,rand(),rand(),rand());
 			t=inpw(IO_FREERUN_TIMER);
 			diff=t-t0;
 			accumTime+=diff;
@@ -1190,13 +1200,12 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 		}
 		WriteDriveControl(0);
 
-		Palette(COLOR_DEBUG_READADDR,255,255,255);
+		Palette(COLOR_DEBUG,255,255,255);
 
 		if(READTRACK_TIMEOUT<=accumTime)
 		{
 			int i;
 			// It does happen in real hardware, and unless Force Interrupt, FDC will never be ready again.
-			Palette(COLOR_DEBUG_READADDR,255,0,255);
 			FDC_Command(FDCCMD_FORCEINTERRUPT);
 			outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
 			for(i=0; i<50; ++i)
@@ -1217,7 +1226,7 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 		*readSize=DMABUF_SIZE-DMACount;
 	}
 
-	return (lastFDCStatus&~FDCSTA_BUSY);
+	return lastFDCStatus;
 }
 
 void CleanUp(void)
@@ -1229,6 +1238,10 @@ void CleanUp(void)
 	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
 	outp(IO_FDC_DRIVE_SELECT,speedByte);
 	Color(7);
+	PrintSysCharWord("        ",1,7);
+	PrintSysCharWord("        ",9,7);
+	PrintSysCharWord("        ",17,7);
+	PrintSysCharWord("        ",25,7);
 }
 
 ////////////////////////////////////////////////////////////
@@ -1423,8 +1436,6 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	unsigned char lostDataReadData=0;
 	unsigned char mfmTry,nFail=0;
 
-	Palette(COLOR_DEBUG_READTRACK,0,0,255);
-
 	STI();
 	Color(4);
 	printf("C%-2d H%d ",C,H);
@@ -1444,12 +1455,8 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	SelectDrive();
 	WriteDriveControl(0);
 
-	Palette(COLOR_DEBUG_READTRACK,0,255,0);
-
 	FDC_WaitIndexHole(); // Need to be immediately after seek.
 	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
-
-	Palette(COLOR_DEBUG_READTRACK,255,0,0);
 
 	for(mfmTry=0; mfmTry<2; ++mfmTry)
 	{
@@ -1493,8 +1500,6 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		}
 	}
 
-	Palette(COLOR_DEBUG_READTRACK,255,255,0);
-
 	// Remove Duplicates >>
 	for(i=nTrackSector-1; 0<i; --i)
 	{
@@ -1533,8 +1538,6 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		}
 	}
 	// Sort sectors <<
-
-	Palette(COLOR_DEBUG_READTRACK,255,0,255);
 
 	STI();
 	RDD_WriteIDMark(cpi->outFName,nTrackSector,idMark);
@@ -1672,35 +1675,9 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	}
 
 
-	Palette(COLOR_DEBUG_READTRACK,0,255,255);
-
 	Color(7);
 
 	outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=H ? CTL_SIDE : 0)|CTL_MFM);
-
-	Palette(COLOR_DEBUG_READTRACK,255,255,255);
-}
-
-void PrintSysCharWord(char str[],unsigned int X,unsigned int color)
-{
-	int L;
-	for(L=0; L<8 && 0!=str[L]; ++L)
-	{
-		VDB_rddefatr(&sysChrAttr[L]);
-		sysChrAttr[L].color=color;
-	}
-	sysCharBufPtr[0]=(unsigned int)str;
-	sysCharBufPtr[2]=(unsigned int)sysChrAttr;
-	VDB_wtsysline(1,L,X,sysCharBufPtr);
-}
-
-void PrintDebugLine(void)
-{
-	PrintSysCharWord("[IRQ]",1,COLOR_DEBUG_HANDLER);
-	PrintSysCharWord("[HEAD]",6,COLOR_DEBUG_READDISK);
-	PrintSysCharWord("[SEEK]",12,COLOR_DEBUG_SEEK);
-	PrintSysCharWord("[ADDR]",18,COLOR_DEBUG_READADDR);
-	PrintSysCharWord("[TRK]",24,COLOR_DEBUG_READTRACK);
 }
 
 void ReadDisk(struct CommandParameterInfo *cpi)
@@ -1709,13 +1686,9 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 	for(C=cpi->startTrk; C<=cpi->endTrk; ++C)
 	{
 		PrintDebugLine();
-		Palette(COLOR_DEBUG_READDISK,0,0,255);
 		FDC_Seek(C);
-		Palette(COLOR_DEBUG_READDISK,255,0,0);
 		ReadTrack(C,0,cpi);
-		Palette(COLOR_DEBUG_READDISK,255,255,255);
 		ReadTrack(C,1,cpi);
-		Palette(COLOR_DEBUG_READDISK,0,255,0);
 	}
 
 	/* if(NULL!=errLog)
@@ -1827,7 +1800,6 @@ int main(int ac,char *av[])
 		return 1;
 	}
 
-	TSUGARU_DEBUGBREAK;
 	INT46_SaveHandler(default_INT46H_HandlerPtr);
 	INT46_TakeOver();
 	signal(SIGINT,CtrlC);
