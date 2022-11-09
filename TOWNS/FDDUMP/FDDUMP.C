@@ -1599,6 +1599,13 @@ void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t me
 	uint16_t prevAddrMarkPtr,prevDataMarkPtr;
 	uint8_t C,H,R,N;
 
+
+	Color(4));
+	printf("HIDNLEAF ");
+	fflush(stdout);
+	++nInfo;
+
+
 	for(ptr=0; ptr+7<readTrackSize; ++ptr)
 	{
 		if(DMABuf[ptr  ]==0xA1 &&
