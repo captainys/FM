@@ -151,12 +151,24 @@ unsigned int ConvertTrack(uint32_t trackTable[],FILE *ofp,FILE *extFp,FILE *ifp,
 		}
 	}
 
+	printf("%d\n",nSec);
+
 	while(16==fread(id,1,16,ifp))
 	{
 		if(id[0]==3)
 		{
 			uint16_t len=id[15];
 			uint32_t microsec=id[13];
+
+			len<<=8;
+			len|=id[14];
+			len+=15;
+			len&=0xFFF0;
+
+			microsec<<=8;
+			microsec|=id[12];
+			microsec<<=8;
+			microsec|=id[11];
 
 			InitializeD77SectorHeader(&hdr);
 
@@ -177,20 +189,17 @@ unsigned int ConvertTrack(uint32_t trackTable[],FILE *ofp,FILE *extFp,FILE *ifp,
 			}
 			hdr.actualSectorLength=len;
 
-			len<<=8;
-			len|=id[14];
-			len+=15;
-			len&=0xFFF0;
-
-			microsec<<=8;
-			microsec|=id[12];
-			microsec<<=8;
-			microsec|=id[11];
-
 			fread(data,1,len,ifp);
 
 			fwrite(&hdr,1,sizeof(hdr),ofp);
 			fwrite(data,1,len,ofp);
+
+			if(NULL!=extFp && 0<len)
+			{
+				uint32_t nanosecPerByte=microsec*1000;
+				nanosecPerByte/=len;
+				fprintf(extFp,"S %d %d %d NSBYTE %lu\n",C,H,id[3],nanosecPerByte);
+			}
 		}
 		else if(id[0]==4)
 		{
@@ -234,11 +243,10 @@ FILE *OpenD77ExtFp(const char d77File[])
 	{
 		d77ExtFile[lastDot+1]='d';
 		d77ExtFile[lastDot+2]='7';
-		d77ExtFile[lastDot+3]='7';
-		d77ExtFile[lastDot+4]='e';
-		d77ExtFile[lastDot+5]='x';
-		d77ExtFile[lastDot+6]='t';
+		d77ExtFile[lastDot+3]='x';
 	}
+
+	printf("%s\n",d77ExtFile);
 
 	return fopen(d77ExtFile,"w");
 }
@@ -283,7 +291,7 @@ unsigned int RDD2D77(const char rddFile[],const char d77File[])
 		goto ERREND;
 	}
 
-	
+	extFp=OpenD77ExtFp(d77File);
 
 	fwrite(&hdr,1,sizeof(hdr),ofp);
 	fwrite(trackTable,sizeof(uint32_t),164,ofp);
