@@ -39,9 +39,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //    +1  cc  Cylinder
 //    +2  hh  Head
 // ID Mark
-// 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
-// 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
-// 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
+// 02 cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+// 02 cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+// 02 cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
 //     :
 //    +1  cc  Cylinder
 //    +2  hh  Head
@@ -49,6 +49,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //    +4  nn  Length=128<<(n&3)
 //    +5  CRC  CRC of the address mark (not for the data)
 //    +6  CRC  CRC of the address mark (not for the data)
+//    +7  st  MB8877 status
 // Data
 // 03 cc hh rr nn st fl 00 00 00 00 <time  > <Length>
 //    +1  cc  Cylinder
@@ -62,9 +63,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
 // (Bytes padded to 16*N bytes)
 // Track Read
-// 04 cc hh 00 00 00 00 00 00 00 00 00 00 <nBytes>
+// 04 cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
 //    +1  cc  Cylinder
 //    +2  hh  Head
+//    +3  st  MB8877 status
 //    +E  (2 bytes) Number of bytes returned from Track Read.
 // (Bytes padded to 16*N bytes)
 
@@ -106,6 +108,7 @@ struct IDMARK idMark[IDBUF_SIZE];
 #define ERRORLOG_TYPE_CRC	1
 #define ERRORLOG_TYPE_RECORD_NOT_FOUND	2
 #define ERRORLOG_TYPE_LOSTDATA	3
+#define ERRORLOG_TYPE_LOSTDATA_READADDR	4
 struct ErrorLog
 {
 	struct ErrorLog far *next;
@@ -113,6 +116,29 @@ struct ErrorLog
 	struct IDMARK idMark;
 };
 struct ErrorLog far *errLog=NULL,far *errLogTail=NULL;
+
+void LogError(unsigned int code,struct IDMARK *idMark)
+{
+	struct ErrorLog far *newLog=(struct ErrorLog far *)_fmalloc(sizeof(struct ErrorLog));
+	if(NULL!=newLog)
+	{
+		newLog->next=NULL;
+		newLog->errType=code;
+		newLog->idMark=*idMark;
+		if(NULL==errLog)
+		{
+			errLog=newLog;
+			errLogTail=newLog;
+		}
+		else
+		{
+			errLogTail->next=newLog;
+			errLogTail=newLog;
+		}
+	}
+}
+
+
 
 #define IO_FDC_STATUS			0x200
 #define FDCSTA_BUSY				0x01
@@ -585,7 +611,7 @@ unsigned int RDD_WriteTrackHeader(const char fName[],uint8_t C,uint8_t H)
 }
 
 // ID Mark
-// 02 cc hh rr nn <CRC> 00 00 00 00 00 00 00 00 00
+// 02 cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
 unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct IDMARK idMark[])
 {
 	FILE *ofp;
@@ -614,6 +640,7 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 		data[3]=idMark[i].chrn[3]; // N
 		data[4]=idMark[i].chrn[4]; // CRC
 		data[6]=idMark[i].chrn[5]; // CRC
+		data[7]=idMark[i].chrn[7]; // FDC Status
 		fwrite(data,1,16,ofp);
 	}
 	fclose(ofp);
@@ -687,8 +714,8 @@ unsigned int RDD_WriteSectorData(const char fName[],const uint8_t CHRN[4],uint8_
 }
 
 // Track Read
-// 04 cc hh 00 00 00 00 00 00 00 00 00 00 <nBytes>
-unsigned int RDD_WriteTrack(const char outFName[],uint8_t C,uint8_t H,uint16_t readSize)
+// 04 cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
+unsigned int RDD_WriteTrack(const char outFName[],uint8_t C,uint8_t H,uint16_t readSize,uint8_t st)
 {
 	FILE *ofp;
 	unsigned int writeSize=0;
@@ -702,7 +729,7 @@ unsigned int RDD_WriteTrack(const char outFName[],uint8_t C,uint8_t H,uint16_t r
 	data[0]=4;
 	data[1]=C;
 	data[2]=H;
-
+	data[3]=st;
 
 	readSizePtr=(unsigned char *)&readSize;
 	data[14]=readSizePtr[0];
@@ -1231,6 +1258,7 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 
 void CleanUp(void)
 {
+	int i;
 	INT46_RestoreHandler(default_INT46H_HandlerPtr);
 	controlByte&=~CTL_MOTOR;
 	speedByte&=~SPD_INUSE;
@@ -1242,6 +1270,13 @@ void CleanUp(void)
 	PrintSysCharWord("        ",9,7);
 	PrintSysCharWord("        ",17,7);
 	PrintSysCharWord("        ",25,7);
+	for(i=0; i<8; ++i)
+	{
+		uint8_t r=(i&2 ? 255 : 0);
+		uint8_t g=(i&4 ? 255 : 0);
+		uint8_t b=(i&1 ? 255 : 0);
+		Palette(i,r,g,b);
+	}
 }
 
 ////////////////////////////////////////////////////////////
@@ -1424,10 +1459,10 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 }
 
 #define PrintIDMark(idMark)
+#define nInfoPerLine 8
 
 void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 {
-	const int nInfoPerLine=8;
 	unsigned char nInfo=0;
 	int FMorMFM=CTL_MFM;
 	int i;
@@ -1480,6 +1515,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 				idMark[nTrackSector].chrn[3]=DMABuf[3];
 				idMark[nTrackSector].chrn[4]=DMABuf[4];
 				idMark[nTrackSector].chrn[5]=DMABuf[5];
+				idMark[nTrackSector].chrn[7]=sta;
 
 				++nTrackSector;
 			}
@@ -1498,6 +1534,16 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 			// Will take loooong time until switch, but be patient.
 			FMorMFM=0;
 		}
+	}
+
+	if(lostDataReadAddr)
+	{
+		struct IDMARK idMark;
+		idMark.chrn[0]=C;
+		idMark.chrn[1]=H;
+		idMark.chrn[2]=0;
+		idMark.chrn[3]=0;
+		LogError(ERRORLOG_TYPE_LOSTDATA_READADDR,&idMark);
 	}
 
 	// Remove Duplicates >>
@@ -1545,13 +1591,14 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	for(i=0; i<nTrackSector; ++i)
 	{
 		uint8_t retry,ioErr=0;
+		lostDataReadData=0;
 
 		for(retry=0; retry<cpi->firstRetryCount; ++retry)
 		{
 			uint32_t readTime;
 			ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 
-			if(0<i && 0==nInfo)
+			if(0<nInfo && 0==nInfo%nInfoPerLine)
 			{
 				printf("       ");
 			}
@@ -1564,14 +1611,14 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 				fflush(stdout);
 				++nInfo;
 
-				if(nInfoPerLine==nInfo)
+				if(0==nInfo%nInfoPerLine)
 				{
 					printf("\n");
-					nInfo=0;
 				}
 			}
 			else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
 			{
+				lostDataReadData=0;
 				Color(IOErrToColor(ioErr));
 				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 				fflush(stdout);
@@ -1580,35 +1627,23 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 				STI();
 				RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,0);
 
-				if(nInfoPerLine==nInfo)
+				if(0==nInfo%nInfoPerLine)
 				{
 					printf("\n");
-					nInfo=0;
 				}
 				break;
 			}
 		}
 
+		if(lostDataReadData)
+		{
+			LogError(ERRORLOG_TYPE_LOSTDATA,&idMark[i]);
+		}
+
 		if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.
 		{
 			int j,len;
-			struct ErrorLog far *newLog=(struct ErrorLog far *)_fmalloc(sizeof(struct ErrorLog));
-			if(NULL!=newLog)
-			{
-				newLog->next=NULL;
-				newLog->errType=ERRORLOG_TYPE_CRC;
-				newLog->idMark=idMark[i];
-				if(NULL==errLog)
-				{
-					errLog=newLog;
-					errLogTail=newLog;
-				}
-				else
-				{
-					errLogTail->next=newLog;
-					errLogTail=newLog;
-				}
-			}
+			LogError(ERRORLOG_TYPE_CRC,&idMark[i]);
 
 			len=(128<<(idMark[i].chrn[3]&3));
 			for(retry=0; retry<cpi->secondRetryCount; ++retry)
@@ -1617,7 +1652,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 				for(j=0; j<len; ++j)
 				{
-					sectorDataCopy[i]=DMABuf[i];
+					sectorDataCopy[j]=DMABuf[j];
 				}
 				ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 
@@ -1626,16 +1661,16 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 					unsigned int different=0;
 					for(j=0; j<len; ++j)
 					{
-						if(sectorDataCopy[i]!=DMABuf[i])
+						if(sectorDataCopy[j]!=DMABuf[j])
 						{
 							different=1;
-							break;
 						}
+						sectorDataCopy[j]=DMABuf[j]; // For next comparison.
 					}
 
-					if(0!=different)
+					if(0==retry || 0!=different)
 					{
-						if(0<i && 0==nInfo)
+						if(0<nInfo && 0==nInfo%nInfoPerLine)
 						{
 							printf("       ");
 						}
@@ -1644,21 +1679,19 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 						printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 						fflush(stdout);
 						++nInfo;
-
 						STI();
 						RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,1);
 
-						if(nInfoPerLine==nInfo)
+						if(0==nInfo%nInfoPerLine)
 						{
 							printf("\n");
-							nInfo=0;
 						}
 					}
 				}
 			}
 		}
 	}
-	if(0!=nInfo)
+	if(0!=nInfo%nInfoPerLine)
 	{
 		printf("\n");
 	}
@@ -1671,9 +1704,8 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		ioErr=FDC_ReadTrack(&readSize);
 
 		STI();
-		RDD_WriteTrack(cpi->outFName,C,H,readSize);
+		RDD_WriteTrack(cpi->outFName,C,H,readSize,ioErr);
 	}
-
 
 	Color(7);
 
@@ -1691,50 +1723,76 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 		ReadTrack(C,1,cpi);
 	}
 
-	/* if(NULL!=errLog)
+	if(NULL!=errLog)
 	{
+		struct ErrorLog far *ptr;
+		int nCRCError=0,nCRCErrorNotF5F6F7=0,nLostDataAddr=0,nLostDataData=0;
 		printf("Error Summary\n");
-		int nCRCError=0,nCRCErrorNotF5F6F7=0;;
-		struct CRCErrorLog *ptr;
-		for(ptr=crcErrLog; NULL!=ptr; ptr=ptr->next)
+
+		for(ptr=errLog; NULL!=ptr; ptr=ptr->next)
 		{
-			printf("CRC Err at Track:%d  Side:%d  Sector:%d\n",ptr->sector.chrn[0],ptr->sector.chrn[1],ptr->sector.chrn[2]);
-			if(0xF5!=ptr->sector.chrn[2] && 0xF6!=ptr->sector.chrn[2] && 0xF7!=ptr->sector.chrn[2])
+			if(ERRORLOG_TYPE_CRC==ptr->errType)
 			{
-				++nCRCErrorNotF5F6F7;
+				if(0==nCRCError)
+				{
+					printf("CRC Error: ");
+				}
+				printf("%02x%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1],ptr->idMark.chrn[2]);
+				++nCRCError;
+				if(0xF5!=ptr->idMark.chrn[2] && 0xF6!=ptr->idMark.chrn[2] && 0xF7!=ptr->idMark.chrn[2])
+				{
+					++nCRCErrorNotF5F6F7;
+				}
 			}
-			++nCRCError;
 		}
+		if(0<nCRCError)
+		{
+			printf("\n");
+		}
+
+		for(ptr=errLog; NULL!=ptr; ptr=ptr->next)
+		{
+			if(ERRORLOG_TYPE_LOSTDATA_READADDR==ptr->errType)
+			{
+				if(0==nLostDataAddr)
+				{
+					printf("Lost Data in Read ID Mark: ");
+				}
+				printf("%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1]);
+				++nLostDataAddr;
+			}
+		}
+		if(0<nLostDataAddr)
+		{
+			printf("\n");
+		}
+
+		for(ptr=errLog; NULL!=ptr; ptr=ptr->next)
+		{
+			if(ERRORLOG_TYPE_LOSTDATA==ptr->errType)
+			{
+				if(0==nLostDataAddr)
+				{
+					printf("Lost Data in Read Sector: ");
+				}
+				printf("%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1]);
+				++nLostDataData;
+			}
+		}
+		if(0<nLostDataData)
+		{
+			printf("\n");
+		}
+
 		printf("%d CRC Errors.\n",nCRCError);
 		printf("%d CRC Errors in not F5,F6,F7 sectors.\n",nCRCErrorNotF5F6F7);
+		printf("%d LostData Errors in Read ID Mark.\n",nLostDataAddr);
+		printf("%d LostData Errors in Read Sector.\n",nLostDataData);
 	}
 	else
 	{
-		printf("No CRC Error.\n");
+		printf("No Error.\n");
 	}
-
-	{
-		for(int track=cpi->startTrk; track<=cpi->endTrk; ++track)
-		{
-			for(int side=0; side<2; ++side)
-			{
-				unsigned char t=track*2+side;
-				if(lostDataLog[t]&1)
-				{
-					printf("Lost Data (ReadAddr) at C:%d H:%d\n",track,side);
-				}
-				if(lostDataLog[t]&2)
-				{
-					printf("Lost Data (Data    ) at C:%d H:%d\n",track,side);
-				}
-
-				if(0==numSectorTrackLog[t])
-				{
-					printf("Unformat C:%d H:%d\n",track,side);
-				}
-			}
-		}
-	} */
 }
 
 ////////////////////////////////////////////////////////////
@@ -1760,7 +1818,7 @@ int main(int ac,char *av[])
 	if(ac<3 || 0!=RecognizeCommandParameter(&cpi,ac,av))
 	{
 		printf("Usage:\n");
-		printf("  RUN386 MAKED77 A: 1232KB [options]\n");
+		printf("  FDDUMP A: 1232KB [options]\n");
 		printf("    A:      Drive\n");
 		printf("    1232KB  Disk Type\n");
 		printf("  Disk Type can be one of:\n");
@@ -1772,7 +1830,7 @@ int main(int ac,char *av[])
 		printf("    -starttrk trackNum  Start track (Between 0 and 76 if 2HD)\n");
 		printf("    -endtrk   trackNum  End track (Between 0 and 76 if 2HD)\n");
 		//printf("    -listonly           List track info only.  No RS232C transmission\n");
-		printf("    -out filename.d77   Save image to .d77 file.\n");
+		printf("    -out filename.rdd   Save image to .rdd (Real Disk Dump) file.\n");
 		//printf("    -19200bps           Transmit the image at 19200bps\n");
 		//printf("    -38400bps           Transmit the image at 38400bps\n");
 		printf("    -name diskName      Specify disk name up to 16 chars.\n");
