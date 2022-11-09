@@ -944,8 +944,6 @@ void FDC_WaitIndexHole(void)
 	{
 		statusByte=inp(IO_FDC_STATUS); // This read will clear IRR.
 	}
-
-	STI();
 }
 
 // A1  Channel
@@ -1501,6 +1499,10 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 		{
 			cpi->writeProtect=1;
 		}
+		else if(0==strcmp(av[i],"-sort") || 0==strcmp(av[i],"-SORT"))
+		{
+			cpi->sortSectors=1;
+		}
 		else if(0==strcmp(av[i],"-dontsort") || 0==strcmp(av[i],"-DONTSORT"))
 		{
 			cpi->sortSectors=0;
@@ -1590,7 +1592,7 @@ unsigned int IsLeafInTheForest(int nIDMarks,const struct IDMARK idMark[],uint16_
 //            bit1=resample flag(1 means Resample for unstable bytes)
 //    +B  (3 bytes) Microseconds for reading the sector.
 //    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
-void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t mediaType)
+void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t mediaType)
 {
 	// Looks like FM TOWNS's FDC is reliable in Read Track command.
 	uint8_t header[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -1604,6 +1606,10 @@ void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t me
 	printf("HIDNLEAF ");
 	fflush(stdout);
 	++nInfo;
+	if(0==nInfo%nInfoPerLine)
+	{
+		printf("\n");
+	}
 
 
 	for(ptr=0; ptr+7<readTrackSize; ++ptr)
@@ -1680,9 +1686,9 @@ void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t me
 			else
 			{
 				// Damn it!  Thexder's hidden sector crossed the index hole!
-				// Wait for index hole,
-				// Wait for certain micro seconds,
-				// Then read sector.
+				// (1) Wait for index hole,
+				// (2) Wait for certain micro seconds,
+				// (3) Then read sector.
 				int retry;
 				uint8_t res=0xFF;
 				for(retry=0; retry<3; ++retry)
@@ -1699,6 +1705,17 @@ void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t me
 						waitTime*=32; // (micro=1M)*len*(16 pulses per byte)/500K.
 					}
 
+					// Time critical.
+
+					CLI();
+
+					SelectDrive();
+					WriteDriveControl(0);
+
+					SetUpDMA(DMABuf,len);
+
+					INT46_DID_COME_IN=0;
+
 					FDC_WaitIndexHole();
 					t0=inpw(IO_FREERUN_TIMER);
 					while(accumTime<waitTime)
@@ -1708,10 +1725,29 @@ void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t me
 						t0=t;
 					}
 
-					// When the data is close to the 
-					res=FDC_ReadSectorReal(&accumTime,C,H,R,N);
-					if(0xFF!=res)
+					outp(IO_FDC_CYLINDER,C);
+					outp(IO_FDC_SECTOR,R);
+					FDC_WaitReady();
+
+					WriteDriveControl(CTL_IRQEN);
+					FDC_Command(FDCCMD_READSECTOR);
+					t0=inpw(IO_FREERUN_TIMER);
+					STI();
+
+					accumTime=0;
+					while(0==INT46_DID_COME_IN && accumTime<READSECTOR_TIMEOUT)
 					{
+						Palette(COLOR_DEBUG,rand(),rand(),rand());
+						t=inpw(IO_FREERUN_TIMER);
+						diff=t-t0;
+						accumTime+=diff;
+						t0=t;
+					}
+					WriteDriveControl(0);
+
+					if(accumTime<READSECTOR_TIMEOUT)
+					{
+						res=lastFDCStatus;
 						break;
 					}
 				}
@@ -1733,6 +1769,17 @@ void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t me
 						{
 							printf("\n");
 						}
+					}
+				}
+				else
+				{
+					Color(2);
+					printf("TIMEOUT  ");
+					fflush(stdout);
+					++nInfo;
+					if(0==nInfo%nInfoPerLine)
+					{
+						printf("\n");
 					}
 				}
 			}
@@ -1773,6 +1820,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	FDC_WaitIndexHole(); // Need to be immediately after seek.
 	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
 
+	STI();
 	for(mfmTry=0; mfmTry<2; ++mfmTry)
 	{
 		uint32_t accumTime=0;
@@ -1883,7 +1931,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	// If Hidden-Leaf protect, do differently.
 	if(IsLeafInTheForest(nTrackSector,idMark,readTrackSize))
 	{
-		DoHiddenLeaf(cpi->outFName,nInfo,readTrackSize,cpi->mediaType);
+		FindHiddenLeaf(cpi->outFName,nInfo,readTrackSize,cpi->mediaType);
 		return;
 	}
 
@@ -2128,6 +2176,7 @@ int main(int ac,char *av[])
 		printf("    -name diskName      Specify disk name up to 16 chars.\n");
 		//printf("    -writeprotect       Write protect the disk image.\n");
 		printf("    -dontsort           Don't sort sectors (preserve interleave).\n");
+		printf("    -sort               Sort sectors.\n");
 		return 1;
 	}
 
