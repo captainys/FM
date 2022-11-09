@@ -1311,11 +1311,13 @@ void CleanUp(void)
 {
 	int i;
 	INT46_RestoreHandler(default_INT46H_HandlerPtr);
+	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
+
 	controlByte&=~CTL_MOTOR;
 	speedByte&=~SPD_INUSE;
 	SelectDrive();
-	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
-	outp(IO_FDC_DRIVE_SELECT,speedByte);
+	WriteDriveControl(0);
+
 	Color(7);
 	PrintSysCharWord("        ",1,7);
 	PrintSysCharWord("        ",9,7);
