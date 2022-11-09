@@ -69,6 +69,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //    +3  st  MB8877 status
 //    +E  (2 bytes) Number of bytes returned from Track Read.
 // (Bytes padded to 16*N bytes)
+// End of Track
+// 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+// End of File
+// 06 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 
 // Next Track
 
@@ -760,6 +764,53 @@ unsigned int RDD_WriteTrack(const char outFName[],uint8_t C,uint8_t H,uint16_t r
 	return 0;
 }
 
+unsigned int RDD_WriteEndOfTrack(const char outFName[])
+{
+	FILE *ofp;
+	uint8_t data[16]={5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+	ofp=fopen(outFName,"ab");
+	if(NULL==ofp)
+	{
+		Color(2);
+		fprintf(stderr,"Cannot open output file.\n");
+		Color(7);
+		return 1;
+	}
+
+	fwrite(data,1,16,ofp);
+
+	fclose(ofp);
+
+	WaitMicrosec(AFTER_SCSI_WAIT);
+	WaitMicrosec(AFTER_SCSI_WAIT);
+	WaitMicrosec(AFTER_SCSI_WAIT);
+
+	return 0;
+}
+
+unsigned int RDD_WriteEndOfDisk(const char outFName[])
+{
+	FILE *ofp;
+	uint8_t data[16]={6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+	ofp=fopen(outFName,"ab");
+	if(NULL==ofp)
+	{
+		Color(2);
+		fprintf(stderr,"Cannot open output file.\n");
+		Color(7);
+		return 1;
+	}
+
+	fwrite(data,1,16,ofp);
+
+	fclose(ofp);
+
+	WaitMicrosec(AFTER_SCSI_WAIT);
+
+	return 0;
+}
 
 ////////////////////////////////////////////////////////////
 // Disk
@@ -1710,6 +1761,8 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	Color(7);
 
 	outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=H ? CTL_SIDE : 0)|CTL_MFM);
+
+	RDD_WriteEndOfTrack(cpi->outFName);
 }
 
 void ReadDisk(struct CommandParameterInfo *cpi)
@@ -1889,6 +1942,8 @@ int main(int ac,char *av[])
 	}
 
 	ReadDisk(&cpi);
+
+	RDD_WriteEndOfDisk(cpi.outFName);
 
 	CleanUp();
 
