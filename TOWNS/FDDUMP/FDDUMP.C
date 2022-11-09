@@ -201,6 +201,7 @@ void LogError(unsigned int code,struct IDMARK *idMark)
 
 #define TSUGARU_DEBUGBREAK				outp(0x2386,2);
 
+#define DRIVE_MOTOR_WAIT_TIME	1000000
 #define READADDR_TIMEOUT		1000000
 #define READADDR_TRACK_TIMEOUT  3000000
 #define READTRACK_TIMEOUT		3000000
@@ -885,24 +886,27 @@ value [ al ]
 
 int CheckDriveReady(void)
 {
-	int i;
-	const int nRepeat=500;
+	uint32_t accumTime=0;
+	uint16_t t0,t,diff;
+	uint8_t driveStatus;
 	SelectDrive();
 	WriteDriveControl(0);
-	for(i=0; i<nRepeat; ++i)
+
+	t0=inpw(IO_FREERUN_TIMER);
+	while(accumTime<DRIVE_MOTOR_WAIT_TIME)
 	{
-		unsigned int readyByte,readyBit;
-		readyByte=ReadDriveStatusIO();
-		readyBit=(readyByte&DRIVE_STA_FREADY);
-		if(0!=readyBit)
+		driveStatus=ReadDriveStatusIO();
+		if(0!=(driveStatus&DRIVE_STA_FREADY))
 		{
 			return 1;
 		}
-		else if(i+1==nRepeat)
-		{
-			printf("Status %02xH\n",readyByte);
-		}
+
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		t0=t;
+		accumTime+=diff;
 	}
+	printf("Status %02xH\n",driveStatus);
 	return 0;
 }
 
@@ -1511,6 +1515,225 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 	return 0;
 }
 
+
+/*
+Thexder Protected Track
+
+82 bytes per dummy sector
+
+1 byte = 16 pulse windows
+
+82 bytes = 1312 pulse windows
+
+500K pulses per sec
+
+1312/500K=2.624 millisec
+*/
+
+
+
+unsigned int IsLeafInTheForest(int nIDMarks,const struct IDMARK idMark[],uint16_t readTrackSize)
+{
+	uint32_t prevDataMark=~0;
+	int i;
+	int nSec=0;
+
+	// Sign of Leaf-In-The-Forest protect (1) all same C,H,R
+	for(i=1; i<nIDMarks; ++i)
+	{
+		if(idMark[i].CHRN[0]!=idMark[0].CHRN[0] ||
+		   idMark[i].CHRN[1]!=idMark[0].CHRN[1] ||
+		   idMark[i].CHRN[2]!=idMark[0].CHRN[2])
+		{
+			return 0;
+		}
+	}
+
+	// Sign of Leaf-In-The-Forest protect (2) many ID marks.
+	for(i=0; i+6<readTrackSize; ++i)
+	{
+		if(DMABuf[i  ]==0xA1 &&
+		   DMABuf[i+1]==0xA1 &&
+		   DMABuf[i+2]==0xFE &&
+		   DMABuf[i+3]==idMark[0].CHRN[0] &&
+		   DMABuf[i+4]==idMark[0].CHRN[1] &&
+		   DMABuf[i+5]==idMark[0].CHRN[2]) // ID Mark
+		{
+			++nSec;
+		}
+		if(DMABuf[i  ]==0xA1 &&
+		   DMABuf[i+1]==0xA1 &&
+		   (DMABuf[i+2]==0xFB || DMABuf[i+2]==0xF8)) // Data Mark
+		{
+		}
+	}
+
+	// Thexder and Fire Crystal had more than 60 sectors in total.
+	// 40 should be a good threshold.
+	if(40<=nSec)
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+// Data
+// 03 cc hh rr nn st fl 00 00 00 00 <time  > <Length>
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +3  rr  Sector Number
+//    +4  nn  Length=128<<(n&3)
+//    +5  st  MB8877 status
+//    +6  fl  bit0=density flag(0:MFM 1:FM)
+//            bit1=resample flag(1 means Resample for unstable bytes)
+//    +B  (3 bytes) Microseconds for reading the sector.
+//    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
+void DoHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t mediaType)
+{
+	// Looks like FM TOWNS's FDC is reliable in Read Track command.
+	uint8_t header[16];
+	uint16_t ptr;
+	uint16_t addrMarkPtr=0,dataMarkPtr=0;
+	uint16_t prevAddrMarkPtr,prevDataMarkPtr;
+	uint8_t C,H,R,N;
+
+	for(ptr=0; ptr+7<readTrackSize; ++ptr)
+	{
+		if(DMABuf[ptr  ]==0xA1 &&
+		   DMABuf[ptr+1]==0xA1 &&
+		   DMABuf[ptr+2]==0xFE)
+		{
+			prevAddrMarkPtr=addrMarkPtr;
+			addrMarkPtr=ptr;
+		}
+		if(DMABuf[ptr  ]==0xA1 &&
+		   DMABuf[ptr+1]==0xA1 &&
+		   (DMABuf[ptr+2]==0xFB || DMABuf[ptr+2]==0xF8))
+		{
+			uint16_t len=0;
+			uint16_t microsec;
+			uint16_t dataPtr;
+
+			prevDataMarkPtr=dataMarkPtr;
+			daraMarkPtr=ptr;
+			dataPtr=ptr+3;
+
+			C=DMABuf[addrMarkPtr+3];
+			H=DMABuf[addrMarkPtr+4];
+			R=DMABuf[addrMarkPtr+5];
+			N=DMABuf[addrMarkPtr+6];
+
+			header[0]=3;
+			header[1]=C;
+			header[2]=H;
+			header[3]=R;
+			header[3]=N;
+			header[4]=IOERR_CRC;
+			if(0xF8==DMABuf[ptr+2])
+			{
+				header[4]|=IOERR_DELETED_DATA;
+			}
+
+			len=(128<<(DMABuf[addrMarkPtr+6]&3));
+			header[14]=(len&0xFF);
+			header[15]=(len>>8);
+
+			if(0x20==mediaType) // 2HD 1000K pulses per sec
+			{
+				microsec=16*len; // (micro=1M)*len*(16 pulses per byte)/1000K.
+			}
+			else // 2D/2DD 500K pulses per sec
+			{
+				microsec=32*len; // (micro=1M)*len*(16 pulses per byte)/500K.
+			}
+			header[0x0B]=microsec&0xFF;
+			header[0x0C]=(microsec>>8)&0xFF;
+			header[0x0C]=(microsec>>16)&0xFF;
+
+			if(dataPtr+len<=readTrackSize)
+			{
+				FILE *ofp=fopen(fName,"ab");
+				if(NULL!=ofp)
+				{
+					fwrite(header,1,16,ofp);
+					fwrite(DMABuf+dataPtr,1,len,ofp);
+					fclose(ofp);
+
+					Color(IOErrToColor(header[4]));
+					printf("%02x%02x%02x%02x ",C,H,R,N);
+					fflush(stdout);
+					++nInfo;
+					if(0==nInfo%nInfoPerLine)
+					{
+						printf("\n");
+					}
+				}
+			}
+			else
+			{
+				// Damn it!  Thexder's hidden sector crossed the index hole!
+				// Wait for index hole,
+				// Wait for certain micro seconds,
+				// Then read sector.
+				int retry;
+				uint8_t res=0xFF;
+				for(retry=0; retry<3; ++retry)
+				{
+					uint32_t waitTime,accumTime=0;
+					uint16_t t0,t,diff;
+					waitTime=prevDataMarkPtr;
+					if(0x20==mediaType) // 2HD 1000K pulses per sec
+					{
+						waitTime*=16; // (micro=1M)*len*(16 pulses per byte)/1000K.
+					}
+					else // 2D/2DD 500K pulses per sec
+					{
+						waitTime*=32; // (micro=1M)*len*(16 pulses per byte)/500K.
+					}
+
+					FDC_WaitIndexHole();
+					t0=inpw(IO_FREERUN_TIMER);
+					while(accumTime<waitTime)
+					{
+						t=inpw(IO_FREERUN_TIMER);
+						diff=t-t0;
+						t0=t;
+					}
+
+					// When the data is close to the 
+					res=FDC_ReadSectorReal(&accumTime,C,H,R,N);
+					if(0xFF!=res)
+					{
+						break;
+					}
+				}
+
+				if(0xFF!=res)
+				{
+					FILE *ofp=fopen(fName,"ab");
+					if(NULL!=ofp)
+					{
+						fwrite(header,1,16,ofp);
+						fwrite(DMABuf,1,len,ofp);
+						fclose(ofp);
+
+						Color(IOErrToColor(header[4]));
+						printf("%02x%02x%02x%02x ",C,H,R,N);
+						fflush(stdout);
+						++nInfo;
+						if(0==nInfo%nInfoPerLine)
+						{
+							printf("\n");
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
 #define PrintIDMark(idMark)
 #define nInfoPerLine 8
 
@@ -1523,6 +1746,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	unsigned char lostDataReadAddr=0;
 	unsigned char lostDataReadData=0;
 	unsigned char mfmTry,nFail=0;
+	uint16_t readTrackSize=0;
 
 	STI();
 	Color(4);
@@ -1641,6 +1865,27 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	STI();
 	RDD_WriteIDMark(cpi->outFName,nTrackSector,idMark);
 
+
+	// Read Track
+	{
+		uint8_t ioErr=0;
+
+		ioErr=FDC_ReadTrack(&readTrackSize);
+
+		STI();
+		RDD_WriteTrack(cpi->outFName,C,H,readSize,ioErr);
+	}
+
+
+	// If Hidden-Leaf protect, do differently.
+	if(IsLeafInTheForest(nTrackSector,idMark,readTrackSize))
+	{
+		DoHiddenLeaf(cpi.outFName,nInfo,readTrackSize,cpi->mediaType);
+		return;
+	}
+
+
+
 	for(i=0; i<nTrackSector; ++i)
 	{
 		uint8_t retry,ioErr=0;
@@ -1747,17 +1992,6 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	if(0!=nInfo%nInfoPerLine)
 	{
 		printf("\n");
-	}
-
-	// Read Track
-	{
-		uint8_t ioErr=0;
-		uint16_t readSize=0;
-
-		ioErr=FDC_ReadTrack(&readSize);
-
-		STI();
-		RDD_WriteTrack(cpi->outFName,C,H,readSize,ioErr);
 	}
 
 	Color(7);
