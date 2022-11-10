@@ -378,6 +378,7 @@ struct INT_DATA_BLOCK
 };
 
 uint16_t default_INT46H_HandlerPtr[2];
+uint8_t default_INT_EnableBits[4]={0,0,0,0};
 
 // Note: INT number is from PIC point of view.  46H from CPU point of view is 06H from PIC point of view.
 void INT46_SaveHandler(uint16_t *ptr);
@@ -426,6 +427,21 @@ void INT46_TakeOver(void)
 	datablock.func=Handle_INT46H;
 	INT46_RegisterHandler(&datablock);
 }
+
+
+void INT_SetEnableBits(uint8_t *ptr);
+#pragma aux INT_SetEnableBits=\
+"mov ah,2"\
+"int 0aeh"\
+parm [ DI ]
+
+
+void INT_GetEnableBits(uint8_t *ptr);
+#pragma aux INT_GetEnableBits=\
+"mov ah,3"\
+"int 0aeh"\
+parm [ DI ]
+
 
 
 ////////////////////////////////////////////////////////////
@@ -1352,6 +1368,8 @@ void CleanUp(void)
 	SelectDrive();
 	WriteDriveControl(0);
 
+	INT_SetEnableBits(default_INT_EnableBits);
+
 	Color(7);
 	PrintSysCharWord("        ",1,7);
 	PrintSysCharWord("        ",9,7);
@@ -2145,6 +2163,8 @@ int main(int ac,char *av[])
 		return 1;
 	}
 
+	INT_GetEnableBits(default_INT_EnableBits);
+
 	if(0==FreeRunTimerAvailable())
 	{
 		Color(2);
@@ -2162,6 +2182,15 @@ int main(int ac,char *av[])
 		printf("Drive Not Ready.\n");
 		Color(7);
 		return 1;
+	}
+
+	{
+		// I don't know what timer does bad for FDC, but at the beginning of Read Sector BIOS Call,
+		// it was cancelling two timers.  So, I just disable timers and see.
+		static uint8_t INT_EnableBits[4];
+		INT_GetEnableBits(INT_EnableBits);
+		INT_EnableBits[3]&=0xFE; // Is it really [3] b0 for INT 0?  FM Towns Techncial Databook says so.
+		INT_SetEnableBits(INT_EnableBits);
 	}
 
 	INT46_SaveHandler(default_INT46H_HandlerPtr);
