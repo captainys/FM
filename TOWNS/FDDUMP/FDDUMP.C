@@ -2187,6 +2187,10 @@ int main(int ac,char *av[])
 	{
 		// I don't know what timer does bad for FDC, but at the beginning of Read Sector BIOS Call,
 		// it was cancelling two timers.  So, I just disable timers and see.
+
+		// Confirmed!  Unless I mask timer interrupt, FDC gets irresponsive, probably because Disk BIOS was using
+		// timer for checking disk change, it did something to I/O, and messed up with FDC.
+
 		static uint8_t INT_EnableBits[4];
 		INT_GetEnableBits(INT_EnableBits);
 		INT_EnableBits[3]&=0xFE; // Is it really [3] b0 for INT 0?  FM Towns Techncial Databook says so.
