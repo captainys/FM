@@ -146,7 +146,7 @@ unsigned int ConvertTrack(uint32_t trackTable[],FILE *ofp,FILE *extFp,FILE *ifp,
 		}
 		else
 		{
-			printf("Unknown tab %d\n",id[0]);
+			printf("Unknown tag %d\n",id[0]);
 			return 1;
 		}
 	}

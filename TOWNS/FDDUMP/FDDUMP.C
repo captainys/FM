@@ -59,6 +59,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //    +5  st  MB8877 status
 //    +6  fl  bit0=density flag(0:MFM 1:FM)
 //            bit1=resample flag(1 means Resample for unstable bytes)
+//            bit2=Probably Leaf-In-The-Forest Protect
 //    +B  (3 bytes) Microseconds for reading the sector.
 //    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
 // (Bytes padded to 16*N bytes)
@@ -113,6 +114,7 @@ struct IDMARK idMark[IDBUF_SIZE];
 #define ERRORLOG_TYPE_RECORD_NOT_FOUND	2
 #define ERRORLOG_TYPE_LOSTDATA	3
 #define ERRORLOG_TYPE_LOSTDATA_READADDR	4
+#define ERRORLOG_TYPE_READ_TRACK 5
 struct ErrorLog
 {
 	struct ErrorLog far *next;
@@ -129,6 +131,30 @@ void LogError(unsigned int code,struct IDMARK *idMark)
 		newLog->next=NULL;
 		newLog->errType=code;
 		newLog->idMark=*idMark;
+		if(NULL==errLog)
+		{
+			errLog=newLog;
+			errLogTail=newLog;
+		}
+		else
+		{
+			errLogTail->next=newLog;
+			errLogTail=newLog;
+		}
+	}
+}
+
+void LogErrorCH(unsigned int code,uint8_t C,uint8_t H)
+{
+	struct ErrorLog far *newLog=(struct ErrorLog far *)_fmalloc(sizeof(struct ErrorLog));
+	if(NULL!=newLog)
+	{
+		newLog->next=NULL;
+		newLog->errType=code;
+		newLog->idMark.chrn[0]=C;
+		newLog->idMark.chrn[1]=H;
+		newLog->idMark.chrn[2]=0;
+		newLog->idMark.chrn[3]=0;
 		if(NULL==errLog)
 		{
 			errLog=newLog;
@@ -520,6 +546,11 @@ void WaitMicrosec(uint32_t microsec)
 
 #define RDD_VERSION 0
 
+#define RDD_SECTORFLAG_DENSITY_FM   1
+#define RDD_SECTORFLAG_RESAMPLE     2
+#define RDD_SECTORFLAG_LEAF_IN_THE_FOREST  4
+
+
 // Begin Disk
 // 00 vr mt fl 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 //    vr  Version 
@@ -671,11 +702,11 @@ unsigned int RDD_WriteSectorData(const char fName[],const uint8_t CHRN[4],uint8_
 
 	if(CTL_MFM!=FMorMFM) // If single-density
 	{
-		flags|=1;
+		flags|=RDD_SECTORFLAG_DENSITY_FM;
 	}
 	if(0!=isResample)
 	{
-		flags|=2;
+		flags|=RDD_SECTORFLAG_RESAMPLE;
 	}
 
 	for(i=0; i<16; ++i)
@@ -891,6 +922,8 @@ int CheckDriveReady(void)
 	uint8_t driveStatus;
 	SelectDrive();
 	WriteDriveControl(0);
+
+	WaitMicrosec(DRIVE_MOTOR_WAIT_TIME);
 
 	t0=inpw(IO_FREERUN_TIMER);
 	while(accumTime<DRIVE_MOTOR_WAIT_TIME)
@@ -1270,6 +1303,7 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 
 		// Memo: Make sure to write 44H to I/O AAh.
 		//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
+		accumTime=0;
 		while(0==INT46_DID_COME_IN && accumTime<READTRACK_TIMEOUT)
 		{
 			Palette(COLOR_DEBUG,rand(),rand(),rand());
@@ -1288,10 +1322,8 @@ unsigned char FDC_ReadTrack(uint16_t *readSize)
 			// It does happen in real hardware, and unless Force Interrupt, FDC will never be ready again.
 			FDC_Command(FDCCMD_FORCEINTERRUPT);
 			outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
-			for(i=0; i<50; ++i)
-			{
-				Wait10ms();
-			}
+			WaitMicrosec(500000);
+			lastFDCStatus=0xFF;
 		}
 		else
 		{
@@ -1602,7 +1634,12 @@ void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t 
 	uint8_t C,H,R,N;
 
 
-	Color(4));
+	if(0<nInfo && 0==nInfo%nInfoPerLine)
+	{
+		printf("       ");
+	}
+
+	Color(4);
 	printf("HIDNLEAF ");
 	fflush(stdout);
 	++nInfo;
@@ -1621,13 +1658,12 @@ void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t 
 			prevAddrMarkPtr=addrMarkPtr;
 			addrMarkPtr=ptr;
 		}
-		if(DMABuf[ptr  ]==0xA1 &&
-		   DMABuf[ptr+1]==0xA1 &&
-		   (DMABuf[ptr+2]==0xFB || DMABuf[ptr+2]==0xF8))
+		else if(DMABuf[ptr  ]==0xA1 &&
+		        DMABuf[ptr+1]==0xA1 &&
+		       (DMABuf[ptr+2]==0xFB || DMABuf[ptr+2]==0xF8))
 		{
 			uint16_t len=0;
-			uint16_t microsec;
-			uint16_t dataPtr;
+			uint16_t dataPtr,microsec;
 
 			prevDataMarkPtr=dataMarkPtr;
 			dataMarkPtr=ptr;
@@ -1642,14 +1678,15 @@ void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t 
 			header[1]=C;
 			header[2]=H;
 			header[3]=R;
-			header[3]=N;
-			header[4]=IOERR_CRC;
+			header[4]=N;
+			header[5]=IOERR_CRC;
 			if(0xF8==DMABuf[ptr+2])
 			{
-				header[4]|=IOERR_DELETED_DATA;
+				header[5]|=IOERR_DELETED_DATA;
 			}
+			header[6]=RDD_SECTORFLAG_LEAF_IN_THE_FOREST;
 
-			len=(128<<(DMABuf[addrMarkPtr+6]&3));
+			len=(128<<(N&3));
 			header[14]=(len&0xFF);
 			header[15]=(len>>8);
 
@@ -1664,7 +1701,6 @@ void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t 
 			header[0x0B]=microsec&0xFF;
 			header[0x0C]=(microsec>>8)&0xFF;
 
-			if(dataPtr+len<=readTrackSize)
 			{
 				FILE *ofp=fopen(fName,"ab");
 				if(NULL!=ofp)
@@ -1672,6 +1708,11 @@ void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t 
 					fwrite(header,1,16,ofp);
 					fwrite(DMABuf+dataPtr,1,len,ofp);
 					fclose(ofp);
+
+					if(0<nInfo && 0==nInfo%nInfoPerLine)
+					{
+						printf("       ");
+					}
 
 					Color(IOErrToColor(header[4]));
 					printf("%02x%02x%02x%02x ",C,H,R,N);
@@ -1683,107 +1724,14 @@ void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t 
 					}
 				}
 			}
-			else
-			{
-				// Damn it!  Thexder's hidden sector crossed the index hole!
-				// (1) Wait for index hole,
-				// (2) Wait for certain micro seconds,
-				// (3) Then read sector.
-				int retry;
-				uint8_t res=0xFF;
-				for(retry=0; retry<3; ++retry)
-				{
-					uint32_t waitTime,accumTime=0;
-					uint16_t t0,t,diff;
-					waitTime=prevDataMarkPtr;
-					if(0x20==mediaType) // 2HD 1000K pulses per sec
-					{
-						waitTime*=16; // (micro=1M)*len*(16 pulses per byte)/1000K.
-					}
-					else // 2D/2DD 500K pulses per sec
-					{
-						waitTime*=32; // (micro=1M)*len*(16 pulses per byte)/500K.
-					}
-
-					// Time critical.
-
-					CLI();
-
-					SelectDrive();
-					WriteDriveControl(0);
-
-					SetUpDMA(DMABuf,len);
-
-					INT46_DID_COME_IN=0;
-
-					FDC_WaitIndexHole();
-					t0=inpw(IO_FREERUN_TIMER);
-					while(accumTime<waitTime)
-					{
-						t=inpw(IO_FREERUN_TIMER);
-						diff=t-t0;
-						t0=t;
-					}
-
-					outp(IO_FDC_CYLINDER,C);
-					outp(IO_FDC_SECTOR,R);
-					FDC_WaitReady();
-
-					WriteDriveControl(CTL_IRQEN);
-					FDC_Command(FDCCMD_READSECTOR);
-					t0=inpw(IO_FREERUN_TIMER);
-					STI();
-
-					accumTime=0;
-					while(0==INT46_DID_COME_IN && accumTime<READSECTOR_TIMEOUT)
-					{
-						Palette(COLOR_DEBUG,rand(),rand(),rand());
-						t=inpw(IO_FREERUN_TIMER);
-						diff=t-t0;
-						accumTime+=diff;
-						t0=t;
-					}
-					WriteDriveControl(0);
-
-					if(accumTime<READSECTOR_TIMEOUT)
-					{
-						res=lastFDCStatus;
-						break;
-					}
-				}
-
-				if(0xFF!=res)
-				{
-					FILE *ofp=fopen(fName,"ab");
-					if(NULL!=ofp)
-					{
-						fwrite(header,1,16,ofp);
-						fwrite(DMABuf,1,len,ofp);
-						fclose(ofp);
-
-						Color(IOErrToColor(header[4]));
-						printf("%02x%02x%02x%02x ",C,H,R,N);
-						fflush(stdout);
-						++nInfo;
-						if(0==nInfo%nInfoPerLine)
-						{
-							printf("\n");
-						}
-					}
-				}
-				else
-				{
-					Color(2);
-					printf("TIMEOUT  ");
-					fflush(stdout);
-					++nInfo;
-					if(0==nInfo%nInfoPerLine)
-					{
-						printf("\n");
-					}
-				}
-			}
 		}
+	}
+
+	Color(7);
+
+	if(0!=nInfo%nInfoPerLine)
+	{
+		printf("\n");
 	}
 }
 
@@ -1797,6 +1745,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	unsigned char lostDataReadData=0;
 	unsigned char mfmTry,nFail=0;
 	uint16_t readTrackSize=0;
+	uint8_t ioErr=0;
 
 	STI();
 	Color(4);
@@ -1866,12 +1815,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 	if(lostDataReadAddr)
 	{
-		struct IDMARK idMark;
-		idMark.chrn[0]=C;
-		idMark.chrn[1]=H;
-		idMark.chrn[2]=0;
-		idMark.chrn[3]=0;
-		LogError(ERRORLOG_TYPE_LOSTDATA_READADDR,&idMark);
+		LogErrorCH(ERRORLOG_TYPE_LOSTDATA_READADDR,C,H);
 	}
 
 	// Remove Duplicates >>
@@ -1913,28 +1857,31 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	}
 	// Sort sectors <<
 
-	STI();
-	RDD_WriteIDMark(cpi->outFName,nTrackSector,idMark);
-
 
 	// Read Track
+	ioErr=FDC_ReadTrack(&readTrackSize);
+	if(0xFF==ioErr)
 	{
-		uint8_t ioErr=0;
+		LogErrorCH(ERRORLOG_TYPE_READ_TRACK,C,H);
+	}
 
-		ioErr=FDC_ReadTrack(&readTrackSize);
 
-		STI();
+	STI();
+	RDD_WriteIDMark(cpi->outFName,nTrackSector,idMark);
+	if(0xFF!=ioErr)
+	{
 		RDD_WriteTrack(cpi->outFName,C,H,readTrackSize,ioErr);
+		// If Hidden-Leaf protect, do differently.
+		if(IsLeafInTheForest(nTrackSector,idMark,readTrackSize))
+		{
+			FindHiddenLeaf(cpi->outFName,nInfo,readTrackSize,cpi->mediaType);
+			RDD_WriteEndOfTrack(cpi->outFName);
+			return;
+		}
 	}
 
 
-	// If Hidden-Leaf protect, do differently.
-	if(IsLeafInTheForest(nTrackSector,idMark,readTrackSize))
-	{
-		FindHiddenLeaf(cpi->outFName,nInfo,readTrackSize,cpi->mediaType);
-		return;
-	}
-
+	WaitMicrosec(500000); // 500ms
 
 
 	for(i=0; i<nTrackSector; ++i)
@@ -2066,7 +2013,7 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 	if(NULL!=errLog)
 	{
 		struct ErrorLog far *ptr;
-		int nCRCError=0,nCRCErrorNotF5F6F7=0,nLostDataAddr=0,nLostDataData=0;
+		int nCRCError=0,nCRCErrorNotF5F6F7=0,nLostDataAddr=0,nLostDataData=0,nReadTrackErr=0;;
 		printf("Error Summary\n");
 
 		for(ptr=errLog; NULL!=ptr; ptr=ptr->next)
@@ -2124,10 +2071,28 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 			printf("\n");
 		}
 
+		for(ptr=errLog; NULL!=ptr; ptr=ptr->next)
+		{
+			if(ERRORLOG_TYPE_READ_TRACK==ptr->errType)
+			{
+				if(0==nReadTrackErr)
+				{
+					printf("Read Track Error: ");
+				}
+				printf("%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1]);
+				++nReadTrackErr;
+			}
+		}
+		if(0<nReadTrackErr)
+		{
+			printf("\n");
+		}
+
 		printf("%d CRC Errors.\n",nCRCError);
 		printf("%d CRC Errors in not F5,F6,F7 sectors.\n",nCRCErrorNotF5F6F7);
 		printf("%d LostData Errors in Read ID Mark.\n",nLostDataAddr);
 		printf("%d LostData Errors in Read Sector.\n",nLostDataData);
+		printf("%d Read-Track Error.\n",nReadTrackErr);
 	}
 	else
 	{
