@@ -1201,11 +1201,25 @@ unsigned char FDC_ReadAddress(uint32_t *accumTime)
 
 unsigned char FDC_ReadSectorReal(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t R,uint8_t N)
 {
+	static uint8_t INT_EnableBits[4]; // Make sure it is in DS.
+	uint8_t INT_EnableBitsBackUp[4];
+
 	uint16_t t0,t,diff,initDMACounter;
 
 	Palette(COLOR_DEBUG,255,0,0);
 
 	*accumTime=0;
+
+
+	INT_GetEnableBits(INT_EnableBits);
+	INT_EnableBitsBackUp[0]=INT_EnableBits[0];
+	INT_EnableBitsBackUp[1]=INT_EnableBits[1];
+	INT_EnableBitsBackUp[2]=INT_EnableBits[2];
+	INT_EnableBitsBackUp[3]=INT_EnableBits[3];
+	INT_EnableBits[3]&=0xC0; // Mask everything except FDC and Secondary PIC.
+	INT_EnableBits[2]=0;     // Mask everything except FDC and Secondary PIC.
+	INT_SetEnableBits(INT_EnableBits);
+
 
 	SelectDrive();
 	WriteDriveControl(0);
@@ -1258,6 +1272,14 @@ unsigned char FDC_ReadSectorReal(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t
 		t0=t;
 	}
 	WriteDriveControl(0);
+
+
+	INT_EnableBits[0]=INT_EnableBitsBackUp[0];
+	INT_EnableBits[1]=INT_EnableBitsBackUp[1];
+	INT_EnableBits[2]=INT_EnableBitsBackUp[2];
+	INT_EnableBits[3]=INT_EnableBitsBackUp[3];
+	INT_SetEnableBits(INT_EnableBits);
+
 
 	Palette(COLOR_DEBUG,255,255,255);
 
