@@ -520,10 +520,12 @@ void PrintDebugLine(void)
 	PrintSysCharWord("[ACT]",1,COLOR_DEBUG);
 }
 
+void CleanUp(void);
+
 void CtrlC(int err)
 {
 	Color(7);
-	INT46_RestoreHandler(default_INT46H_HandlerPtr);
+	CleanUp();
 	printf("Intercepted Ctrl+C\n");
 	exit(1);
 }
@@ -929,7 +931,7 @@ uint8_t ReadDriveStatusIO(void);
 "in al,dx"\
 "in al,dx"\
 "movzx ax,al"\
-value [ al ]
+value [ al ] modify [ dx ]
 
 int CheckDriveReady(void)
 {
@@ -956,6 +958,7 @@ int CheckDriveReady(void)
 		accumTime+=diff;
 	}
 	printf("Status %02xH\n",driveStatus);
+	printf("FDC Status %02x\n",inp(IO_FDC_STATUS));
 	return 0;
 }
 
@@ -2174,16 +2177,6 @@ int main(int ac,char *av[])
 		return 1;
 	}
 
-	SetDriveMode(cpi.drive,cpi.mode);
-
-	if(0==CheckDriveReady())
-	{
-		Color(2);
-		printf("Drive Not Ready.\n");
-		Color(7);
-		return 1;
-	}
-
 	{
 		// I don't know what timer does bad for FDC, but at the beginning of Read Sector BIOS Call,
 		// it was cancelling two timers.  So, I just disable timers and see.
@@ -2200,6 +2193,19 @@ int main(int ac,char *av[])
 	INT46_SaveHandler(default_INT46H_HandlerPtr);
 	INT46_TakeOver();
 	signal(SIGINT,CtrlC);
+
+	SetDriveMode(cpi.drive,cpi.mode);
+
+	// Looks like drive-ready should be checked after masking timer and/or taking over INT 46h,
+	// or I keep getting FREADY=0 from I/O 0208h.
+	if(0==CheckDriveReady())
+	{
+		Color(2);
+		printf("Drive Not Ready.\n");
+		Color(7);
+		goto ERREND;
+	}
+
 
 	RestoreState=FDC_Restore(); // Can check write-protect
 	if(RestoreState&0x80)
