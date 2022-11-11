@@ -10,9 +10,9 @@ This program was developed for preserving programs for Fujitsu FM-7/77/77AV seri
 
 Also it captures a sector that changes the contents up to 12 times by default.  Multiple-samples are necessary for replicating one type of copy protection that relies on unstable bytes.
 
-Some games for FM-7 used Leaf-In-The-Forest protect, that hides real sectors among dummy sectors.  Initially I thought it would be difficult to capture this information.  However, to my surprise, track-read command in FM TOWNS (2MX at least) returns accurate sector data.  I have confirmed that hidden-sector content can be recovered from track-read output of The Fire Crystal.  Well, Thexder's one of the two hidden sectors was crossing the index hole, and Track-Read stopped in the middle, so it did not work for Thexder unfortunately.
+Some games for FM-7 used Leaf-In-The-Forest protect, which hides real sectors among dummy sectors.  Initially I thought it would be difficult to capture this information.  However, to my surprise, track-read command in FM TOWNS (2MX at least) returns accurate sector data, from which I can extract real sectors.  I have confirmed that hidden-sector content can be recovered from track-read output of The Fire Crystal and Thexder.  I initially thought I failed to capture hidden sector of Thexder, but I was wrong.
 
-Therefore, to my knowledge, FDDUMP.EXE can capture information needed for replicating majority of known copy protect used for FM-7/77/77AV series and FM TOWNS series computers.  (Post processors are in the works now)
+So, this program captures all copy protections used for FM-7 series to my knowledge.
 
 My best suggestion is, if you own an original copy of classic games, use a pulse-width capture devices such as KryoFlux, Pauline, FD Shield, and FDX, as well as capture from real hardware.  We have not yet explored how the error-correction of the real hardware was working.  I have experience many cases that I could not recover sectors from pulse-width capture image, but real FM77AV or FM TOWNS was able to read missed sectors with no error.
 
@@ -26,9 +26,9 @@ My best suggestion is, if you own an original copy of classic games, use a pulse
 
 また、読み込むたびに内容が変化するセクタは、最大12回マルチサンプルします。マルチサンプルは、セクタ内容の変化をチェックする通称コロコロプロテクトを再現するために必要です。
 
-さらに、いくつかのゲーム（確認できているのは今のところ Thexder と Fire Crystal)が使う木の葉隠れプロテクトの再現に必要な情報もTrack Readから回収できる、らしいということがわかって、実際Fire Crystalの隠れセクタは取り出すことができたのですが、Thexderの場合は、ダミーセクタの間に隠れているセクタのうちのひとつがインデックスホールをまたいでしまうのですが、トラックリードコマンドが途中で止まってしまうらしく、手持ちのMXではキャプチャに失敗しました。
+さらに、いくつかのゲーム（確認できているのは今のところ Thexder と Fire Crystal)が使う木の葉隠れプロテクトの再現に必要な情報もTrack Readから回収できることが判明して、ThexderとFire Crystalはこの方法で隠れセクタを再現することができました。
 
-というわけで、FDDUMP.EXEは、Thexderはだめだったものの、FM-7/FM TOWNSで使われた主要なプロテクトの再現に必要な情報を抜き出すことができます。
+というわけで、このツールを使うととりあえず今まで自分が知ってる範囲のFM-7/77/77AV, FM TOWNSシリーズで使われたすべてのコピープロテクトを再現するために必要な情報を抜き出すことができます。
 
 もしも、レトロゲームの原本を持っているならば、KryoFlux, Pauline, FD Shieldなどのツールによるパルスイメージと合わせて実機でのサンプルも保存しておくことをお勧めします。パルスイメージは、生データを保存できる反面、まだ実機のフロッピーディスクコントローラがどういうエラー修正をしていたのか完全に解明できていません。PaulineでキャプチャしたイメージではいくつかのセクタにCRCエラーが出たままだったのに、実機に読ませたらなにごともなく読んだというケースがかなり多くあります。いつかは実機のエラー補正機能も解明できて、パルスから完全な情報の抜き出しができるようになるかもしれませんが、現状では両方残しておくと完璧と思います。
 
@@ -38,3 +38,42 @@ My best suggestion is, if you own an original copy of classic games, use a pulse
 
 
 
+Required System
+必要なシステム
+
+FM TOWNS UG or newer plus SCSI hard disk (can be virtual SCSI hard drive like SCSI2SD).  Or, more than 8MB RAM.  Towns OS Command Mode, ORICON, or MS-DOS.
+
+You cannot save disk image to a floppy disk because it won't fit to start with and it cannot access floppy disk while this program is reading a disk.  FM TOWNS (and many other systems) use same floppy-disk controller.  It is NOT possible to read image from drive A and save to drive B, since FDDUMP.EXE take over all floppy-disk access.
+
+Therefore, you need to save disk image to either hard drive, or save disk image to RAM disk and transfer to outside of TOWNS.
+
+
+
+FM TOWNS UG以上 ＋ SCSI ハードディスク (SCSI2SDなどの仮想SCSIハードディスクも可）、または8MB程度のRAMで4MB程度のRAMディスク。Towns OS Command Mode, ORICON, or MS-DOS.
+
+フロッピーディスクイメージを取りながらフロッピーディスクに書き込むことは、そもそもディスクに入りきらないのとFDDUMPが両ドライブのアクセスをテイクオーバーしてしまうのでできません。SCSIハードディスクに保存するか、あるいはいったんRAMディスクに保存してTOWNSの外に転送するかどちらかが必要です。
+
+
+
+
+
+Usage
+使い方
+
+FDDUMP drive: mediaType -out filename
+  drive:  A or B
+  mediaType  2D/2DD/2HD or can be 320KB/640KB/1232KB (for 1440KB 2HD disk, try 2HD)
+
+Optional
+  -starttrk t    Start capture from cylinder t
+  -endtrk t      End capture at cylinder 5
+
+
+
+FDDUMP ドライブ: メディアタイプ -out ファイル名
+  ドライブ:  A or B
+  メディアタイプ  2D/2DD/2HD または 320KB/640KB/1232KB (1440KBのディスクの場合2HDで多分読めます)
+
+Optional
+  -starttrk t    シリンダーtからキャプチャ開始
+  -endtrk t      シリンダーtまでキャプチャ
