@@ -1425,6 +1425,7 @@ struct CommandParameterInfo
 	unsigned char sortSectors;
 	char diskName[32];
 	char outFName[512];
+	char logFName[512];
 };
 
 void InitializeCommandParameterInfo(struct CommandParameterInfo *cpi)
@@ -1445,6 +1446,7 @@ void InitializeCommandParameterInfo(struct CommandParameterInfo *cpi)
 		cpi->diskName[i]=0;
 	}
 	cpi->outFName[0]=0;
+	cpi->logFName[0]=0;
 }
 
 int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[])
@@ -1541,6 +1543,19 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 			if(i+1<ac)
 			{
 				strcpy(cpi->outFName,av[i+1]);
+				++i;
+			}
+			else
+			{
+				fprintf(stderr,"Too few arguments for %s\n",av[i]);
+				return -1;
+			}
+		}
+		else if(0==strcmp(av[i],"-LOG") || 0==strcmp(av[i],"-log"))
+		{
+			if(i+1<ac)
+			{
+				strcpy(cpi->logFName,av[i+1]);
 				++i;
 			}
 			else
@@ -2042,22 +2057,35 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	RDD_WriteEndOfTrack(cpi->outFName);
 }
 
-void ReadDisk(struct CommandParameterInfo *cpi)
+void WriteInfoLog(FILE *ofp,struct CommandParameterInfo *cpi)
 {
-	int C;
-	for(C=cpi->startTrk; C<=cpi->endTrk; ++C)
+	fprintf(ofp,"Output: %s\n",cpi->outFName);
+	fprintf(ofp,"Drive:  %c\n",'A'+cpi->drive);
+
+	switch(cpi->mode)
 	{
-		PrintDebugLine();
-		FDC_Seek(C);
-		ReadTrack(C,0,cpi);
-		ReadTrack(C,1,cpi);
+	case MODE_2D:
+		fprintf(ofp,"Media Type: 2D\n");
+		break;
+	case MODE_2DD:
+		fprintf(ofp,"Media Type: 2DD\n");
+		break;
+	case MODE_2HD_1232K:
+		fprintf(ofp,"Media Type: 2HD\n");
+		break;
 	}
 
+	fprintf(ofp,"Start Track: %d\n",cpi->startTrk);
+	fprintf(ofp,"End Track: %d\n",cpi->endTrk);
+}
+
+void WriteErrorLog(FILE *ofp,struct CommandParameterInfo *cpi)
+{
 	if(NULL!=errLog)
 	{
 		struct ErrorLog far *ptr;
 		int nCRCError=0,nCRCErrorNotF5F6F7=0,nLostDataAddr=0,nLostDataData=0,nReadTrackErr=0;;
-		printf("Error Summary\n");
+		fprintf(ofp,"Error Summary\n");
 
 		for(ptr=errLog; NULL!=ptr; ptr=ptr->next)
 		{
@@ -2065,9 +2093,9 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 			{
 				if(0==nCRCError)
 				{
-					printf("CRC Error: ");
+					fprintf(ofp,"CRC Error: ");
 				}
-				printf("%02x%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1],ptr->idMark.chrn[2]);
+				fprintf(ofp,"%02x%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1],ptr->idMark.chrn[2]);
 				++nCRCError;
 				if(0xF5!=ptr->idMark.chrn[2] && 0xF6!=ptr->idMark.chrn[2] && 0xF7!=ptr->idMark.chrn[2])
 				{
@@ -2077,7 +2105,7 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 		}
 		if(0<nCRCError)
 		{
-			printf("\n");
+			fprintf(ofp,"\n");
 		}
 
 		for(ptr=errLog; NULL!=ptr; ptr=ptr->next)
@@ -2086,15 +2114,15 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 			{
 				if(0==nLostDataAddr)
 				{
-					printf("Lost Data in Read ID Mark: ");
+					fprintf(ofp,"Lost Data in Read ID Mark: ");
 				}
-				printf("%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1]);
+				fprintf(ofp,"%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1]);
 				++nLostDataAddr;
 			}
 		}
 		if(0<nLostDataAddr)
 		{
-			printf("\n");
+			fprintf(ofp,"\n");
 		}
 
 		for(ptr=errLog; NULL!=ptr; ptr=ptr->next)
@@ -2103,15 +2131,15 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 			{
 				if(0==nLostDataAddr)
 				{
-					printf("Lost Data in Read Sector: ");
+					fprintf(ofp,"Lost Data in Read Sector: ");
 				}
-				printf("%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1]);
+				fprintf(ofp,"%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1]);
 				++nLostDataData;
 			}
 		}
 		if(0<nLostDataData)
 		{
-			printf("\n");
+			fprintf(ofp,"\n");
 		}
 
 		for(ptr=errLog; NULL!=ptr; ptr=ptr->next)
@@ -2120,26 +2148,61 @@ void ReadDisk(struct CommandParameterInfo *cpi)
 			{
 				if(0==nReadTrackErr)
 				{
-					printf("Read Track Error: ");
+					fprintf(ofp,"Read Track Error: ");
 				}
-				printf("%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1]);
+				fprintf(ofp,"%02x%02x ",ptr->idMark.chrn[0],ptr->idMark.chrn[1]);
 				++nReadTrackErr;
 			}
 		}
 		if(0<nReadTrackErr)
 		{
-			printf("\n");
+			fprintf(ofp,"\n");
 		}
 
-		printf("%d CRC Errors.\n",nCRCError);
-		printf("%d CRC Errors in not F5,F6,F7 sectors.\n",nCRCErrorNotF5F6F7);
-		printf("%d LostData Errors in Read ID Mark.\n",nLostDataAddr);
-		printf("%d LostData Errors in Read Sector.\n",nLostDataData);
-		printf("%d Read-Track Error.\n",nReadTrackErr);
+		fprintf(ofp,"%d CRC Errors.\n",nCRCError);
+		fprintf(ofp,"%d CRC Errors in not F5,F6,F7 sectors.\n",nCRCErrorNotF5F6F7);
+		fprintf(ofp,"%d LostData Errors in Read ID Mark.\n",nLostDataAddr);
+		fprintf(ofp,"%d LostData Errors in Read Sector.\n",nLostDataData);
+		fprintf(ofp,"%d Read-Track Error.\n",nReadTrackErr);
 	}
 	else
 	{
-		printf("No Error.\n");
+		fprintf(ofp,"No Error.\n");
+	}
+}
+
+void ReadDisk(struct CommandParameterInfo *cpi)
+{
+	int C;
+
+	if(0!=cpi->logFName[0])
+	{
+		FILE *ofp=fopen(cpi->logFName,"a");
+		if(NULL!=ofp)
+		{
+			WriteInfoLog(ofp,cpi);
+			fclose(ofp);
+		}
+	}
+
+	for(C=cpi->startTrk; C<=cpi->endTrk; ++C)
+	{
+		PrintDebugLine();
+		FDC_Seek(C);
+		ReadTrack(C,0,cpi);
+		ReadTrack(C,1,cpi);
+	}
+
+	WriteErrorLog(stdout,cpi);
+
+	if(0!=cpi->logFName[0])
+	{
+		FILE *ofp=fopen(cpi->logFName,"a");
+		if(NULL!=ofp)
+		{
+			WriteErrorLog(ofp,cpi);
+			fclose(ofp);
+		}
 	}
 }
 
@@ -2185,6 +2248,7 @@ int main(int ac,char *av[])
 		//printf("    -writeprotect       Write protect the disk image.\n");
 		printf("    -dontsort           Don't sort sectors (preserve interleave).\n");
 		printf("    -sort               Sort sectors.\n");
+		printf("    -log filename.txt   Write log file.\n");
 		return 1;
 	}
 
