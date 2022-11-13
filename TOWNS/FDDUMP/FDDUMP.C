@@ -737,6 +737,7 @@ unsigned int RDD_WriteSectorData(const char fName[],const uint8_t CHRN[4],uint8_
 	data[3]=CHRN[2];
 	data[4]=CHRN[3];
 	data[5]=FDCSta;
+	data[6]=flags;
 
 	readTimePtr=(unsigned char *)&readTime;
 	data[11]=readTimePtr[0];
