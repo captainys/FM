@@ -739,16 +739,50 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 	// Begin Track or can be Track Read
 	ptr+=16;
 	unsigned int C=0,H=0;
+	D77Track *trkPtr=nullptr;
 	while(ptr+16<=len)
 	{
 		switch(rdd[ptr])
 		{
 		case 1: // Begin Track
+			C=rdd[ptr+1];
+			H=rdd[ptr+2];
+			ptr+=16;
+			if(track.size()<=C*2+H)
+			{
+				track.resize(C*2+H+1);
+				trkPtr=&track.back();
+			}
 			break;
 		case 2: // ID Mark
 			// Ignore.  Just take from Sector Data
+			ptr+=16;
 			break;
 		case 3: // Sector Data
+			if(nullptr!=trkPtr)
+			{
+				auto cc=rdd[ptr+1];
+				auto hh=rdd[ptr+2];
+				auto rr=rdd[ptr+3];
+				auto nn=rdd[ptr+4];
+				auto FDCStatus=rdd[ptr+5];
+				auto flags=rdd[ptr+6];
+				unsigned int millisec=rdd[ptr+0x0B]|(rdd[ptr+0x0C]<<8)|(rdd[ptr+0x0D]<<16);
+				unsigned int realLen=rdd[ptr+0x0E]|(rcc[ptr+0x0F]<<8);
+
+				D77Sector sector;
+				sector.Make(cc,hh,rr,128<<(nn&3));
+
+				ptr+=(realLen+15)&0xFFF0;
+			}
+			else
+			{
+				if(true==verboseMode)
+				{
+					fprintf(stderr,"Sector data without a track.\n");
+				}
+				return false;
+			}
 			break;
 		case 4: // Track Read
 			break;
@@ -762,8 +796,8 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 			if(true==verboseMode)
 			{
 				fprintf(stderr,"Undefined RDD tag %d\n",rdd[ptr]);
-				return false;
 			}
+			return false;
 		}
 	}
 
