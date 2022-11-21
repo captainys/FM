@@ -156,6 +156,7 @@ public:
 			std::vector <unsigned char> sectorData;
 
 			bool resampled=false;  // true if the sector was sampled multiple times for replicating unstable-byte or Corocoro protect.
+			bool probLeafInTheForest=false;  // true if it is suspected to be one of leaf-in-the-forest protect (such as Thexder and Fire Crystal)
 
 			// Experimental >>
 			// nanosecPerByte
@@ -188,6 +189,7 @@ public:
 
 			std::vector <D77Sector> sector;
 			std::vector <unsigned char> trackImage;  // Result by track-dump command of MB8877.
+			unsigned char FDCStatusAfterTrackRead=0;
 
 			D77Track();
 			~D77Track();
@@ -371,6 +373,9 @@ public:
 
 		/*! Get CRC error. */
 		bool GetCRCError(int trk,int sid,int sec) const;
+
+		/*! Get Record Not Found Error. */
+		bool GetRecordNotFound(int trk,int sid,int sec) const;
 
 		/*! Get DDM */
 		bool GetDDM(int trk,int sid,int sec) const;

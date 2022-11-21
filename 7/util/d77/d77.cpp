@@ -13,6 +13,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 << LICENSE */
 #include <set>
+#include <string.h>
 #include "d77.h"
 
 
@@ -109,6 +110,8 @@ void D77File::D77Disk::D77Sector::CleanUp(void)
 	crcStatus=0;
 
 	nanosecPerByte=0;
+	resampled=false;
+	probLeafInTheForest=false;
 
 	for(auto &c : reservedByte)
 	{
@@ -169,6 +172,8 @@ void D77File::D77Disk::D77Track::CleanUp(void)
 		s.CleanUp();
 	}
 	sector.clear();
+	trackImage.clear();
+	FDCStatusAfterTrackRead=0;
 }
 
 void D77File::D77Disk::D77Track::PrintInfo(void) const
@@ -772,8 +777,32 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 
 				D77Sector sector;
 				sector.Make(cc,hh,rr,128<<(nn&3));
+				sector.resampled=(0!=(flags&2));
+				sector.probLeafInTheForest=(0!=(flags&4));
+				sector.density=(0!=(flags&0) ? 0x40 : 0x00);
+				sector.deletedData=((FDCStatus & ) ? 0x10 : 0);
+				if(0!=(FDCStatus&))
+				{
+					sector.crcStatus=0xB0; // CRC Error
+				}
+				else if(0!=(FDCStatus&))
+				{
+					sector.crcStatus=0xF0; // Record Not Found;
+				}
+				sector.nanosecPerByte=millisec*1000/std::max(realLen,1);
+				sector.sectorData.resize(realLen);
+				for(size_t i=0; i<realLen; ++i)
+				{
+					sector.sectorData[i]=rdd[ptr+16+i];
+				}
+				trkPtr->sector.push_back(sector);
 
-				ptr+=(realLen+15)&0xFFF0;
+				for(auto &s : trkPtr->sector) // **** D77!
+				{
+					s.nSectorTrack=trkPtr->sector.size();
+				}
+
+				ptr+=16+(realLen+15)&0xFFF0;
 			}
 			else
 			{
@@ -785,9 +814,34 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 			}
 			break;
 		case 4: // Track Read
+			if(C!=rdd[ptr+1] || H!=rdd[ptr+2])
+			{
+				if(true==verboseMode)
+				{
+					fprintf(stderr,"Track dump for wrong track.\n");
+				}
+				return false;
+			}
+			else if(nullptr!=trkPtr)
+			{
+				unsigned int realLen=rdd[ptr+0x0E]|(rcc[ptr+0x0F]<<8);
+				for(size_t i=0; i<realLen; ++i)
+				{
+					trkPtr->trackImage.push_back(rdd[ptr+16+i]);
+				}
+				ptr+=16+(realLen+15)&0xFFF0;
+			}
+			else
+			{
+				if(true==verboseMode)
+				{
+					fprintf(stderr,"Track dump without a track.\n");
+				}
+				return false;
+			}
 			break;
 		case 5: // End of Track
-			// Ignore.  Nothing to do
+			trkPtr=nullptr;
 			break;
 		case 6: // End of Disk.  Force it to be done
 			ptr=len;
@@ -1384,12 +1438,29 @@ bool D77File::D77Disk::GetCRCError(int trk,int sid,int sec) const
 		{
 			if(s.sector==sec)
 			{
-				return 0!=s.crcStatus;
+				return 0!=s.crcStatus && 0xF0!=s.crcStatus;
 			}
 		}
 	}
 	return false;
 }
+
+bool D77File::D77Disk::GetRecordNotFound(int trk,int sid,int sec) const
+{
+	auto trackPtr=FindTrack(trk,sid);
+	if(nullptr!=trackPtr)
+	{
+		for(auto &s : trackPtr->sector)
+		{
+			if(s.sector==sec)
+			{
+				return 0xF0==s.crcStatus;
+			}
+		}
+	}
+	return false;
+}
+
 bool D77File::D77Disk::GetDDM(int trk,int sid,int sec) const
 {
 	auto trackPtr=FindTrack(trk,sid);
