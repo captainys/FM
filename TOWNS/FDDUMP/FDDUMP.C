@@ -13,6 +13,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 << LICENSE */
 
+#define VERSION "20221113"
 
 // For Open Watcom C
 #include <stdio.h>
@@ -28,12 +29,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 // Signature (First 16 bytes)
 // 'R' 'E' 'A' 'L' 'D' 'I' 'S' 'K' 'D' 'U' 'M' 'P' 0 0 0 0 
 // Begin Disk
-// 00 vr mt fl 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+// 00 vr mt fl cd 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 //    +1  vr  Version 
 //    +2  mt  media type
 //    +3  fl  flags
 //            bit0  1:Write Protected  0:Write Enabled
-// (32 bytes name, 0 padded
+//    +4  cd  Capture Device
+//            00:FM TOWNS
+// (32 bytes name, 0 padded)
 // Begin Track
 // 01 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 //    +1  cc  Cylinder
@@ -556,6 +559,50 @@ void WaitMicrosec(uint32_t microsec)
 		diff=t-t0;
 		accum+=diff;
 		t0=t;
+	}
+}
+
+////////////////////////////////////////////////////////////
+// Status Output
+
+#define nInfoPerLine 9  // Including "Ccc Hhh"
+uint8_t nInfo=0;
+
+void StartSectorInfo(uint8_t C,uint8_t H)
+{
+	Color(4);
+	printf("C%-2d H%d ",C,H);
+	fflush(stdout);
+	Color(7);
+
+	nInfo=1;
+}
+
+void BeforeSectorInfo(void)
+{
+	if(0==(nInfo%nInfoPerLine))
+	{
+		printf("       ");
+		++nInfo;
+	}
+}
+
+void AfterSectorInfo(void)
+{
+	fflush(stdout);
+	++nInfo;
+	if(0==(nInfo%nInfoPerLine))
+	{
+		printf("\n");
+	}
+}
+
+void EndSectorInfo(void)
+{
+	Color(7);
+	if(0!=(nInfo%nInfoPerLine))
+	{
+		printf("\n");
 	}
 }
 
@@ -1670,8 +1717,6 @@ unsigned int IsLeafInTheForest(int nIDMarks,const struct IDMARK idMark[],uint16_
 	return 0;
 }
 
-#define nInfoPerLine 8
-
 // Data
 // 03 cc hh rr nn st fl 00 00 00 00 <time  > <Length>
 //    +1  cc  Cylinder
@@ -1683,7 +1728,7 @@ unsigned int IsLeafInTheForest(int nIDMarks,const struct IDMARK idMark[],uint16_
 //            bit1=resample flag(1 means Resample for unstable bytes)
 //    +B  (3 bytes) Microseconds for reading the sector.
 //    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
-void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t mediaType)
+void FindHiddenLeaf(const char fName[],uint16_t readTrackSize,uint8_t mediaType)
 {
 	// Looks like FM TOWNS's FDC is reliable in Read Track command.
 	uint8_t header[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -1693,19 +1738,10 @@ void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t 
 	uint8_t C,H,R,N;
 
 
-	if(0<nInfo && 0==nInfo%nInfoPerLine)
-	{
-		printf("       ");
-	}
-
+	BeforeSectorInfo();
 	Color(4);
 	printf("HIDNLEAF ");
-	fflush(stdout);
-	++nInfo;
-	if(0==nInfo%nInfoPerLine)
-	{
-		printf("\n");
-	}
+	AfterSectorInfo();
 
 
 	for(ptr=0; ptr+7<readTrackSize; ++ptr)
@@ -1768,35 +1804,20 @@ void FindHiddenLeaf(const char fName[],int nInfo,uint16_t readTrackSize,uint8_t 
 					fwrite(DMABuf+dataPtr,1,len,ofp);
 					fclose(ofp);
 
-					if(0<nInfo && 0==nInfo%nInfoPerLine)
-					{
-						printf("       ");
-					}
+					BeforeSectorInfo();
 
 					Color(IOErrToColor(header[4]));
 					printf("%02x%02x%02x%02x ",C,H,R,N);
-					fflush(stdout);
-					++nInfo;
-					if(0==nInfo%nInfoPerLine)
-					{
-						printf("\n");
-					}
+
+					AfterSectorInfo();
 				}
 			}
 		}
-	}
-
-	Color(7);
-
-	if(0!=nInfo%nInfoPerLine)
-	{
-		printf("\n");
 	}
 }
 
 void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 {
-	unsigned char nInfo=0;
 	int FMorMFM=CTL_MFM;
 	int i;
 	int nTrackSector=0;
@@ -1807,10 +1828,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	uint8_t ioErr=0;
 
 	STI();
-	Color(4);
-	printf("C%-2d H%d ",C,H);
-	fflush(stdout);
-	Color(7);
+	StartSectorInfo(C,H);
 
 	RDD_WriteTrackHeader(cpi->outFName,C,H);
 
@@ -1933,8 +1951,9 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 		// If Hidden-Leaf protect, do differently.
 		if(IsLeafInTheForest(nTrackSector,idMark,readTrackSize))
 		{
-			FindHiddenLeaf(cpi->outFName,nInfo,readTrackSize,cpi->mediaType);
+			FindHiddenLeaf(cpi->outFName,readTrackSize,cpi->mediaType);
 			RDD_WriteEndOfTrack(cpi->outFName);
+			EndSectorInfo();
 			return;
 		}
 	}
@@ -1953,39 +1972,27 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 			uint32_t readTime;
 			ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
 
-			if(0<nInfo && 0==nInfo%nInfoPerLine)
-			{
-				printf("       ");
-			}
+			BeforeSectorInfo();
 
 			if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
 			{
 				lostDataReadData=1;
 				Color(IOErrToColor(ioErr));
 				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-				fflush(stdout);
-				++nInfo;
 
-				if(0==nInfo%nInfoPerLine)
-				{
-					printf("\n");
-				}
+				AfterSectorInfo();
 			}
 			else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
 			{
 				lostDataReadData=0;
 				Color(IOErrToColor(ioErr));
 				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-				fflush(stdout);
-				++nInfo;
+
+				AfterSectorInfo();
 
 				STI();
 				RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,0);
 
-				if(0==nInfo%nInfoPerLine)
-				{
-					printf("\n");
-				}
 				break;
 			}
 		}
@@ -2025,41 +2032,37 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 					if(0==retry || 0!=different)
 					{
-						if(0<nInfo && 0==nInfo%nInfoPerLine)
-						{
-							printf("       ");
-						}
+						BeforeSectorInfo();
 
 						Color(IOErrToColor(ioErr));
 						printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-						fflush(stdout);
-						++nInfo;
+
+						AfterSectorInfo();
+
 						STI();
 						RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,1);
-
-						if(0==nInfo%nInfoPerLine)
-						{
-							printf("\n");
-						}
 					}
 				}
 			}
 		}
 	}
-	if(0!=nInfo%nInfoPerLine)
-	{
-		printf("\n");
-	}
-
-	Color(7);
 
 	outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=H ? CTL_SIDE : 0)|CTL_MFM);
+
+	EndSectorInfo();
 
 	RDD_WriteEndOfTrack(cpi->outFName);
 }
 
 void WriteInfoLog(FILE *ofp,struct CommandParameterInfo *cpi)
 {
+	if(NULL==ofp)
+	{
+		return;
+	}
+
+	fprintf(ofp,"FDDUMP Version: %s\n",VERSION);
+
 	fprintf(ofp,"Output: %s\n",cpi->outFName);
 	fprintf(ofp,"Drive:  %c\n",'A'+cpi->drive);
 
@@ -2082,6 +2085,11 @@ void WriteInfoLog(FILE *ofp,struct CommandParameterInfo *cpi)
 
 void WriteErrorLog(FILE *ofp,struct CommandParameterInfo *cpi)
 {
+	if(NULL==ofp)
+	{
+		return;
+	}
+
 	if(NULL!=errLog)
 	{
 		struct ErrorLog far *ptr;
@@ -2130,7 +2138,7 @@ void WriteErrorLog(FILE *ofp,struct CommandParameterInfo *cpi)
 		{
 			if(ERRORLOG_TYPE_LOSTDATA==ptr->errType)
 			{
-				if(0==nLostDataAddr)
+				if(0==nLostDataData)
 				{
 					fprintf(ofp,"Lost Data in Read Sector: ");
 				}
@@ -2222,7 +2230,7 @@ int main(int ac,char *av[])
 	struct CommandParameterInfo cpi;
 
 	Color(4);
-	printf("FDDUMP for FM TOWNS\n");
+	printf("FDDUMP for FM TOWNS  Version %s\n",VERSION);
 	Color(7);
 	printf("  by CaptainYS\n");
 
