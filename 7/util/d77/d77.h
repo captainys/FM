@@ -155,6 +155,8 @@ public:
 			unsigned short sectorDataSize; // Excluding the header.
 			std::vector <unsigned char> sectorData;
 
+			bool resampled=false;  // true if the sector was sampled multiple times for replicating unstable-byte or Corocoro protect.
+
 			// Experimental >>
 			// nanosecPerByte
 			//   Zero means standard rate computed from RPM and track length.
@@ -185,6 +187,7 @@ public:
 			};
 
 			std::vector <D77Sector> sector;
+			std::vector <unsigned char> trackImage;  // Result by track-dump command of MB8877.
 
 			D77Track();
 			~D77Track();
@@ -237,6 +240,7 @@ public:
 			void CleanUp(void);
 		};
 		D77Header header;
+		std::string rddDiskName;
 
 	private:
 		std::vector <D77Track> track;
@@ -283,6 +287,11 @@ public:
 		    It clears the contents.  Also modified-flag will be cleared.
 		*/
 		bool SetD77Image(const unsigned char d77[],bool verboseMode);
+
+		/*! Construct a disk from an RDD image.
+		    It clears the contents.  Also modified-flag will be cleared.
+		*/
+		bool SetRDDImage(size_t len,const unsigned char d77[],bool verboseMode);
 
 		/*! Constructs a track from a bytes in a D77 image.
 		*/

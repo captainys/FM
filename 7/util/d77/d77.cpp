@@ -145,6 +145,7 @@ bool D77File::D77Disk::D77Sector::Make(int trk,int sid,int secId,int secSize)
 	this->sizeShift=sizeShift;
 	sectorDataSize=secSize;
 	sectorData.resize(secSize);
+	resampled=false;
 	for(auto &b : sectorData)
 	{
 		b=0;
@@ -412,6 +413,7 @@ void D77File::D77Disk::CleanUp(void)
 	{
 		t.CleanUp();
 	}
+	rddDiskName="";
 	modified=false;
 }
 
@@ -692,6 +694,79 @@ bool D77File::D77Disk::SetD77Image(const unsigned char d77Img[],bool verboseMode
 			++nUnformat;
 		}
 	}
+	return true;
+}
+
+bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool verboseMode)
+{
+	CleanUp();
+
+	unsigned char ptr=0;
+
+	if(0!=strncmp((const char *)rdd,"REALDISKDUMP"))
+	{
+		if(true==verboseMode)
+		{
+			fprintf(stderr,"Wrong RDD Signature.\n");
+		}
+		return false;
+	}
+
+	// Begin Disk
+	ptr+=16;
+	if(0!=rdd[ptr])
+	{
+		if(true==verboseMode)
+		{
+			fprintf(stderr,"Begin Disk (00h) does not follow the signature.\n");
+		}
+		return false;
+	}
+
+	unsigned int version=rdd[ptr+1];
+	header.mediaType=rdd[ptr+2];
+	header.writeProtected=(rdd[ptr+3]&1);
+
+	// Disk Name
+	ptr+=16;
+	strncpy(header.diskName,(cosnt char *)rdd+ptr,16);
+	for(int i=0; i<32; ++i)
+	{
+		rddDiskName.push_back(rdd[ptr+i]);
+	}
+
+
+	// Begin Track or can be Track Read
+	ptr+=16;
+	unsigned int C=0,H=0;
+	while(ptr+16<=len)
+	{
+		switch(rdd[ptr])
+		{
+		case 1: // Begin Track
+			break;
+		case 2: // ID Mark
+			// Ignore.  Just take from Sector Data
+			break;
+		case 3: // Sector Data
+			break;
+		case 4: // Track Read
+			break;
+		case 5: // End of Track
+			// Ignore.  Nothing to do
+			break;
+		case 6: // End of Disk.  Force it to be done
+			ptr=len;
+			break;
+		default:
+			if(true==verboseMode)
+			{
+				fprintf(stderr,"Undefined RDD tag %d\n",rdd[ptr]);
+				return false;
+			}
+		}
+	}
+
 	return true;
 }
 
@@ -1618,6 +1693,13 @@ void D77File::SetData(long long int nByte,const unsigned char byteData[],bool ve
 		}
 
 		const unsigned char *diskPtr=byteData+diskOffset;
+
+		size_t sz=diskPtr[0x1C]+(diskPtr[0x1D]<<8)+(diskPtr[0x1E]<<16)+(diskPtr[0x1F]<<24);
+		if(0==sz || nByte<diskOffset+sz || nByte<672+diskOffset)
+		{
+			break;
+		}
+
 		D77Disk disk;
 		disk.SetD77Image(diskPtr,verboseMode);
 		auto nextDiskOffset=diskOffset+disk.header.diskSize;
