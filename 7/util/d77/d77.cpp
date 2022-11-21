@@ -12,6 +12,7 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 << LICENSE */
+#include <algorithm>
 #include <set>
 #include <string.h>
 #include "d77.h"
@@ -708,7 +709,7 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 
 	unsigned char ptr=0;
 
-	if(0!=strncmp((const char *)rdd,"REALDISKDUMP"))
+	if(0!=strncmp((const char *)rdd,"REALDISKDUMP",12))
 	{
 		if(true==verboseMode)
 		{
@@ -734,7 +735,7 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 
 	// Disk Name
 	ptr+=16;
-	strncpy(header.diskName,(cosnt char *)rdd+ptr,16);
+	strncpy(header.diskName,(const char *)rdd+ptr,16);
 	for(int i=0; i<32; ++i)
 	{
 		rddDiskName.push_back(rdd[ptr+i]);
@@ -773,23 +774,23 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 				auto FDCStatus=rdd[ptr+5];
 				auto flags=rdd[ptr+6];
 				unsigned int millisec=rdd[ptr+0x0B]|(rdd[ptr+0x0C]<<8)|(rdd[ptr+0x0D]<<16);
-				unsigned int realLen=rdd[ptr+0x0E]|(rcc[ptr+0x0F]<<8);
+				unsigned int realLen=rdd[ptr+0x0E]|(rdd[ptr+0x0F]<<8);
 
 				D77Sector sector;
 				sector.Make(cc,hh,rr,128<<(nn&3));
 				sector.resampled=(0!=(flags&2));
 				sector.probLeafInTheForest=(0!=(flags&4));
 				sector.density=(0!=(flags&0) ? 0x40 : 0x00);
-				sector.deletedData=((FDCStatus & ) ? 0x10 : 0);
-				if(0!=(FDCStatus&))
+				sector.deletedData=((FDCStatus & 0x20) ? 0x10 : 0);
+				if(0!=(FDCStatus&0x08))
 				{
 					sector.crcStatus=0xB0; // CRC Error
 				}
-				else if(0!=(FDCStatus&))
+				else if(0!=(FDCStatus&0x10))
 				{
 					sector.crcStatus=0xF0; // Record Not Found;
 				}
-				sector.nanosecPerByte=millisec*1000/std::max(realLen,1);
+				sector.nanosecPerByte=millisec*1000/std::max<int>(realLen,1);
 				sector.sectorData.resize(realLen);
 				for(size_t i=0; i<realLen; ++i)
 				{
@@ -824,7 +825,7 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 			}
 			else if(nullptr!=trkPtr)
 			{
-				unsigned int realLen=rdd[ptr+0x0E]|(rcc[ptr+0x0F]<<8);
+				unsigned int realLen=rdd[ptr+0x0E]|(rdd[ptr+0x0F]<<8);
 				for(size_t i=0; i<realLen; ++i)
 				{
 					trkPtr->trackImage.push_back(rdd[ptr+16+i]);
