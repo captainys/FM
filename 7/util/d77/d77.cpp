@@ -707,7 +707,7 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 {
 	CleanUp();
 
-	unsigned char ptr=0;
+	size_t ptr=0;
 
 	if(0!=strncmp((const char *)rdd,"REALDISKDUMP",12))
 	{
@@ -743,7 +743,7 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 
 
 	// Begin Track or can be Track Read
-	ptr+=16;
+	ptr+=32;
 	unsigned int C=0,H=0;
 	D77Track *trkPtr=nullptr;
 	while(ptr+16<=len)
@@ -843,6 +843,7 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 			break;
 		case 5: // End of Track
 			trkPtr=nullptr;
+			ptr+=16;
 			break;
 		case 6: // End of Disk.  Force it to be done
 			ptr=len;
@@ -850,7 +851,7 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 		default:
 			if(true==verboseMode)
 			{
-				fprintf(stderr,"Undefined RDD tag %d\n",rdd[ptr]);
+				fprintf(stderr,"Undefined RDD tag %02xh at %xh\n",rdd[ptr],ptr);
 			}
 			return false;
 		}
@@ -1812,6 +1813,14 @@ void D77File::SetData(long long int nByte,const unsigned char byteData[],bool ve
 		this->disk.push_back((D77Disk &&)disk);
 		diskOffset=nextDiskOffset;
 	}
+}
+
+bool D77File::SetRDDData(const std::vector <unsigned char> &byteData,bool verboseMode)
+{
+	D77Disk disk;
+	auto ret=disk.SetRDDImage(byteData.size(),byteData.data(),verboseMode);
+	this->disk.push_back((D77Disk &&)disk);
+	return ret;
 }
 
 bool D77File::SetRawBinary(const std::vector <unsigned char> &byteData,bool verboseMode)

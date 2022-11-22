@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include <vector>
 #include <string>
@@ -407,6 +408,27 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 		{
 			fName=this->fName;
 		}
+
+		size_t lastDot=0;
+		for(size_t i=0; i<fName.size(); ++i)
+		{
+			if('.'==fName[i])
+			{
+				lastDot=i;
+			}
+		}
+		std::string ext;
+		for(size_t i=lastDot; i<fName.size(); ++i)
+		{
+			ext.push_back(toupper(fName[i]));
+		}
+
+		if(".RDD"==ext)
+		{
+			printf(".RDD write not supported yet.\n");
+			return;
+		}
+
 
 		FILE *fp=fopen(fName.c_str(),"wb");
 		if(nullptr!=fp)
@@ -1803,7 +1825,7 @@ int main(int ac,char *av[])
 	if(2>ac)
 	{
 		printf("Usage:\n");
-		printf("  d77analyze filename.d77\n");
+		printf("  d77analyze filename.d77/.rdd\n");
 		printf("    or\n");
 		printf("  d77analyze -new filename.d77\n");
 		printf("    or\n");
@@ -1831,7 +1853,14 @@ int main(int ac,char *av[])
 	D77File d77;
 	if(true!=readRaw)
 	{
-		d77.SetData(dat);
+		if(16<fsize && 0==strncmp((const char *)dat.data(),"REALDISKDUMP",12))
+		{
+			d77.SetRDDData(dat);
+		}
+		else
+		{
+			d77.SetData(dat);
+		}
 	}
 	else
 	{

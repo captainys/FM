@@ -455,6 +455,10 @@ public:
 	bool SetRawBinary(const std::vector <unsigned char> &byteData,bool verboseMode=true);
 	bool SetRawBinary(long long int nByte,const unsigned char byteData[],bool verboseMode=true);
 
+	/*! Create from .RDD disk image.
+	*/
+	bool SetRDDData(const std::vector <unsigned char> &byteData,bool verboseMode=true);
+
 	/*! Create a standard format disk and return a disk Id.
 	*/
 	int CreateStandardFormatted(void);
