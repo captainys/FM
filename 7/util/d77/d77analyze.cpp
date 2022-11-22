@@ -29,6 +29,7 @@ public:
 	D77Analyzer();
 
 	void Terminal(D77File &d77);
+	std::string GetFileExtension(std::string fName) const;
 	void ProcessCommand(const std::vector <std::string> &argv);
 	void Help(void) const;
 	void DumpSector(int diskId,int cyl,int side,int sec) const;
@@ -78,6 +79,24 @@ void D77Analyzer::Terminal(D77File &d77)
 		auto argv=D77File::QuickParser(cmd);
 		ProcessCommand(argv);
 	}
+}
+
+std::string D77Analyzer::GetFileExtension(std::string fName) const
+{
+	size_t lastDot=0;
+	for(size_t i=0; i<fName.size(); ++i)
+	{
+		if('.'==fName[i])
+		{
+			lastDot=i;
+		}
+	}
+	std::string ext;
+	for(size_t i=lastDot; i<fName.size(); ++i)
+	{
+		ext.push_back(toupper(fName[i]));
+	}
+	return ext;
 }
 
 void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
@@ -409,26 +428,12 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 			fName=this->fName;
 		}
 
-		size_t lastDot=0;
-		for(size_t i=0; i<fName.size(); ++i)
+		auto ext=GetFileExtension(fName);
+		if("WRAW"!=cmd && ".RDD"!=ext && ".D77"!=ext && ".BIN"!=ext && ".XDF"!=ext)
 		{
-			if('.'==fName[i])
-			{
-				lastDot=i;
-			}
-		}
-		std::string ext;
-		for(size_t i=lastDot; i<fName.size(); ++i)
-		{
-			ext.push_back(toupper(fName[i]));
-		}
-
-		if(".RDD"==ext)
-		{
-			printf(".RDD write not supported yet.\n");
+			printf("Unsupported file type.\n");
 			return;
 		}
-
 
 		FILE *fp=fopen(fName.c_str(),"wb");
 		if(nullptr!=fp)
@@ -439,13 +444,17 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 				if(nullptr!=diskPtr)
 				{
 					decltype(diskPtr->MakeD77Image()) img;
-					if("WRAW"==cmd)
+					if("WRAW"==cmd || ".BIN"==ext || ".XDF"==ext)
 					{
 						img=diskPtr->MakeRawImage();
 					}
-					else
+					else if(".D77"==ext)
 					{
 						img=diskPtr->MakeD77Image();
+					}
+					else if(".RDD"==ext)
+					{
+						img=diskPtr->MakeRDDImage();
 					}
 
 					if(0<img.size())
@@ -1570,7 +1579,24 @@ void D77Analyzer::Compare(const std::vector <std::string> &argv) const
 	auto raw=FM7Lib::ReadBinaryFile(argv[1].c_str());
 	if(0<raw.size())
 	{
-		bDiskD77.SetData(raw);
+		auto ext=GetFileExtension(argv[1]);
+		if(".D77"==ext)
+		{
+			bDiskD77.SetData(raw);
+		}
+		else if(".RDD"==ext)
+		{
+			bDiskD77.SetRDDData(raw);
+		}
+		else if(".BIN"==ext || ".XDF"==ext)
+		{
+			bDiskD77.SetRawBinary(raw);
+		}
+		else
+		{
+			fprintf(stderr,"Unsupported file extension %s\n",argv[1].c_str());
+			return;
+		}
 	}
 	else
 	{

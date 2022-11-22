@@ -684,6 +684,70 @@ std::vector <unsigned char> D77File::D77Disk::MakeRDDImage(void) const
 			}
 		}
 
+		for(auto &s : track[trk].sector)
+		{
+			// Data
+			bin.push_back(0x03);
+			bin.push_back(s.cylinder);
+			bin.push_back(s.head);
+			bin.push_back(s.sector);
+			bin.push_back(s.sizeShift);
+
+			// Make up MB8877 Status Byte
+			unsigned char st=0;
+			if(0!=s.deletedData)
+			{
+				st|=MB8877_STATUS_DELETED_DATA; // Deleted Data or Record Type
+			}
+			if(0xF0==s.crcStatus)
+			{
+				st|=MB8877_STATUS_RECORD_NOT_FOUND; // Record Not Found
+			}
+			else if(0!=s.crcStatus)
+			{
+				st|=MB8877_STATUS_CRC; // CRC Error
+			}
+			bin.push_back(st);
+
+			unsigned char flags=0;
+			if(0!=s.density)
+			{
+				flags|=1; // Single density
+			}
+			if(true==s.resampled)
+			{
+				flags|=2;
+			}
+			if(true==s.probLeafInTheForest)
+			{
+				flags|=4;
+			}
+			bin.push_back(flags);
+
+			while(0x0B!=(bin.size()&0x0F))
+			{
+				bin.push_back(0);
+			}
+
+			unsigned int millisec=s.nanosecPerByte;
+			millisec*=s.sectorData.size();
+			millisec/=1000;
+			bin.push_back(millisec&0xFF);
+			bin.push_back((millisec>>8)&0xFF);
+			bin.push_back((millisec>>24)&0xFF);
+
+			bin.push_back(s.sectorData.size()&0xFF);
+			bin.push_back((s.sectorData.size()>>8)&0xFF);
+
+			for(auto c : s.sectorData)
+			{
+				bin.push_back(c);
+			}
+			while(0!=(bin.size()&0x0F))
+			{
+				bin.push_back(0);
+			}
+		}
 
 		// End Track
 		bin.push_back(0x05);
@@ -699,6 +763,8 @@ std::vector <unsigned char> D77File::D77Disk::MakeRDDImage(void) const
 	{
 		bin.push_back(0);
 	}
+
+	return bin;
 }
 
 std::vector <unsigned char> D77File::D77Disk::MakeRawImage(void) const
@@ -894,15 +960,16 @@ bool D77File::D77Disk::SetRDDImage(size_t &bytesUsed,size_t len,const unsigned c
 				sector.Make(cc,hh,rr,128<<(nn&3));
 				sector.resampled=(0!=(flags&2));
 				sector.probLeafInTheForest=(0!=(flags&4));
-				sector.density=(0!=(flags&0) ? 0x40 : 0x00);
-				sector.deletedData=((FDCStatus & 0x20) ? 0x10 : 0);
-				if(0!=(FDCStatus&0x08))
+				sector.density=(0!=(flags&0) ? D77_DENSITY_FM : 0x00);
+				sector.deletedData=((FDCStatus & MB8877_STATUS_DELETED_DATA) ? D77_DATAMARK_DELETED : 0);
+
+				if(0!=(FDCStatus&MB8877_STATUS_CRC))
 				{
-					sector.crcStatus=0xB0; // CRC Error
+					sector.crcStatus=D77_SECTOR_STATUS_CRC; // CRC Error
 				}
-				else if(0!=(FDCStatus&0x10))
+				else if(0!=(FDCStatus&MB8877_STATUS_RECORD_NOT_FOUND))
 				{
-					sector.crcStatus=0xF0; // Record Not Found;
+					sector.crcStatus=D77_SECTOR_STATUS_RECORD_NOT_FOUND; // Record Not Found;
 				}
 				sector.nanosecPerByte=millisec*1000/std::max<int>(realLen,1);
 				sector.sectorData.resize(realLen);
