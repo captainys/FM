@@ -588,6 +588,119 @@ std::vector <unsigned char> D77File::D77Disk::MakeD77Image(void) const
 	return d77Img;
 }
 
+std::vector <unsigned char> D77File::D77Disk::MakeRDDImage(void) const
+{
+	std::vector <unsigned char> bin;
+
+	// Signature
+	{
+		for(auto c : "REALDISKDUMP")
+		{
+			bin.push_back(c);
+		}
+		bin.push_back(0);
+		bin.push_back(0);
+		bin.push_back(0);
+		bin.push_back(0);
+	}
+
+	// Begin Disk
+	bin.push_back(0x00);  // Begin disk
+	bin.push_back(0x00);  // Version
+	bin.push_back(header.mediaType);
+	unsigned char flags=0;
+	if(0!=header.writeProtected)
+	{
+		flags|=1;
+	}
+	bin.push_back(flags);
+	while(0!=(bin.size()&0x0F))
+	{
+		bin.push_back(0);
+	}
+
+	// Disk Name
+	if(0<rddDiskName.size())
+	{
+		for(int i=0; i<32; ++i)
+		{
+			if(i<rddDiskName.size())
+			{
+				bin.push_back(rddDiskName[i]);
+			}
+			else
+			{
+				bin.push_back(0);
+			}
+		}
+	}
+	else
+	{
+		for(int i=0; i<17; ++i)
+		{
+			bin.push_back(header.diskName[i]);
+		}
+		for(int i=17; i<32; ++i)
+		{
+			bin.push_back(0);
+		}
+	}
+
+	for(unsigned int trk=0; trk<track.size(); ++trk)
+	{
+		auto C=trk/2;
+		auto H=trk%2;
+
+		// Begin Track
+		bin.push_back(0x01);
+		bin.push_back(C);
+		bin.push_back(H);
+		while(0!=(bin.size()&0x0F))
+		{
+			bin.push_back(0);
+		}
+
+		if(0<track[trk].trackImage.size())
+		{
+			// Track Read
+			bin.push_back(0x04);
+			bin.push_back(C);
+			bin.push_back(H);
+			bin.push_back(track[trk].FDCStatusAfterTrackRead);
+			while(14!=(bin.size()&0x0F))
+			{
+				bin.push_back(0);
+			}
+			bin.push_back(track[trk].trackImage.size()&0xFF);
+			bin.push_back((track[trk].trackImage.size()>>8)&0xFF);
+
+			for(auto d : track[trk].trackImage)
+			{
+				bin.push_back(d);
+			}
+			while(0!=(bin.size()&0x0F))
+			{
+				bin.push_back(0);
+			}
+		}
+
+
+		// End Track
+		bin.push_back(0x05);
+		while(0!=(bin.size()&0x0F))
+		{
+			bin.push_back(0);
+		}
+	}
+
+	// End Disk
+	bin.push_back(0x06);
+	while(0!=(bin.size()&0x0F))
+	{
+		bin.push_back(0);
+	}
+}
+
 std::vector <unsigned char> D77File::D77Disk::MakeRawImage(void) const
 {
 	std::vector <unsigned char> rawImg;
@@ -703,11 +816,12 @@ bool D77File::D77Disk::SetD77Image(const unsigned char d77Img[],bool verboseMode
 	return true;
 }
 
-bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool verboseMode)
+bool D77File::D77Disk::SetRDDImage(size_t &bytesUsed,size_t len,const unsigned char rdd[],bool verboseMode)
 {
 	CleanUp();
 
 	size_t ptr=0;
+	bytesUsed=0;
 
 	if(0!=strncmp((const char *)rdd,"REALDISKDUMP",12))
 	{
@@ -846,6 +960,7 @@ bool D77File::D77Disk::SetRDDImage(size_t len,const unsigned char rdd[],bool ver
 			ptr+=16;
 			break;
 		case 6: // End of Disk.  Force it to be done
+			bytesUsed=ptr+16;
 			ptr=len;
 			break;
 		default:
@@ -1817,10 +1932,23 @@ void D77File::SetData(long long int nByte,const unsigned char byteData[],bool ve
 
 bool D77File::SetRDDData(const std::vector <unsigned char> &byteData,bool verboseMode)
 {
-	D77Disk disk;
-	auto ret=disk.SetRDDImage(byteData.size(),byteData.data(),verboseMode);
-	this->disk.push_back((D77Disk &&)disk);
-	return ret;
+	size_t ptr=0;
+	while(ptr+16<=byteData.size() &&
+		   0==strncmp((const char *)byteData.data()+ptr,"REALDISKDUMP",12))
+	{
+		D77Disk disk;
+		size_t bytesUsed=0;
+		if(true==disk.SetRDDImage(bytesUsed,byteData.size()-ptr,byteData.data()+ptr,verboseMode))
+		{
+			this->disk.push_back((D77Disk &&)disk);
+			ptr+=bytesUsed;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 bool D77File::SetRawBinary(const std::vector <unsigned char> &byteData,bool verboseMode)
@@ -1940,6 +2068,18 @@ std::vector <unsigned char> D77File::MakeD77Image(void) const
 	}
 	return bin;
 }
+
+std::vector <unsigned char> D77File::MakeRDDImage(void) const
+{
+	std::vector <unsigned char> bin;
+	for(auto &d : disk)
+	{
+		auto diskBin=d.MakeRDDImage();
+		bin.insert(bin.end(),diskBin.begin(),diskBin.end());
+	}
+	return bin;
+}
+
 std::vector <unsigned char> D77File::MakeRawImage(void) const
 {
 	std::vector <unsigned char> bin;

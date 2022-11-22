@@ -272,6 +272,7 @@ public:
 
 		std::vector <unsigned char> MakeD77Image(void) const;
 
+		std::vector <unsigned char> MakeRDDImage(void) const;
 
 		std::vector <unsigned char> MakeRawImage(void) const;
 
@@ -293,7 +294,7 @@ public:
 		/*! Construct a disk from an RDD image.
 		    It clears the contents.  Also modified-flag will be cleared.
 		*/
-		bool SetRDDImage(size_t len,const unsigned char d77[],bool verboseMode);
+		bool SetRDDImage(size_t &bytesUsed,size_t len,const unsigned char d77[],bool verboseMode);
 
 		/*! Constructs a track from a bytes in a D77 image.
 		*/
@@ -470,6 +471,10 @@ public:
 	/*! Create a binary to be written to an image file.
 	*/
 	std::vector <unsigned char> MakeD77Image(void) const;
+
+	/*! Create a binary to be written to an image file.
+	*/
+	std::vector <unsigned char> MakeRDDImage(void) const;
 
 	/*!  Create a binary to be written to an image file.
 	*/
