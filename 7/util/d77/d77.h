@@ -140,6 +140,10 @@ public:
 
 		D77_SECTOR_STATUS_CRC=0xB0,
 		D77_SECTOR_STATUS_RECORD_NOT_FOUND=0xF0,
+
+		UNSTABLE_NONE=0x00,
+		UNSTABLE_VERSION1=0x01,
+		UNSTABLE_VERSION2=0x02,
 	};
 
 	static std::vector <std::string> QuickParser(const char str[]);
@@ -174,6 +178,7 @@ public:
 			unsigned char reservedByte[5];
 			unsigned short sectorDataSize; // Excluding the header.
 			std::vector <unsigned char> sectorData;
+			std::vector <bool> unstableByte;
 
 			bool resampled=false;  // true if the sector was sampled multiple times for replicating unstable-byte or Corocoro protect.
 			bool probLeafInTheForest=false;  // true if it is suspected to be one of leaf-in-the-forest protect (such as Thexder and Fire Crystal)
@@ -193,6 +198,31 @@ public:
 			    Must be set before written to a track.
 			*/
 			bool Make(int trk,int sid,int secId,int secSize);
+
+			/*! Returns sector data taking unstable-bytes into account;
+			*/
+			inline std::vector <unsigned char> GetData(void) const
+			{
+				if(sectorData.size()!=unstableByte.size())
+				{
+					return sectorData;
+				}
+				else
+				{
+					auto copy=sectorData;
+					for(int i=0; i<copy.size(); ++i)
+					{
+						if(true==unstableByte[i])
+						{
+							copy[i]=rand()&0x255;
+						}
+					}
+					return copy;
+				}
+			}
+
+			bool SameCHRN(const D77Sector &s) const;
+			bool SameCHRNandActualSize(const D77Sector &s) const;
 		};
 		class D77Track
 		{
@@ -247,6 +277,25 @@ public:
 			*/
 			int GetSide(void) const;
 
+
+			/*! Check if the track is suspected to be leaf-in-the-forest protect.
+			    This type copy-protect (only confirmed on Thexder and Fire Crystal for FM-7)
+			    typically has multiple sectors with same CHR.
+			*/
+			bool SuspectedLeafInTheForest(void) const;
+
+
+			/*! Identify unstable-byte protect.
+			    IdentifyUnstableByte function checks if the track has multpile sectors,
+			    but all same CHR for distinguishing multi sample and leaf-in-the-forest.
+			    IdentifyUnstableByteRDD function relies on resampled flag of RDD.
+			*/
+			void IdentifyUnstableByte(void);
+			void IdentifyUnstableByteRDD(void);
+		private:
+			void UnidentifyUnstableByteForContinuousData(void);
+
+		public:
 			/*! Returns a list of sectors in the track.
 			    Member addr will all be zero.
 			*/

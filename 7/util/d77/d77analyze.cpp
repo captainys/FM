@@ -217,6 +217,45 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 				printf("Too few arguments.\n");
 			}
 		}
+		else if('U'==cmd[1])
+		{
+			if(4<=argv.size())
+			{
+				auto cyl=FM7Lib::Atoi(argv[1].data());
+				auto side=FM7Lib::Atoi(argv[2].data());
+				auto sec=FM7Lib::Atoi(argv[3].data());
+				auto diskPtr=d77Ptr->GetDisk(diskId);
+				decltype(diskPtr->GetSectorByIndex(cyl,side,sec-1)) secPtr;
+				if('#'==argv[3][0])
+				{
+					sec=FM7Lib::Atoi(argv[3].data()+1);
+					secPtr=diskPtr->GetSectorByIndex(cyl,side,sec-1);
+				}
+				else
+				{
+					secPtr=diskPtr->GetSector(cyl,side,sec);
+				}
+				if(nullptr!=secPtr && 0<secPtr->unstableByte.size())
+				{
+					for(int i=0; i<secPtr->unstableByte.size(); ++i)
+					{
+						printf("%c",(secPtr->unstableByte[i] ? 'U' : '.'));
+						if(15==i%16 || i+1==secPtr->unstableByte.size())
+						{
+							printf("\n");
+						}
+					}
+				}
+				else
+				{
+					printf("No unstable-byte information on that sector.\n");
+				}
+			}
+			else
+			{
+				printf("Too few arguments.\n");
+			}
+		}
 //		else if("D77EXT"==cmd)
 //		{
 //			if(2<=argv.size())
@@ -983,6 +1022,8 @@ void D77Analyzer::Help(void) const
 	printf("\tCompare disk image.\n");
 	printf("D track side sec\n");
 	printf("\tDump sector.\n");
+	printf("DU track side sec\n");
+	printf("\tDump unstable-byte info.\n");
 	printf("FRANKEN file.d77 file.d77 ....\n");
 	printf("\Make a franken disk by taking good sectors from specified d77 and replace bad sectors in the\n");
 	printf("\tcurrent d77.\n");

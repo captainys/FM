@@ -120,6 +120,18 @@ void D77File::D77Disk::D77Sector::CleanUp(void)
 	}
 	sectorDataSize=0; // Including the header.
 	sectorData.clear();
+	unstableByte.clear();
+}
+bool D77File::D77Disk::D77Sector::SameCHRN(const D77Sector &s) const
+{
+	return (cylinder==s.cylinder &&
+	        head==s.head &&
+	        sector==s.sector &&
+	        sizeShift==s.sizeShift);
+}
+bool D77File::D77Disk::D77Sector::SameCHRNandActualSize(const D77Sector &s) const
+{
+	return SameCHRN(s) && sectorData.size()==s.sectorData.size();
 }
 bool D77File::D77Disk::D77Sector::Make(int trk,int sid,int secId,int secSize)
 {
@@ -369,6 +381,158 @@ int D77File::D77Disk::D77Track::GetSide(void) const
 		return sector[0].head;
 	}
 	return -1;
+}
+
+bool D77File::D77Disk::D77Track::SuspectedLeafInTheForest(void) const
+{
+	bool allSameCHR=true;
+	for(auto &s : sector)
+	{
+		if(s.cylinder!=sector[0].cylinder ||
+		   s.head!=sector[0].head ||
+		   s.sizeShift!=sector[0].sizeShift)
+		{
+			allSameCHR=false;
+		}
+	}
+	return allSameCHR;
+}
+
+void D77File::D77Disk::D77Track::IdentifyUnstableByte(void)
+{
+	if(true==SuspectedLeafInTheForest())
+	{
+		return;
+	}
+
+
+	for(auto &s : sector)
+	{
+		s.unstableByte.clear();
+	}
+	// If the value changes, can be an unstable byte.
+	for(int i=0; i<sector.size(); ++i)
+	{
+		auto &s0=sector[i];
+		if(0<s0.unstableByte.size()) // Already taken care?
+		{
+			continue;
+		}
+
+		s0.unstableByte.resize(s0.sectorData.size());
+		for(auto &b : s0.unstableByte)
+		{
+			b=false;
+		}
+
+		for(int j=i+1; j<sector.size(); ++j)
+		{
+			auto &s1=sector[j];
+			if(true==s0.SameCHRNandActualSize(s1))
+			{
+				for(int k=0; k<s0.sectorData.size(); ++k)
+				{
+					if(s0.sectorData[k]!=s1.sectorData[k])
+					{
+						s0.unstableByte[k]=true;
+					}
+				}
+			}
+		}
+
+		// Once identified, copy to all multi-sample sectors.
+		for(int j=i+1; j<sector.size(); ++j)
+		{
+			auto &s1=sector[j];
+			if(true==s0.SameCHRNandActualSize(s1))
+			{
+				s1.unstableByte=s0.unstableByte;
+			}
+		}
+	}
+	UnidentifyUnstableByteForContinuousData();
+}
+
+void D77File::D77Disk::D77Track::IdentifyUnstableByteRDD(void)
+{
+	for(auto &s : sector)
+	{
+		s.unstableByte.clear();
+	}
+	// If the value changes, can be an unstable byte.
+	for(int i=0; i<sector.size(); ++i)
+	{
+		auto &s0=sector[i];
+		if(0<s0.unstableByte.size()) // Already taken care?
+		{
+			continue;
+		}
+		if(true!=s0.resampled)
+		{
+			continue;
+		}
+
+		s0.unstableByte.resize(s0.sectorData.size());
+		for(auto &b : s0.unstableByte)
+		{
+			b=false;
+		}
+
+		for(int j=i+1; j<sector.size(); ++j)
+		{
+			auto &s1=sector[j];
+			if(true==s1.resampled &&
+			   true==s0.SameCHRNandActualSize(s1))
+			{
+				for(int k=0; k<s0.sectorData.size(); ++k)
+				{
+					if(s0.sectorData[k]!=s1.sectorData[k])
+					{
+						s0.unstableByte[k]=true;
+					}
+				}
+			}
+		}
+
+		// Once identified, copy to all multi-sample sectors.
+		for(int j=i+1; j<sector.size(); ++j)
+		{
+			auto &s1=sector[j];
+			if(true==s1.resampled &&
+			   true==s0.SameCHRNandActualSize(s1))
+			{
+				s1.unstableByte=s0.unstableByte;
+			}
+		}
+	}
+	UnidentifyUnstableByteForContinuousData();
+}
+
+void D77File::D77Disk::D77Track::UnidentifyUnstableByteForContinuousData(void)
+{
+	// Trailing stable bytes can flip between 0xF6 and 0x00, therefore can be identified as unstable bytes, but must not be randomized.
+	// If the same byte repeats more than 4 bytes, it must be a stable byte,
+	for(auto &s : sector)
+	{
+		if(s.sectorData.size()==s.unstableByte.size())
+		{
+			for(int i=0; i+4<=s.sectorData.size(); ++i)
+			{
+				int j=i+1;
+				for(; j<s.sectorData.size() && s.sectorData[i]==s.sectorData[j]; ++j)
+				{
+				}
+				if(i+4<=j)
+				{
+					for(; i<j; ++i)
+					{
+						s.unstableByte[i]=false;
+					}
+					--i;
+				}
+			}
+		}
+	}
 }
 
 std::vector <D77File::D77Disk::D77Track::SectorLocation> D77File::D77Disk::D77Track::AllSector(void) const
@@ -881,6 +1045,7 @@ bool D77File::D77Disk::SetD77Image(const unsigned char d77Img[],bool verboseMode
 			}
 			nUnformat=0;
 			track.push_back(MakeTrackData(d77Img+offset,d77Img+header.diskSize));
+			track.back().IdentifyUnstableByte();
 			prevOffset=offset;
 			++trackCount;
 		}
@@ -1049,6 +1214,7 @@ bool D77File::D77Disk::SetRDDImage(size_t &bytesUsed,size_t len,const unsigned c
 			}
 			break;
 		case 5: // End of Track
+			trkPtr->IdentifyUnstableByte();
 			trkPtr=nullptr;
 			ptr+=16;
 			break;
@@ -1858,7 +2024,7 @@ std::vector <unsigned char> D77File::D77Disk::ReadSector(int trk,int sid,int sec
 		auto secPtr=trkPtr->FindSector(sec);
 		if(nullptr!=secPtr)
 		{
-			return secPtr->sectorData;
+			return secPtr->GetData();
 		}
 	}
 
