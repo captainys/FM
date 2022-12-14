@@ -411,11 +411,11 @@ void FM77AVKeyboardEmulator::ProcessKeyStroke(int key,bool shift,bool ctrl,bool 
 	if(MODE_TRANSLATION==mode || MODE_RKANA==mode)
 	{
 		// Note: Don't add shift and ctrl unless the key code is processed in this function.
-		if(FSKEY_BS==key)
+		/* BACKSPACE now emits character code 8.  if(FSKEY_BS==key)
 		{
 			keySched.AddStroke(AVKEY_BACKSPACE,shift,ctrl,graph);
 		}
-		else if(FSKEY_INS==key)
+		else */ if(FSKEY_INS==key)
 		{
 			keySched.AddStroke(AVKEY_INS,shift,ctrl,graph);
 		}

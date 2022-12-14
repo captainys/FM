@@ -124,9 +124,9 @@ static FM77AVRKanaMap rKanaTable[]=
 
 	{"nya",	false,	{{AVKEY_I,		false,false,false},	{AVKEY_7,		true,false,false},	{AVKEY_NULL,	false,false,false}}},
 	{"nyi",	false,	{{AVKEY_I,		false,false,false},	{AVKEY_E,		true,false,false},	{AVKEY_NULL,	false,false,false}}},
-	{"nyu",	false,	{{AVKEY_1,		false,false,false},	{AVKEY_8,		true,false,false},	{AVKEY_NULL,	false,false,false}}},
-	{"nye",	false,	{{AVKEY_COMMA,	false,false,false},	{AVKEY_5,		true,false,false},	{AVKEY_NULL,	false,false,false}}},
-	{"nyo",	false,	{{AVKEY_K,		false,false,false},	{AVKEY_9,		true,false,false},	{AVKEY_NULL,	false,false,false}}},
+	{"nyu",	false,	{{AVKEY_I,		false,false,false},	{AVKEY_8,		true,false,false},	{AVKEY_NULL,	false,false,false}}},
+	{"nye",	false,	{{AVKEY_I,		false,false,false},	{AVKEY_5,		true,false,false},	{AVKEY_NULL,	false,false,false}}},
+	{"nyo",	false,	{{AVKEY_I,		false,false,false},	{AVKEY_9,		true,false,false},	{AVKEY_NULL,	false,false,false}}},
 
 	{"ha",	false,	{{AVKEY_F,		false,false,false},	{AVKEY_NULL,	false,false,false},	{AVKEY_NULL,	false,false,false}}},
 	{"hi",	false,	{{AVKEY_V,		false,false,false},	{AVKEY_NULL,	false,false,false},	{AVKEY_NULL,	false,false,false}}},

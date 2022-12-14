@@ -262,6 +262,7 @@ static KeyTranslationTable keyTranslationTable[]=
 {
 	{'\t',{AVKEY_TAB,           false,false,false}},
 	{' ', {AVKEY_MID_SPACE,     false,false,false}},		// 32
+	{ 8 , {AVKEY_BACKSPACE,     false,false,false}},		// Backspace=8
 	{'!', {AVKEY_1,             true,false,false}},
 	{'\"',{AVKEY_DOUBLE_QUOTE,  false,false,false}},
 	{'#', {AVKEY_3,             true,false,false}},

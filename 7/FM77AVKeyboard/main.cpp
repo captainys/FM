@@ -309,6 +309,13 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 			fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_DIRECT);
 		}
 	}
+	if(FsGetKeyState(FSKEY_R) && FsGetKeyState(FSKEY_K) && FsGetKeyState(FSKEY_A))
+	{
+		if(fm77avKeyboardEmu.GetMode()!=FM77AVKeyboardEmulator::MODE_RKANA)
+		{
+			fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_RKANA);
+		}
+	}
 	if(FsGetKeyState(FSKEY_SHIFT) &&
 	   FsGetKeyState(FSKEY_DEL) &&
 	   true!=fm77avKeyboardEmu.IsAutoTyping())
@@ -316,7 +323,8 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 		const char *prog=nullptr;
 		if(FSKEY_0==key)
 		{
-			prog="10 OPEN \"I\",#1,\"COM0:(F8N1)\"\r\n"
+			prog="\x08\x08\x08\x08\x08\x08\x08\x08"
+				"10 OPEN \"I\",#1,\"COM0:(F8N1)\"\r\n"
 				"20 LINE INPUT #1,A$\r\n"
 				"30 CLOSE\r\n"
 				"40 EXEC VARPTR(A$)\r\n"
@@ -324,11 +332,16 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 		}
 		else if(FSKEY_1==key)
 		{
-			prog="10 OPEN \"I\",#1,\"COM1:(F8N1)\"\r\n"
+			prog="\x08\x08\x08\x08\x08\x08\x08\x08"
+				"10 OPEN \"I\",#1,\"COM1:(F8N1)\"\r\n"
 				"20 LINE INPUT #1,A$\r\n"
 				"30 CLOSE\r\n"
 				"40 EXEC VARPTR(A$)\r\n"
 				"RUN\r\n";
+		}
+		else if(FSKEY_HOME==key)
+		{
+			fm77avKeyboardEmu.SendStroke(AVKEY_KANA,false,false,false);
 		}
 		if(nullptr!=prog)
 		{
@@ -342,6 +355,47 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 			fm77avKeyboardEmu.StartAutoTyping(toSend,500);
 		}
 	}
+	if(FsGetKeyState(FSKEY_H) &&
+	   FsGetKeyState(FSKEY_E) &&
+	   FsGetKeyState(FSKEY_L) &&
+	   FsGetKeyState(FSKEY_P))
+	{
+		std::vector <char> toSend;
+		std::string base=
+			"WIDTH 80,25\r\n"
+			"60000 REM SHIFT+DEL+0     Auto-Type RS232C Client Loader (COM0).\r\n"
+			"60001 REM ShIFT+DEL+1     Auto-Type RS232C Client Loader (COM1).\r\n"
+			"60002 REM SHIFT+DEL+HOME  Emit KANA key.\r\n"
+			"60003 REM D+I+R           Direct Mode.\r\n"
+			"60004 REM T+R+A           Translation Mode.\r\n";
+			"60005 REM R+K+A           Romaji Mode (Need to set KANA mode).\r\n";
+		switch(fm77avKeyboardEmu.mode)
+		{
+		case FM77AVKeyboardEmulator::MODE_TRANSLATION:
+			base+="60006 REM Now Translation Mode.\r\n";
+			break;
+		case FM77AVKeyboardEmulator::MODE_DIRECT:
+			base+="60007 REM Now Direct Mode.\r\n";
+			break;
+		case FM77AVKeyboardEmulator::MODE_RKANA:
+			base+="60008 REM Now Romaji Kana Mode.\r\n";
+			break;
+		}
+		toSend.push_back(8);
+		toSend.push_back(8);
+		toSend.push_back(8);
+		toSend.push_back(8);
+		toSend.push_back(8);
+		toSend.push_back(8);
+		toSend.push_back(8);
+		toSend.push_back(8);
+		for(auto c : base)
+		{
+			toSend.push_back(c);
+		}
+		fm77avKeyboardEmu.StartAutoTyping(toSend,500);
+	}
+
 
 	int lb,mb,rb,mx,my;
 	auto mouseEvt=FsGetMouseEvent(lb,mb,rb,mx,my);
