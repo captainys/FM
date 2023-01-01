@@ -54,39 +54,39 @@ private:
 	};
 	CommandParameterInfo cpi;
 
-	CheapGUI::Text *titleTxt;
-	CheapGUI::Text *statusText;
-	CheapGUI::Text *errorText;
+	CheapGUI::Text *titleTxt=nullptr;
+	CheapGUI::Text *statusText=nullptr;
+	CheapGUI::Text *errorText=nullptr;
 
 	std::vector <CheapGUI::CheckBox *> portBtn;
 
-	CheapGUI::CheckBox *translateModeBtn;
-	CheapGUI::CheckBox *directModeBtn;
-	CheapGUI::CheckBox *rKanaModeBtn;
+	CheapGUI::CheckBox *translateModeBtn=nullptr;
+	CheapGUI::CheckBox *directModeBtn=nullptr;
+	CheapGUI::CheckBox *rKanaModeBtn=nullptr;
 	std::vector <CheapGUI::CheckBox *> modeBtn;
 
-	CheapGUI::PushButton *autoTypingBtn,*autoTypingBasicBtn,*autoTypeClipboardBtn;
+	CheapGUI::PushButton *autoTypingBtn=nullptr,*autoTypingBasicBtn=nullptr,*autoTypeClipboardBtn=nullptr;
 
-	CheapGUI::PushButton *exitBtn;
-	CheapGUI::PushButton *secretBtn;
-	CheapGUI::PushButton *capsBtn;
-	CheapGUI::PushButton *kanaBtn;
-	CheapGUI::CheckBox *autoStopBtn;
-	CheapGUI::CheckBox *autoFireBtn;
+	CheapGUI::PushButton *exitBtn=nullptr;
+	CheapGUI::PushButton *secretBtn=nullptr;
+	CheapGUI::PushButton *capsBtn=nullptr;
+	CheapGUI::PushButton *kanaBtn=nullptr;
+	CheapGUI::CheckBox *autoStopBtn=nullptr;
+	CheapGUI::CheckBox *autoFireBtn=nullptr;
 
-	CheapGUI::Text *rKanaTxt;
-	CheapGUI::CheckBox *pauseBtn;
+	CheapGUI::Text *rKanaTxt=nullptr;
+	CheapGUI::CheckBox *pauseBtn=nullptr;
 
-	CheapGUI::Text *irToyVersionTxt;
-	CheapGUI::Text *protocolVersionTxt;
+	CheapGUI::Text *irToyVersionTxt=nullptr;
+	CheapGUI::Text *protocolVersionTxt=nullptr;
 
-	CheapGUI::Text *zxcTxt;
-	CheapGUI::CheckBox *ZXCforLMRSpaceBtn;
-	CheapGUI::Text *arrowTxt;
-	CheapGUI::CheckBox *arrowForArrowBtn,*arrowFor4DirBtn,*arrowFor8DirBtn;
+	CheapGUI::Text *zxcTxt=nullptr;
+	CheapGUI::CheckBox *ZXCforLMRSpaceBtn=nullptr;
+	CheapGUI::Text *arrowTxt=nullptr;
+	CheapGUI::CheckBox *arrowForArrowBtn=nullptr,*arrowFor4DirBtn=nullptr,*arrowFor8DirBtn=nullptr;
 	std::vector <CheapGUI::Widget *> assignmentWidget;
 
-	CheapGUI::PushButton *saveCOMPortLogBtn;
+	CheapGUI::PushButton *saveCOMPortLogBtn=nullptr;
 
 public:
 	bool quit;
@@ -295,6 +295,11 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 		Quit();
 	}
 
+	if(FSKEY_ESC==key && true==fm77avKeyboardEmu.IsAutoTyping())
+	{
+		fm77avKeyboardEmu.StopAutoTyping();
+	}
+
 	if(FsGetKeyState(FSKEY_T) && FsGetKeyState(FSKEY_R) && FsGetKeyState(FSKEY_A))
 	{
 		if(fm77avKeyboardEmu.GetMode()!=FM77AVKeyboardEmulator::MODE_TRANSLATION)
@@ -415,141 +420,144 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 		ignoreNextLButtonUp=false;
 	}
 
-	if(exitBtn==gui.PeekLastClicked())
+	auto lastClicked=gui.GetLastClicked();
+	if(nullptr!=lastClicked)
 	{
-		Quit();
-	}
-	if(secretBtn==gui.PeekLastClicked())
-	{
-		fm77avKeyboardEmu.SendFM77AVSecretMessage();
-	}
-	if(capsBtn==gui.PeekLastClicked())
-	{
-		fm77avKeyboardEmu.SendStroke(AVKEY_CAPS,false,false,false);
-	}
-	if(kanaBtn==gui.PeekLastClicked())
-	{
-		fm77avKeyboardEmu.SendStroke(AVKEY_KANA,false,false,false);
-	}
-	if(pauseBtn==gui.PeekLastClicked())
-	{
-		fm77avKeyboardEmu.SetPause(pauseBtn->GetCheck());
-		if(true==fm77avKeyboardEmu.GetPause())
+		if(exitBtn==lastClicked)
 		{
-			titleTxt->SetText("FM77AV Keyboard Emulator (PAUSED)");
+			Quit();
 		}
-		else
+		if(secretBtn==lastClicked)
 		{
-			titleTxt->SetText("FM77AV Keyboard Emulator");
+			fm77avKeyboardEmu.SendFM77AVSecretMessage();
 		}
-	}
-	if(autoTypingBtn==gui.PeekLastClicked() && fm77avKeyboardEmu.GetIRToyState()==IRToy_Controller::STATE_GOWILD)
-	{
-		FileDialogOption opt;
-		auto fName=SelectFile(opt);
-		fm77avKeyboardEmu.StartAutoTyping(fName.c_str(),0);
-		ignoreNextLButtonUp=true;
-	}
-	if(autoTypingBasicBtn==gui.PeekLastClicked() && fm77avKeyboardEmu.GetIRToyState()==IRToy_Controller::STATE_GOWILD)
-	{
-		FileDialogOption opt;
-		auto fName=SelectFile(opt);
-		fm77avKeyboardEmu.StartAutoTyping(fName.c_str(),500);
-		ignoreNextLButtonUp=true;
-	}
-	if(autoTypeClipboardBtn==gui.PeekLastClicked() && fm77avKeyboardEmu.GetIRToyState()==IRToy_Controller::STATE_GOWILD)
-	{
-		auto clipboard=ReadFromClipboard();
-		fm77avKeyboardEmu.StartAutoTyping(clipboard,500);
-		ignoreNextLButtonUp=true;
-	}
-	if(autoStopBtn==gui.PeekLastClicked())
-	{
-		fm77avKeyboardEmu.SetAutoStop(autoStopBtn->GetCheck());
-	}
-	if(autoFireBtn==gui.PeekLastClicked())
-	{
-		fm77avKeyboardEmu.SetAutoFire(autoFireBtn->GetCheck());
-	}
-	if(translateModeBtn==gui.PeekLastClicked() ||
-	   directModeBtn==gui.PeekLastClicked() ||
-	   rKanaModeBtn==gui.PeekLastClicked())
-	{
-		if(translateModeBtn==gui.PeekLastClicked())
+		if(capsBtn==lastClicked)
 		{
-			fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_TRANSLATION);
+			fm77avKeyboardEmu.SendStroke(AVKEY_CAPS,false,false,false);
 		}
-		else if(directModeBtn==gui.PeekLastClicked())
+		if(kanaBtn==lastClicked)
 		{
-			fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_DIRECT);
+			fm77avKeyboardEmu.SendStroke(AVKEY_KANA,false,false,false);
 		}
-		else if(rKanaModeBtn==gui.PeekLastClicked())
+		if(pauseBtn==lastClicked)
 		{
-			fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_RKANA);
-		}
-	}
-	if(portBtn.size()==availablePort.size())
-	{
-		for(int i=0; i<portBtn.size(); ++i)
-		{
-			if(portBtn[i]==gui.PeekLastClicked())
+			fm77avKeyboardEmu.SetPause(pauseBtn->GetCheck());
+			if(true==fm77avKeyboardEmu.GetPause())
 			{
-				autoPortScan=false;
-				fm77avKeyboardEmu.Connect(availablePort[i]);
-				port=availablePort[i];
-				break;
-			}
-		}
-	}
-	if(ZXCforLMRSpaceBtn==gui.PeekLastClicked())
-	{
-		if(true==ZXCforLMRSpaceBtn->GetCheck())
-		{
-			fm77avKeyboardEmu.keyMap.ZXCForLMRSpzce();
-		}
-		else
-		{
-			fm77avKeyboardEmu.keyMap.ZXCForZXC();
-		}
-	}
-	if(arrowForArrowBtn==gui.PeekLastClicked())
-	{
-		fm77avKeyboardEmu.keyMap.ArrowForArrow();
-		fm77avKeyboardEmu.SetArrowFor8Dir(false);
-	}
-	if(arrowFor4DirBtn==gui.PeekLastClicked())
-	{
-		fm77avKeyboardEmu.keyMap.ArrowFor2468();
-		fm77avKeyboardEmu.SetArrowFor8Dir(false);
-	}
-	if(arrowFor8DirBtn==gui.PeekLastClicked())
-	{
-		fm77avKeyboardEmu.keyMap.ArrowForNone();
-		fm77avKeyboardEmu.SetArrowFor8Dir(true);
-	}
-	if(saveCOMPortLogBtn==gui.PeekLastClicked())
-	{
-		auto log=fm77avKeyboardEmu.GetIRToyCOMTransactionLog();
-		FILE *fp=fopen("comlog.bin","wb");
-		if(nullptr!=fp)
-		{
-			auto wSize=fwrite(log.data(),1,log.size(),fp);
-			fclose(fp);
-			if(wSize==log.size())
-			{
-				statusText->SetText("Saved comlog.bin");
+				titleTxt->SetText("FM77AV Keyboard Emulator (PAUSED)");
 			}
 			else
 			{
-				statusText->SetText("File write error.");
+				titleTxt->SetText("FM77AV Keyboard Emulator");
 			}
 		}
-		else
+		if(autoTypingBtn==lastClicked && fm77avKeyboardEmu.GetIRToyState()==IRToy_Controller::STATE_GOWILD)
 		{
-			statusText->SetText("Cannot open log file.");
+			FileDialogOption opt;
+			auto fName=SelectFile(opt);
+			fm77avKeyboardEmu.StartAutoTyping(fName.c_str(),0);
+			ignoreNextLButtonUp=true;
+		}
+		if(autoTypingBasicBtn==lastClicked && fm77avKeyboardEmu.GetIRToyState()==IRToy_Controller::STATE_GOWILD)
+		{
+			FileDialogOption opt;
+			auto fName=SelectFile(opt);
+			fm77avKeyboardEmu.StartAutoTyping(fName.c_str(),500);
+			ignoreNextLButtonUp=true;
+		}
+		if(autoTypeClipboardBtn==lastClicked && fm77avKeyboardEmu.GetIRToyState()==IRToy_Controller::STATE_GOWILD)
+		{
+			auto clipboard=ReadFromClipboard();
+			fm77avKeyboardEmu.StartAutoTyping(clipboard,500);
+			ignoreNextLButtonUp=true;
+		}
+		if(autoStopBtn==lastClicked)
+		{
+			fm77avKeyboardEmu.SetAutoStop(autoStopBtn->GetCheck());
+		}
+		if(autoFireBtn==lastClicked)
+		{
+			fm77avKeyboardEmu.SetAutoFire(autoFireBtn->GetCheck());
+		}
+		if(translateModeBtn==lastClicked ||
+		   directModeBtn==lastClicked ||
+		   rKanaModeBtn==lastClicked)
+		{
+			if(translateModeBtn==lastClicked)
+			{
+				fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_TRANSLATION);
+			}
+			else if(directModeBtn==lastClicked)
+			{
+				fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_DIRECT);
+			}
+			else if(rKanaModeBtn==lastClicked)
+			{
+				fm77avKeyboardEmu.SetMode(FM77AVKeyboardEmulator::MODE_RKANA);
+			}
+		}
+		if(portBtn.size()==availablePort.size())
+		{
+			for(int i=0; i<portBtn.size(); ++i)
+			{
+				if(portBtn[i]==lastClicked)
+				{
+					autoPortScan=false;
+					fm77avKeyboardEmu.Connect(availablePort[i]);
+					port=availablePort[i];
+					break;
+				}
+			}
+		}
+		if(ZXCforLMRSpaceBtn==lastClicked)
+		{
+			if(true==ZXCforLMRSpaceBtn->GetCheck())
+			{
+				fm77avKeyboardEmu.keyMap.ZXCForLMRSpzce();
+			}
+			else
+			{
+				fm77avKeyboardEmu.keyMap.ZXCForZXC();
+			}
+		}
+		if(arrowForArrowBtn==lastClicked)
+		{
+			fm77avKeyboardEmu.keyMap.ArrowForArrow();
+			fm77avKeyboardEmu.SetArrowFor8Dir(false);
+		}
+		if(arrowFor4DirBtn==lastClicked)
+		{
+			fm77avKeyboardEmu.keyMap.ArrowFor2468();
+			fm77avKeyboardEmu.SetArrowFor8Dir(false);
+		}
+		if(arrowFor8DirBtn==lastClicked)
+		{
+			fm77avKeyboardEmu.keyMap.ArrowForNone();
+			fm77avKeyboardEmu.SetArrowFor8Dir(true);
+		}
+		if(saveCOMPortLogBtn==lastClicked)
+		{
+			auto log=fm77avKeyboardEmu.GetIRToyCOMTransactionLog();
+			FILE *fp=fopen("comlog.bin","wb");
+			if(nullptr!=fp)
+			{
+				auto wSize=fwrite(log.data(),1,log.size(),fp);
+				fclose(fp);
+				if(wSize==log.size())
+				{
+					statusText->SetText("Saved comlog.bin");
+				}
+				else
+				{
+					statusText->SetText("File write error.");
+				}
+			}
+			else
+			{
+				statusText->SetText("Cannot open log file.");
+			}
 		}
 	}
-	gui.GetLastClicked();
 
 	fm77avKeyboardEmu.ProcessChar(FsInkeyChar());
 	bool shift=FsGetKeyState(FSKEY_SHIFT)!=0;
