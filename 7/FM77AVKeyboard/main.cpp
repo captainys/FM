@@ -704,6 +704,7 @@ bool FM77AVKeyboardEmulatorMain::NeedRedraw(void) const
 
 void FM77AVKeyboardEmulatorMain::UpdateIRToyState(CheapGUI::Text *statusText,int irToyState,int prevIRToyState)
 {
+#ifndef YS_RASPBERRYPI
 	if(irToyState!=prevIRToyState)
 	{
 		switch(irToyState)
@@ -757,6 +758,9 @@ void FM77AVKeyboardEmulatorMain::UpdateIRToyState(CheapGUI::Text *statusText,int
 			break;
 		}
 	}
+#else
+	statusText->SetText("RaspPI GPIO");
+#endif
 }
 
 void FM77AVKeyboardEmulatorMain::UpdateIRToyErrorCode(CheapGUI::Text *textPtr,int irToyError,int prevIRToyError,bool autoTyping,bool prevAutoTyping)
