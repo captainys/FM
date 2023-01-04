@@ -357,7 +357,7 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 			{
 				toSend.push_back(prog[i]);
 			}
-			fm77avKeyboardEmu.StartAutoTyping(toSend,500);
+			fm77avKeyboardEmu.StartAutoTypingStr(toSend,500,"LOADER");
 		}
 	}
 	if(FsGetKeyState(FSKEY_H) &&
@@ -398,7 +398,7 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 		{
 			toSend.push_back(c);
 		}
-		fm77avKeyboardEmu.StartAutoTyping(toSend,500);
+		fm77avKeyboardEmu.StartAutoTypingStr(toSend,500,"HELP");
 	}
 
 
@@ -455,20 +455,20 @@ void FM77AVKeyboardEmulatorMain::ProcessUserInput(void)
 		{
 			FileDialogOption opt;
 			auto fName=SelectFile(opt);
-			fm77avKeyboardEmu.StartAutoTyping(fName.c_str(),0);
+			fm77avKeyboardEmu.StartAutoTypingFile(fName.c_str(),0);
 			ignoreNextLButtonUp=true;
 		}
 		if(autoTypingBasicBtn==lastClicked && fm77avKeyboardEmu.GetIRToyState()==IRToy_Controller::STATE_GOWILD)
 		{
 			FileDialogOption opt;
 			auto fName=SelectFile(opt);
-			fm77avKeyboardEmu.StartAutoTyping(fName.c_str(),500);
+			fm77avKeyboardEmu.StartAutoTypingFile(fName.c_str(),500);
 			ignoreNextLButtonUp=true;
 		}
 		if(autoTypeClipboardBtn==lastClicked && fm77avKeyboardEmu.GetIRToyState()==IRToy_Controller::STATE_GOWILD)
 		{
 			auto clipboard=ReadFromClipboard();
-			fm77avKeyboardEmu.StartAutoTyping(clipboard,500);
+			fm77avKeyboardEmu.StartAutoTypingStr(clipboard,500,"PASTE");
 			ignoreNextLButtonUp=true;
 		}
 		if(autoStopBtn==lastClicked)
@@ -769,7 +769,10 @@ void FM77AVKeyboardEmulatorMain::UpdateIRToyErrorCode(CheapGUI::Text *textPtr,in
 	{
 		if(true==autoTyping)
 		{
-			textPtr->SetText("AUTO TYPING...");
+			std::string msg="AUTO TYPING [";
+			msg+=fm77avKeyboardEmu.GetAutoTypingType();
+			msg+="]";
+			textPtr->SetText(msg.c_str());
 			textPtr->SetColor(0,255,0,255);
 		}
 		else

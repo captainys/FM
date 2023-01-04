@@ -2,7 +2,7 @@
 #include <string.h>
 #include "fm77avkeyboardemu.h"
 
-void FM77AVKeyboardEmulator::StartAutoTyping(const char fName[],int lineBreakWait)
+void FM77AVKeyboardEmulator::StartAutoTypingFile(const char fName[],int lineBreakWait)
 {
 	if(nullptr==fName || 0==fName[0])
 	{
@@ -15,6 +15,7 @@ void FM77AVKeyboardEmulator::StartAutoTyping(const char fName[],int lineBreakWai
 		{
 			autoTypingFName=fName;
 			autoTypingPtr=0;
+			autoTypingType="File";
 
 			fseek(fp,0,SEEK_END);
 			auto fSize=ftell(fp);
@@ -35,10 +36,11 @@ void FM77AVKeyboardEmulator::StartAutoTyping(const char fName[],int lineBreakWai
 		}
 	}
 }
-void FM77AVKeyboardEmulator::StartAutoTyping(const std::vector <char> text,int lineBreakWait)
+void FM77AVKeyboardEmulator::StartAutoTypingStr(const std::vector <char> text,int lineBreakWait,std::string typeType)
 {
 	autoTypingFName="Clipboard";
 	autoTypingPtr=0;
+	autoTypingType=typeType;
 
 	autoTypingTxt.clear();
 	autoTypingTxt.insert(autoTypingTxt.end(),text.begin(),text.end());
@@ -63,6 +65,10 @@ bool FM77AVKeyboardEmulator::IsAutoTyping(void) const
 std::string FM77AVKeyboardEmulator::GetAutoTypingFileName(void) const
 {
 	return autoTypingFName;
+}
+std::string FM77AVKeyboardEmulator::GetAutoTypingType(void) const
+{
+	return autoTypingType;
 }
 
 void FM77AVKeyboardEmulator::AutoType(void)

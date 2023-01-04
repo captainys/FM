@@ -71,18 +71,19 @@ public:
 
 private:
 	bool keyState[AVKEY_NUM_KEYCODE];
-	int nRKanaBufUsed;
-	char rKanaBuf[4];
-	bool autoStop,autoFire;
-	bool arrowFor8Dir;
+	int nRKanaBufUsed=0;
+	char rKanaBuf[4]={0,0,0,0};
+	bool autoStop=false,autoFire=false;
+	bool arrowFor8Dir=false;
 
 	FM77AVKeyboardScheduler keySched;
 	std::chrono::time_point <std::chrono::system_clock> nextDotTimer;
 	bool breakKeyState;
 
 	std::string autoTypingFName;
-	long long int autoTypingPtr;
-	long long int autoTypingLineBreakWait;
+	std::string autoTypingType;
+	long long int autoTypingPtr=0;
+	long long int autoTypingLineBreakWait=0;
 	std::vector <unsigned char> autoTypingTxt;
 	std::chrono::time_point <std::chrono::system_clock> nextAutoTypingTimer;
 public:
@@ -113,11 +114,12 @@ public:
 	void SetArrowFor8Dir(bool arrowFor8Dir);
 	bool GetArrowFor8Dir(void) const;
 
-	void StartAutoTyping(const char fName[],int lineBreakWait);
-	void StartAutoTyping(const std::vector <char> text,int lineBreakWait);
+	void StartAutoTypingFile(const char fName[],int lineBreakWait);
+	void StartAutoTypingStr(const std::vector <char> text,int lineBreakWait,std::string autoTypingType);
 	void StopAutoTyping(void);
 	bool IsAutoTyping(void) const;
 	std::string GetAutoTypingFileName(void) const;
+	std::string GetAutoTypingType(void) const;
 
 private:
 	void AutoType(void);
