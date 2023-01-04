@@ -26,7 +26,10 @@ bool InitTransmitter(void)
    return false;
 }
 
-
+void CloseTransmitter(void)
+{
+	gpioTerminate();
+}
 
 int MakeOnOffCycle(int onOffCycle[30],const char bits[30],const unsigned int pulseWidth[30])
 {

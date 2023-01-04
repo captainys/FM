@@ -97,6 +97,7 @@ public:
 	void Configure(void);
 
 	void Initialize(void);
+	void Close(void);
 	void SetUpCheapGUI(void);
 	void ProcessUserInput(void);
 	void RunOneStep(void);
@@ -141,6 +142,14 @@ void FM77AVKeyboardEmulatorMain::Initialize(void)
 	prevIRToyError=IRToy_Controller::ERROR_NULL;
 	prevAutoTyping=false;
 	prevRKana.clear();
+}
+
+void FM77AVKeyboardEmulatorMain::Close(void)
+{
+#ifndef YS_RASPBERRYPI
+#else
+	CloseTransmitter();
+#endif
 }
 
 bool FM77AVKeyboardEmulatorMain::RecognizeCommandParameter(int ac,char *av[])
@@ -850,6 +859,7 @@ int main(int ac,char *av[])
 		FsSleep(1); // Give some CPU time for COM driver.
 	}
 
+	app.Close();
 	CheapGUI::DeleteBitmapFontRenderer();
 
 	return 0;
