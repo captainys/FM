@@ -1,0 +1,221 @@
+						.386p
+						ASSUME	CS:CODE
+
+						PUBLIC	READCD
+
+
+IO_DMA_INITIALIZE		EQU		0A0H
+IO_DMA_CHANNEL			EQU		0A1H
+IO_DMA_COUNT_LOW		EQU		0A2H
+IO_DMA_COUNT_HIGH		EQU		0A3H
+IO_DMA_ADDR_LOW			EQU		0A4H
+IO_DMA_ADDR_MID_LOW		EQU		0A5H
+IO_DMA_ADDR_MID_HIGH	EQU		0A6H
+IO_DMA_ADDR_HIGH		EQU		0A7H
+IO_DMA_DEVICE_CTRL_LOW	EQU		0A8H
+IO_DMA_DEVICE_CTRL_HIGH	EQU		0A9H
+IO_DMA_MODE_CONTROL		EQU		0AAH
+IO_DMA_STATUS			EQU		0ABH
+IO_DMA_REQUEST			EQU		0AEH
+IO_DMA_MASK				EQU		0AFH
+
+IO_CDC_MASTER_CONTROL	EQU		04C0H
+IO_CDC_MASTER_STATUS	EQU		04C0H
+IO_CDC_COMMAND			EQU		04C2H
+IO_CDC_STATUS			EQU		04C2H
+IO_CDC_PARAM			EQU		04C4H
+IO_CDC_TFR_CONTROL		EQU		04C6H
+
+
+CDCCMD_MODE1_READ		EQU		02H
+CDCCMD_RAWREAD			EQU		03H
+CDCCMD_IRQ				EQU		40H
+CDCCMD_STATUSREQ		EQU		20H
+
+CODE					SEGMENT
+
+; extern unsigned int READCD(unsigned int physaddr);
+
+READCD					PROC
+; [EBP+8]  Physical Address
+; [EBP+4]  EIP
+; [EBP]    Last EBP
+
+						PUSH	EBP
+						MOV		EBP,ESP
+						PUSH	EBX
+						PUSH	ECX
+						PUSHFD
+
+
+						CLI
+
+						MOV		DX,IO_CDC_STATUS
+						IN		AL,DX
+						IN		AL,DX
+						IN		AL,DX
+						IN		AL,DX
+						IN		AL,DX
+						IN		AL,DX
+						IN		AL,DX
+						IN		AL,DX
+
+
+
+						MOV		DX,IO_CDC_MASTER_STATUS
+WAIT_CDC_READY:			IN		AL,DX
+						AND		AL,1
+						JE		WAIT_CDC_READY
+
+
+
+						; Set up DMA
+
+						MOV		AL,3	; Reset SCSI Controller
+						OUT		IO_DMA_INITIALIZE,AL
+						MOV		AL,3	; Channel 3 CD-ROM
+						OUT		IO_DMA_CHANNEL,AL
+						MOV		AL,20H	; DMA enable
+						OUT		IO_DMA_DEVICE_CTRL_LOW,AL
+
+						MOV		AL,44H	; Device to Mem
+						OUT		IO_DMA_MODE_CONTROL,AL
+
+						MOV		EAX,[EBP+8]
+						OUT		IO_DMA_ADDR_LOW,AX
+						SHR		EAX,16
+						OUT		IO_DMA_ADDR_MID_HIGH,AL
+						MOV		AL,AH
+						OUT		IO_DMA_ADDR_HIGH,AL
+
+						MOV		AX,01000H	; Up to 4KB
+						OUT		IO_DMA_COUNT_LOW,AX
+
+						; Unmask DMA
+						IN		AL,IO_DMA_MASK
+						AND		AL,07H
+						OUT		IO_DMA_MASK,AL
+
+
+
+
+
+						; Set Param.  First sector
+						MOV		DX,IO_CDC_PARAM
+						MOV		AL,0	; 0min 2sec 0frm is first sector.
+						OUT		DX,AL
+						MOV		AL,2
+						OUT		DX,AL
+						MOV		AL,0
+						OUT		DX,AL
+						MOV		AL,0
+						OUT		DX,AL
+						MOV		AL,2
+						OUT		DX,AL
+						MOV		AL,0
+						OUT		DX,AL
+						MOV		AL,0
+						OUT		DX,AL
+						MOV		AL,0
+						OUT		DX,AL
+
+						MOV		DX,IO_CDC_COMMAND
+						MOV		AL,CDCCMD_RAWREAD+CDCCMD_IRQ+CDCCMD_STATUSREQ
+						OUT		DX,AL
+
+WAIT_DATA_READY:
+						CALL	GET_CDC_STATUS
+						CMP		AL,21H ; Error
+						JE		READCD_CDC_ERROR
+						CMP		AL,22H ; Data Ready
+						JNE		WAIT_DATA_READY
+
+
+						MOV		DX,IO_CDC_TFR_CONTROL
+						MOV		AL,010H	; DMA Transfer
+						OUT		DX,AL
+
+						CALL	WAIT_DMAE
+
+
+WAIT_READ_DONE:
+						CALL	GET_CDC_STATUS
+						CMP		AL,06H	; Read Done
+						JNE		WAIT_READ_DONE
+
+
+						MOV		DX,IO_CDC_TFR_CONTROL
+						XOR		AL,AL
+						OUT		DX,AL
+
+						; Mask DMA
+						IN		AL,IO_DMA_MASK
+						AND		AL,0FH
+						OR		AL,08H
+						OUT		IO_DMA_MASK,AL
+
+						; Clear DMA_ADDR_HIGH Just in case
+						XOR		AL,AL
+						OUT		IO_DMA_ADDR_HIGH,AL
+
+						XOR		EAX,EAX
+READCD_RET:
+						POPFD
+						POP		ECX
+						POP		EBX
+						POP		EBP
+						RET
+
+READCD_CDC_ERROR:
+						MOV		EAX,1
+						JMP		READCD_RET
+
+READCD					ENDP
+
+
+
+GET_CDC_STATUS		PROC
+
+						MOV		DX,IO_CDC_MASTER_STATUS
+						IN		AL,DX
+						AND		AL,02H
+						JE		GET_CDC_STATUS_NO_STATUS
+
+						MOV		DX,IO_CDC_STATUS
+						IN		AL,DX
+						ROR		EAX,8
+						IN		AL,DX
+						ROR		EAX,8
+						IN		AL,DX
+						ROR		EAX,8
+						IN		AL,DX
+						ROR		EAX,8
+
+						RET
+
+GET_CDC_STATUS_NO_STATUS:
+						XOR		EAX,EAX
+						RET
+
+
+GET_CDC_STATUS		ENDP
+
+
+WAIT_DMAE				PROC
+
+						MOV		DX,IO_CDC_MASTER_STATUS
+WAIT_DMAE_LOOP:
+						IN		AL,DX
+						AND		AL,40H
+						JE		WAIT_DMAE_LOOP
+
+						RET
+
+WAIT_DMAE				ENDP
+
+CODE					ENDS
+						END
+
+
+
+
