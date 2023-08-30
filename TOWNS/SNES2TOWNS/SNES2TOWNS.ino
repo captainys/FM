@@ -1,9 +1,9 @@
-#define LATCH       17   // A0 for LATCH
-#define CLOCK       18   // A1 for CLOCK
+#define CLOCK       17   // A0 for CLOCK
+#define LATCH       18   // A1 for LATCH
 #define DATA        19   // A2 for DATA
 
-#define OUT_BEGIN   0    // Pin 0
-#define NUM_OUTPUT  14   // to Pin 13
+#define OUT_BEGIN   2    // Pin 2
+#define NUM_OUTPUT  12   // to Pin 13
 
 void setup() {
     pinMode(LATCH,OUTPUT);
