@@ -1,3 +1,6 @@
+#define AS_CPSF     14   // If A0 is high, present self to TOWNS as CPSF
+#define AS_FJ6BTN   15   // If A1 is high, present self to TOWNS as Fujitsu 6-Button Pad 
+
 #define CLOCK       17   // A0 for CLOCK
 #define LATCH       18   // A1 for LATCH
 #define DATA        19   // A2 for DATA
@@ -18,6 +21,9 @@ void setup() {
         pinMode(OUT_BEGIN+i,OUTPUT);
         digitalWrite(OUT_BEGIN+i,LOW);
     }
+
+    pinMode(AS_CPSF,INPUT);
+    pinMode(AS_FJ6BTN,INPUT);
 }
 
 void loop() {
