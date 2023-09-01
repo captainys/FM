@@ -1,39 +1,53 @@
-#define AS_CPSF     14   // If A0 is high, present self to TOWNS as CPSF
-#define AS_FJ6BTN   15   // If A1 is high, present self to TOWNS as Fujitsu 6-Button Pad 
+#define AS_CPSF 14    // If A0 is high, present self to TOWNS as CPSF
+#define AS_FJ6BTN 15  // If A1 is high, present self to TOWNS as Fujitsu 6-Button Pad
 
-#define CLOCK       17   // A0 for CLOCK
-#define LATCH       18   // A1 for LATCH
-#define DATA        19   // A2 for DATA
+#define CLOCK 17  // A0 for CLOCK
+#define LATCH 18  // A1 for LATCH
+#define DATA 19   // A2 for DATA
 
-#define OUT_BEGIN   2    // Pin 2
-#define NUM_OUTPUT  12   // to Pin 13
+#define OUT_BEGIN 2    // Pin 2
+#define NUM_OUTPUT 12  // to Pin 13
 
 void setup() {
-    pinMode(LATCH,OUTPUT);
-    pinMode(CLOCK,OUTPUT);
-    pinMode(DATA,INPUT);
+  pinMode(LATCH, OUTPUT);
+  pinMode(CLOCK, OUTPUT);
+  pinMode(DATA, INPUT);
 
-    digitalWrite(CLOCK,LOW);
-    digitalWrite(LATCH,LOW);
+  digitalWrite(CLOCK, LOW);
+  digitalWrite(LATCH, LOW);
 
-    for(int i=0; i<NUM_OUTPUT; ++i)
-    {
-        pinMode(OUT_BEGIN+i,OUTPUT);
-        digitalWrite(OUT_BEGIN+i,LOW);
-    }
+  for (int i = 0; i < NUM_OUTPUT; ++i) {
+    pinMode(OUT_BEGIN + i, OUTPUT);
+    digitalWrite(OUT_BEGIN + i, LOW);
+  }
 
-    pinMode(AS_CPSF,INPUT);
-    pinMode(AS_FJ6BTN,INPUT);
+  pinMode(AS_CPSF, INPUT);
+  pinMode(AS_FJ6BTN, INPUT);
 }
 
 void loop() {
-    digitalWrite(CLOCK,LOW);
-    digitalWrite(LATCH,HIGH);
-    digitalWrite(LATCH,LOW);
-    for(int i=0; NUM_OUTPUT; ++i)
-    {
-        digitalWrite(OUT_BEGIN+i,digitalRead(DATA));
-        digitalWrite(CLOCK,HIGH);
-        digitalWrite(CLOCK,LOW);
-    }
+  digitalWrite(CLOCK, HIGH);
+  digitalWrite(LATCH, HIGH);
+  delayMicroseconds(12);
+  digitalWrite(LATCH, LOW);
+  for (int i = 0; i<NUM_OUTPUT; ++i) {
+    delayMicroseconds(6);
+    digitalWrite(OUT_BEGIN + i, digitalRead(DATA));
+    digitalWrite(CLOCK, LOW);
+    delayMicroseconds(6);
+    digitalWrite(CLOCK, HIGH);
+  }
+
+ /* static int k=OUT_BEGIN;
+  for(int i=0; i<NUM_OUTPUT; ++i)
+  {
+    digitalWrite(OUT_BEGIN+i,HIGH);
+  }
+  digitalWrite(k,LOW);
+  ++k;
+  if(OUT_BEGIN+NUM_OUTPUT<k)
+  {
+    k=OUT_BEGIN;
+  }
+  delay(100); */
 }
