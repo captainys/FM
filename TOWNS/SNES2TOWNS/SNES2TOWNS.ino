@@ -1,5 +1,5 @@
-#define AS_CPSF 14    // If A0 is high, present self to TOWNS as CPSF
-#define AS_FJ6BTN 15  // If A1 is high, present self to TOWNS as Fujitsu 6-Button Pad
+#define AS_TOWNS2BTN 14  // If A0 is high, present self as 2-Button Towns Game Pad
+#define AS_TOWNS6BTN 15  // If A1 is high, present self as 6-Button Towns Game Pad
 
 #define CLOCK 17  // A0 for CLOCK
 #define LATCH 18  // A1 for LATCH
