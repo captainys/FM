@@ -1740,7 +1740,7 @@
     (property "Value" "SNES_CONTROLLER" (at 45.085 86.36 0)
       (effects (font (size 1.27 1.27)))
     )
-    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x07_P2.54mm_Vertical" (at 44.45 96.52 0)
+    (property "Footprint" "SNES:SNES_Controller" (at 44.45 96.52 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (at 44.45 96.52 0)
