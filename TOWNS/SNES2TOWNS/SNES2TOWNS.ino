@@ -1,6 +1,6 @@
 #define AS_TOWNS2BTN 14  // If A0 is high, present self as 2-Button Towns Game Pad
 #define AS_TOWNS6BTN 15  // If A1 is high, present self as 6-Button Towns Game Pad
-
+#define STATUS_LED 16
 #define CLOCK 17  // A0 for CLOCK
 #define LATCH 18  // A1 for LATCH
 #define DATA 19   // A2 for DATA
@@ -42,6 +42,9 @@ void setup() {
   pinMode(LATCH, OUTPUT);
   pinMode(CLOCK, OUTPUT);
   pinMode(DATA, INPUT);
+
+  pinMode(STATUS_LED,OUTPUT);
+  digitalWrite(STATUS_LED,HIGH);
 
   digitalWrite(CLOCK, LOW);
   digitalWrite(LATCH, LOW);
