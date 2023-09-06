@@ -103,6 +103,8 @@ void loop() {
     digitalWrite(CLOCK, HIGH);
   }
 
+  digitalWrite(STATUS_LED,readbuf[_START]);
+
   switch(mode)
   {
   case MODE_AS_CPSF:
