@@ -35,7 +35,7 @@
 
 #define OUT_BEGIN OUT_P7B   // Pin 2
 #define OUT_END OUT_P1A  // to Pin 13
-
+#define NUM_OUTPUT (OUT_END-OUT_BEGIN+1)
 
 
 void setup() {
@@ -79,6 +79,14 @@ void DoTownsThings(unsigned int readbuf[])
 void loop() {
   unsigned int readbuf[NUM_OUTPUT];
   unsigned int mode=MODE_AS_CPSF;
+  if(HIGH==digitalRead(AS_TOWNS2BTN))
+  {
+    mode=MODE_AS_TOWNSPAD;
+  }
+  else if(HIGH==digitalRead(AS_TOWNS6BTN))
+  {
+    mode=MODE_AS_TOWNS6BUTTON;
+  }
 
   digitalWrite(CLOCK, HIGH);
   digitalWrite(LATCH, HIGH);
