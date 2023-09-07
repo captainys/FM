@@ -35,8 +35,8 @@
 
 #define OUT_BEGIN OUT_P7B   // Pin 2
 #define OUT_END OUT_P1A  // to Pin 13
-#define NUM_OUTPUT (OUT_END-OUT_BEGIN+1)
-
+#define NUM_OUTPUTS (OUT_END-OUT_BEGIN+1)
+#define SNES_NUM_PULSES 16
 
 void setup() {
   pinMode(LATCH, OUTPUT);
@@ -80,7 +80,7 @@ void DoTownsThings(unsigned int readbuf[])
 }
 
 void loop() {
-  unsigned int readbuf[NUM_OUTPUT];
+  unsigned int readbuf[NUM_OUTPUTS];
   unsigned int mode=MODE_AS_CPSF;
   if(HIGH==digitalRead(AS_TOWNS2BTN))
   {
@@ -95,9 +95,15 @@ void loop() {
   digitalWrite(LATCH, HIGH);
   delayMicroseconds(12);
   digitalWrite(LATCH, LOW);
-  for (int i = 0; i<NUM_OUTPUT; ++i) {
+  // Experiment indicates 16 clock pulses are necessary for SNES Controller.
+  // CAPCOM Power Stick Fighter works fine if I stop at 12 clock pulses, but
+  // SNES Controller occasionally fails to latch if I do not cycle clock pulse 16 times after latch.
+  for (int i = 0; i<SNES_NUM_PULSES; ++i) {
     delayMicroseconds(6);
-    readbuf[i]=digitalRead(DATA);
+    if(i<NUM_OUTPUTS)
+    {
+      readbuf[i]=digitalRead(DATA);
+    }
     digitalWrite(CLOCK, LOW);
     delayMicroseconds(6);
     digitalWrite(CLOCK, HIGH);
