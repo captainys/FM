@@ -1,3 +1,19 @@
+/* LICENSE>>
+Copyright 2023 Soji Yamakawa (CaptainYS, http://www.ysflight.com)
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+<< LICENSE */
+
+
 #define AS_TOWNS2BTN 14  // If A0 is high, present self as 2-Button Towns Game Pad
 #define AS_TOWNS6BTN 15  // If A1 is high, present self as 6-Button Towns Game Pad
 #define STATUS_LED 16
@@ -98,6 +114,10 @@ void loop() {
   // Experiment indicates 16 clock pulses are necessary for SNES Controller.
   // CAPCOM Power Stick Fighter works fine if I stop at 12 clock pulses, but
   // SNES Controller occasionally fails to latch if I do not cycle clock pulse 16 times after latch.
+  // Update: SNES Controller apparently does not allow re-latching until all 16 clock pulses comes.
+  //         Therefore, if I stop reading at 12 clock pulses, next time the latch pulse is ignored,
+  //         and I only reads left-over four bits, which are not assigned to any buttons.
+  //         This behavior is not observed in CAPCOM Power Stick Fighter.
   for (int i = 0; i<SNES_NUM_PULSES; ++i) {
     delayMicroseconds(6);
     if(i<NUM_OUTPUTS)
