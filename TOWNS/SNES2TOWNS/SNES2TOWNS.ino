@@ -14,6 +14,18 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 << LICENSE */
 
 
+#include <avr/sleep.h>
+
+
+// Based on:
+// https://forum.arduino.cc/t/help-needed-sleeping-the-atmega4809-arduino-nano-every/914000/2
+// http://ww1.microchip.com/downloads/en/AppNotes/TB3213-Getting-Started-with-RTC-90003213A.pdf
+
+
+#define USE_RTC
+
+
+
 #define AS_TOWNS2BTN 14  // If A0 is high, present self as 2-Button Towns Game Pad
 #define AS_TOWNS6BTN 15  // If A1 is high, present self as 6-Button Towns Game Pad
 #define STATUS_LED 16
@@ -72,6 +84,15 @@ void setup() {
 
   pinMode(AS_TOWNS2BTN, INPUT);
   pinMode(AS_TOWNS6BTN, INPUT);
+
+#ifdef USE_RTC
+  while(RTC.STATUS>0);
+  RTC.CLKSEL=RTC_CLKSEL_INT32K_gc; // 32K Hz Oscillator
+  RTC.PITINTCTRL=RTC_PI_bm;           // Periodic Interrupt
+  RTC.PITCTRLA=RTC_PERIOD_CYC512_gc|RTC_PITEN_bm;  // Roughly every 16ms
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  sleep_enable();
+#endif
 }
 
 enum
@@ -95,7 +116,8 @@ void DoTownsThings(unsigned int readbuf[])
   }
 }
 
-void loop() {
+void UpdateController(void)
+{
   unsigned int readbuf[NUM_OUTPUTS];
   unsigned int mode=MODE_AS_CPSF;
   if(HIGH==digitalRead(AS_TOWNS2BTN))
@@ -178,17 +200,19 @@ void loop() {
     digitalWrite(OUT_P7B,readbuf[_B]);
     break;
   }
-
- /* static int k=OUT_BEGIN;
-  for(int i=0; i<NUM_OUTPUT; ++i)
-  {
-    digitalWrite(OUT_BEGIN+i,HIGH);
-  }
-  digitalWrite(k,LOW);
-  ++k;
-  if(OUT_BEGIN+NUM_OUTPUT<k)
-  {
-    k=OUT_BEGIN;
-  }
-  delay(100); */
 }
+
+#ifdef USE_RTC
+ISR(RTC_PIT_vect)
+{
+  UpdateController();
+  RTC.PITINTFLAGS = RTC_PI_bm;  // Is it required?  The sample says so.
+}
+void loop() {
+  sleep_cpu();
+}
+#else
+void loop() {
+  UpdateController();
+}
+#endif
