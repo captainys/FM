@@ -28,10 +28,11 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #define AS_TOWNS2BTN 14  // If A0 is high, present self as 2-Button Towns Game Pad
 #define AS_TOWNS6BTN 15  // If A1 is high, present self as 6-Button Towns Game Pad
-#define STATUS_LED 16
 #define CLOCK 17  // A0 for CLOCK
 #define LATCH 18  // A1 for LATCH
 #define DATA 19   // A2 for DATA
+#define STATUS_LED 20
+
 
 // Order SNES game pad sends.
 #define _B 0
@@ -48,7 +49,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #define _R 11
 
 //                   CPSF     TOWNS 6BTN    TOWNS 2BTN
-#define OUT_P1A 13  // UP          UP            UP
+#define OUT_P1A 16  // UP          UP            UP
 #define OUT_P1B 12  // R           X             UP
 #define OUT_P2A 11  // DOWN        DOWN          DOWN
 #define OUT_P2B 10  // Y           Y             DOWN
@@ -61,25 +62,41 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #define OUT_P7A  3  // B           B             B
 #define OUT_P7B  2  // START       B             B
 
-#define OUT_BEGIN OUT_P7B   // Pin 2
-#define OUT_END OUT_P1A  // to Pin 13
-#define NUM_OUTPUTS (OUT_END-OUT_BEGIN+1)
+#define NUM_OUTPUTS 12
 #define SNES_NUM_PULSES 16
 
 void setup() {
+  unsigned int out_pins[NUM_OUTPUTS]=
+  {
+    OUT_P1A,
+    OUT_P1B,
+    OUT_P2A,
+    OUT_P2B,
+    OUT_P3A,
+    OUT_P3B,
+    OUT_P4A,
+    OUT_P4B,
+    OUT_P6A,
+    OUT_P6B,
+    OUT_P7A,
+    OUT_P7B,
+  };
+
   pinMode(LATCH, OUTPUT);
   pinMode(CLOCK, OUTPUT);
   pinMode(DATA, INPUT);
 
   pinMode(STATUS_LED,OUTPUT);
   digitalWrite(STATUS_LED,HIGH);
+  pinMode(LED_BUILTIN,OUTPUT);
+  digitalWrite(LED_BUILTIN,LOW);
 
   digitalWrite(CLOCK, LOW);
   digitalWrite(LATCH, LOW);
 
-  for(int i=OUT_BEGIN; i<=OUT_END; ++i) {
-    pinMode(i, OUTPUT);
-    digitalWrite(i, LOW);
+  for(int i=0; i<NUM_OUTPUTS; ++i) {
+    pinMode(out_pins[i], OUTPUT);
+    digitalWrite(out_pins[i], LOW);
   }
 
   pinMode(AS_TOWNS2BTN, INPUT);
