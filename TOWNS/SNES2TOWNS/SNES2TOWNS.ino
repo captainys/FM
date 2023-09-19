@@ -31,7 +31,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #define CLOCK 17  // A0 for CLOCK
 #define LATCH 18  // A1 for LATCH
 #define DATA 19   // A2 for DATA
-#define STATUS_LED 20
 
 
 // Order SNES game pad sends.
@@ -86,8 +85,6 @@ void setup() {
   pinMode(CLOCK, OUTPUT);
   pinMode(DATA, INPUT);
 
-  pinMode(STATUS_LED,OUTPUT);
-  digitalWrite(STATUS_LED,HIGH);
   pinMode(LED_BUILTIN,OUTPUT);
   digitalWrite(LED_BUILTIN,LOW);
 
@@ -168,8 +165,6 @@ void UpdateController(void)
     digitalWrite(CLOCK, HIGH);
   }
 
-  digitalWrite(STATUS_LED,readbuf[_START]);
-
   switch(mode)
   {
   case MODE_AS_CPSF:
@@ -220,10 +215,23 @@ void UpdateController(void)
 }
 
 #ifdef USE_RTC
+unsigned char counter=0;
+
 ISR(RTC_PIT_vect)
 {
+  counter=(counter+1)&63;
+  if(0==counter)
+  {
+    digitalWrite(LED_BUILTIN,HIGH);
+  }
+
   UpdateController();
   RTC.PITINTFLAGS = RTC_PI_bm;  // Is it required?  The sample says so.
+
+  if(0==counter)
+  {
+    digitalWrite(LED_BUILTIN,LOW);
+  }
 }
 void loop() {
   sleep_cpu();
