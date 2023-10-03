@@ -146,7 +146,7 @@
       (stroke (width 0.15) (type solid)) (fill none) (layer "Cmts.User") (tstamp bab95490-2244-4da8-8ef8-95ecd0b6c738))
     (fp_circle (center 0 0) (end 3.45 0)
       (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd") (tstamp 7d34d7d0-1ce8-43f9-9344-b0c5e2857fd2))
-    (pad "" np_thru_hole circle (at 0 0) (size 3 3) (drill 3) (layers "F&B.Cu" "*.Mask") (tstamp 3801fd52-1458-4c93-94c0-ef6660c5c2b1))
+    (pad "" np_thru_hole circle (at 0 0) (size 2.9 2.9) (drill 2.9) (layers "F&B.Cu" "*.Mask") (tstamp 3801fd52-1458-4c93-94c0-ef6660c5c2b1))
   )
 
   (footprint "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (layer "F.Cu")
@@ -735,7 +735,7 @@
       (stroke (width 0.15) (type solid)) (fill none) (layer "Cmts.User") (tstamp 8528376e-b91d-47b1-9df1-66c3dc883f08))
     (fp_circle (center 0 0) (end 3.45 0)
       (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd") (tstamp 42c95a44-1d62-4c87-8281-cde85bc58eec))
-    (pad "" np_thru_hole circle (at 0 0) (size 3 3) (drill 3) (layers "F&B.Cu" "*.Mask") (tstamp eb7a9c43-f90b-4f48-b4eb-d3618d7d7484))
+    (pad "" np_thru_hole circle (at 0 0) (size 2.9 2.9) (drill 2.9) (layers "F&B.Cu" "*.Mask") (tstamp eb7a9c43-f90b-4f48-b4eb-d3618d7d7484))
   )
 
   (footprint "MountingHole:MountingHole_3.2mm_M3" (layer "F.Cu")
@@ -760,7 +760,7 @@
       (stroke (width 0.15) (type solid)) (fill none) (layer "Cmts.User") (tstamp f9610942-4e7b-4116-83e9-781f42376fdb))
     (fp_circle (center 0 0) (end 3.45 0)
       (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd") (tstamp bed1a5d6-0c67-4354-a778-6a842320e6d7))
-    (pad "" np_thru_hole circle (at 0 0) (size 3 3) (drill 3) (layers "F&B.Cu" "*.Mask") (tstamp 939d54ac-6c43-4ba5-af43-56dd58e018b0))
+    (pad "" np_thru_hole circle (at 0 0) (size 2.9 2.9) (drill 2.9) (layers "F&B.Cu" "*.Mask") (tstamp 939d54ac-6c43-4ba5-af43-56dd58e018b0))
   )
 
   (footprint "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (layer "F.Cu")
@@ -1271,7 +1271,7 @@
       (stroke (width 0.15) (type solid)) (fill none) (layer "Cmts.User") (tstamp 3654e2d6-5c55-423b-8c88-e7378afa6904))
     (fp_circle (center 0 0) (end 3.45 0)
       (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd") (tstamp 4b95976a-bff4-4a45-8e55-b6f6e76a37c5))
-    (pad "" np_thru_hole circle (at 0 0) (size 3 3) (drill 3) (layers "F&B.Cu" "*.Mask") (tstamp adf7114b-2f01-42c7-bcf3-465af98756b5))
+    (pad "" np_thru_hole circle (at 0 0) (size 2.9 2.9) (drill 2.9) (layers "F&B.Cu" "*.Mask") (tstamp adf7114b-2f01-42c7-bcf3-465af98756b5))
   )
 
   (footprint "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" (layer "F.Cu")
