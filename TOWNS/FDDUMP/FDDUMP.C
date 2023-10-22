@@ -31,11 +31,12 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 // Begin Disk
 // 00 vr mt fl cd 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 //    +1  vr  Version 
-//    +2  mt  media type
+//    +2  mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
 //    +3  fl  flags
 //            bit0  1:Write Protected  0:Write Enabled
 //    +4  cd  Capture Device
 //            00:FM TOWNS
+//            FF:Converted from other data type.
 // (32 bytes name, 0 padded)
 // Begin Track
 // 01 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
