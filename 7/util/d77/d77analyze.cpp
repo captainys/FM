@@ -235,12 +235,12 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 				{
 					secPtr=diskPtr->GetSector(cyl,side,sec);
 				}
-				if(nullptr!=secPtr && 0<secPtr->unstableByte.size())
+				if(nullptr!=secPtr && 0<secPtr->unstableBytes.size())
 				{
-					for(int i=0; i<secPtr->unstableByte.size(); ++i)
+					for(int i=0; i<secPtr->unstableBytes.size(); ++i)
 					{
-						printf("%c",(secPtr->unstableByte[i] ? 'U' : '.'));
-						if(15==i%16 || i+1==secPtr->unstableByte.size())
+						printf("%c",(secPtr->unstableBytes[i] ? 'U' : '.'));
+						if(15==i%16 || i+1==secPtr->unstableBytes.size())
 						{
 							printf("\n");
 						}
