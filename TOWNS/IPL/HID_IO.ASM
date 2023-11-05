@@ -1,10 +1,17 @@
+; FM TOWNS Techincal Data Book pp.238
+; "To make it compatible with MSX game pads, COM out must be zero."
+; "To read A and B buttons, TRIG out must be one."
+; The value written to I/O 04D6H must be 0FH instead of 3FH.
+PAD_OUT_CONST			EQU		0FH
+
+
 WAIT_BUTTON_RELEASE		PROC
 
 						PUSH	AX
 						PUSH	DX
 
 @@:
-						MOV		AL,3FH
+						MOV		AL,PAD_OUT_CONST
 						MOV		DX,IO_PAD_OUT
 						OUT		DX,AL
 
@@ -34,7 +41,7 @@ WAIT_BUTTON_PRESS		PROC
 						PUSH	DX
 
 @@:
-						MOV		AL,3FH
+						MOV		AL,PAD_OUT_CONST
 						MOV		DX,IO_PAD_OUT
 						OUT		DX,AL
 
@@ -64,7 +71,7 @@ WAIT_PADA_RELEASE		PROC
 						PUSH	DX
 
 @@:
-						MOV		AL,3FH
+						MOV		AL,PAD_OUT_CONST
 						MOV		DX,IO_PAD_OUT
 						OUT		DX,AL
 
@@ -100,7 +107,7 @@ READ_PADA				PROC
 
 						PUSH	DX
 
-						MOV		AL,3FH
+						MOV		AL,PAD_OUT_CONST
 						MOV		DX,IO_PAD_OUT
 						OUT		DX,AL
 
