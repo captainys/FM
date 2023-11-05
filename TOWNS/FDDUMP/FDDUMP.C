@@ -29,8 +29,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 // Signature (First 16 bytes)
 // 'R' 'E' 'A' 'L' 'D' 'I' 'S' 'K' 'D' 'U' 'M' 'P' 0 0 0 0 
 // Begin Disk
-// 00 vr mt fl cd 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+// 00h vr mt fl cd 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 //    +1  vr  Version 
+//              1  Added 10h Unstable-byte flags.
 //    +2  mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
 //    +3  fl  flags
 //            bit0  1:Write Protected  0:Write Enabled
@@ -39,13 +40,13 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //            FF:Converted from other data type.
 // (32 bytes name, 0 padded)
 // Begin Track
-// 01 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+// 01h cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 //    +1  cc  Cylinder
 //    +2  hh  Head
 // ID Mark
-// 02 cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
-// 02 cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
-// 02 cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
 //     :
 //    +1  cc  Cylinder
 //    +2  hh  Head
@@ -55,7 +56,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //    +6  CRC  CRC of the address mark (not for the data)
 //    +7  st  MB8877 status
 // Data
-// 03 cc hh rr nn st fl 00 00 00 00 <time  > <Length>
+// 03h cc hh rr nn st fl 00 00 00 00 <time  > <Length>
 //    +1  cc  Cylinder
 //    +2  hh  Head
 //    +3  rr  Sector Number
@@ -68,16 +69,26 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
 // (Bytes padded to 16*N bytes)
 // Track Read
-// 04 cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
+// 04h cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
 //    +1  cc  Cylinder
 //    +2  hh  Head
 //    +3  st  MB8877 status
 //    +E  (2 bytes) Number of bytes returned from Track Read.
 // (Bytes padded to 16*N bytes)
 // End of Track
-// 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+// 05h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 // End of File
-// 06 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+// 06h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+// Unstable-byte flags.  (Non-zero means unstable.)
+// Immediately preceding data (ID Mark, Sector, or Track Read) has unstable bytes.
+// 10h sz sz 00 00 00 00 00 00 00 00 00 00 00 00
+//    +1  sz  Lower-byte of the size in bytes.
+//    +2  sz  Higher-byte of the size in bytes.
+//            The size is ((n+7)&~7) bytes, where n is the preceding data length.
+//            The size does NOT include the 16-byte header length.
+// (Data.  Padded to 16*N bytes.  Flag for byte i is data[i/8]&(1<<(i&7)). )
+
 
 // Next Track
 
