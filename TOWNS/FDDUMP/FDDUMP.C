@@ -748,10 +748,10 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 	for(i=0; i<numIDMarks; ++i)
 	{
 		data[1]=idMark[i].chrn[0]; // C
-		data[1]=idMark[i].chrn[1]; // H
-		data[2]=idMark[i].chrn[2]; // R
-		data[3]=idMark[i].chrn[3]; // N
-		data[4]=idMark[i].chrn[4]; // CRC
+		data[2]=idMark[i].chrn[1]; // H
+		data[3]=idMark[i].chrn[2]; // R
+		data[4]=idMark[i].chrn[3]; // N
+		data[5]=idMark[i].chrn[4]; // CRC
 		data[6]=idMark[i].chrn[5]; // CRC
 		data[7]=idMark[i].chrn[7]; // FDC Status
 		fwrite(data,1,16,ofp);
