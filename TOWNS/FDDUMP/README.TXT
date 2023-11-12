@@ -2,6 +2,13 @@ FDDUMP.EXE for FM TOWNS by CaptainYS (http://www.ysflight.com)
 
 
 
+!!!CAUTION!!!
+A bug in FDDUMP.EXE was causing IDMarks to be wrong.  Majority of the .RDD images can be fixed by applying REPAIRRDD.EXE command.  Sorry!
+It has been fixed in the corrected version.
+
+
+
+
 Introduction
 
 This is a disk-imaging tool that runs on Fujitsu FM TOWNS computers.  The model needs to be UG or newer since the program uses Free-Run Timer for measuring the time.  If the model is older, you can try MAKED77.EXP instead, although it captures less information.
@@ -77,3 +84,9 @@ FDDUMP ドライブ: メディアタイプ -out ファイル名
 Optional
   -starttrk t    シリンダーtからキャプチャ開始
   -endtrk t      シリンダーtまでキャプチャ
+
+
+
+
+2023/11/12
+Fixed a bug in capturing IDMarks.
