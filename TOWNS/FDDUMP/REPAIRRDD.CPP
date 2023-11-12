@@ -81,6 +81,7 @@ int main(int ac,char *av[])
 			if(trkIDMarkBegin<trkIDMarkEnd)
 			{
 				bool needCorrection=true;
+				// It is unlikely that the first bytes of CRC are all zero.
 				for(auto i=trkIDMarkBegin; i<trkIDMarkEnd; i+=16)
 				{
 					if(0!=data[i+5])
@@ -109,6 +110,15 @@ int main(int ac,char *av[])
 		case 6:
 			// End of File
 			ptr=data.size();
+			break;
+		case 0x10:
+			{
+				unsigned int len=data[ptr+0x02];
+				len<<=8;
+				len|=data[ptr+0x01];
+				len=(len+15)&0xFFF0;
+				ptr+=16+len;
+			}
 			break;
 		}
 	}
