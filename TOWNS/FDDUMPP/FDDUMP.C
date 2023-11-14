@@ -15,8 +15,22 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
+#define VERSION "20231114"
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <dos.h>
+#include <conio.h>
+#include <signal.h>
+#include <malloc.h>
+#include <fmcfrb.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+
+#define TSUGARU_DEBUGBREAK				outp(0x2386,2);
+
 
 
 struct PhysToLinear
@@ -179,18 +193,6 @@ struct bufferInfo MakeDataBuffer(void)
 
 
 
-
-#define VERSION "20231112"
-
-// For Open Watcom C
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <dos.h>
-#include <conio.h>
-#include <signal.h>
-#include <malloc.h>
-#include <fmcfrb.h>
 
 // RDD Output Data Data Format (.RDD  Real Disk Dump)
 // Signature (First 16 bytes)
@@ -405,8 +407,6 @@ void LogErrorCH(unsigned int code,unsigned char C,unsigned char H)
 
 #define IO_FREERUN_TIMER		0x26
 
-#define TSUGARU_DEBUGBREAK				outp(0x2386,2);
-
 #define DRIVE_MOTOR_WAIT_TIME	2000000
 #define READADDR_TIMEOUT		1000000
 #define READADDR_TRACK_TIMEOUT  3000000
@@ -449,8 +449,8 @@ const struct PICMask PIC_ENABLE_FDC_ONLY={{0xBF,0xFF}};
 struct PICMask PIC_GetMask(void)
 {
 	struct PICMask mask;
-	mask.m[0]=_inp(0x0000);
-	mask.m[1]=_inp(0x0010);
+	mask.m[0]=_inp(0x0002);
+	mask.m[1]=_inp(0x0012);
 	return mask;
 }
 
@@ -497,9 +497,10 @@ unsigned char IOErrToColor(unsigned char ioErr)
 extern void _STI();
 extern void _CLI();
 extern unsigned int GetDMACount(void);
+extern Tsugaru_Debug(const char str[]);
 
 #pragma Calling_convention(_INTERRUPT|_CALLING_CONVENTION);
-_Far void Handle_INT46H(void)
+_Handler Handle_INT46H(void)
 {
 	Palette(COLOR_DEBUG,255,0,0);
 
@@ -561,7 +562,8 @@ _Far void Handle_INT46H(void)
 
 	Palette(COLOR_DEBUG,255,255,255);
 
-	// PIC_INT46H_EOI();
+	// EOI
+	_outp(0x0000,0x66); // Specific EOI + INT 6(46H).
 
 	// DOS-Extender intercepts INT 46H in its own handler, then redirect to this handler by CALLF.
 	// Must return by RETF.
@@ -602,9 +604,8 @@ struct INTHandler INT46_SaveHandler(void)
 
 void INT46_TakeOver(void)
 {
-	// I want to go with _setpvect(0x46,Handle_INT46H); but _Handler Handle_INT46H(void)
-	// gives incompatible data type error.
-	SetINT46Handler(GetCS(),(unsigned int)Handle_INT46H);
+	// Want to make it _setrpvect eventually.  Leave it for now.
+	_setpvect(0x46,Handle_INT46H);
 }
 
 
@@ -1303,6 +1304,8 @@ unsigned char FDC_ReadAddress(unsigned int  *accumTime)
 
 	_CLI();
 	INT46_DID_COME_IN=0;
+	struct PICMask picmask=PIC_GetMask();
+	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
 
 	FDC_WaitReady();
 	_STI();
@@ -1328,6 +1331,8 @@ unsigned char FDC_ReadAddress(unsigned int  *accumTime)
 	WriteDriveControl(0);
 
 	Palette(COLOR_DEBUG,255,255,255);
+
+	PIC_SetMask(picmask);
 
 	if(READADDR_TIMEOUT<=*accumTime)
 	{
@@ -1943,6 +1948,9 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
 
 	_STI();
+
+
+
 	for(mfmTry=0; mfmTry<2; ++mfmTry)
 	{
 		unsigned int  accumTime=0;
@@ -2032,12 +2040,14 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	// Sort sectors <<
 
 
+
 	// Read Track
 	ioErr=FDC_ReadTrack(&readTrackSize);
 	if(0xFF==ioErr)
 	{
 		LogErrorCH(ERRORLOG_TYPE_READ_TRACK,C,H);
 	}
+
 
 
 	_STI();
@@ -2057,6 +2067,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 
 	WaitMicrosec(500000); // 500ms
+
 
 
 	for(i=0; i<nTrackSector; ++i)
@@ -2158,7 +2169,7 @@ void WriteInfoLog(FILE *ofp,struct CommandParameterInfo *cpi)
 		return;
 	}
 
-	fprintf(ofp,"FDDUMP Version: %s\n",VERSION);
+	fprintf(ofp,"FDDUMP.EXP Version: %s\n",VERSION);
 
 	fprintf(ofp,"Output: %s\n",cpi->outFName);
 	fprintf(ofp,"Drive:  %c\n",'A'+cpi->drive);
@@ -2379,7 +2390,7 @@ int main(int ac,char *av[])
 		// timer for checking disk change, it did something to I/O, and messed up with FDC.
 
 		struct PICMask picmask=PIC_GetMask();
-		picmask.m[0]&=0xFE;  // Is it really [3] b0 for INT 0?  FM Towns Techncial Databook says so.
+		picmask.m[0]|=1;
 		PIC_SetMask(picmask);
 	}
 

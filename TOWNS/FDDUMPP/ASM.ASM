@@ -8,6 +8,7 @@
 						PUBLIC	GetINT46Handler
 						PUBLIC	SetINT46Handler
 						PUBLIC	SetUpDMA
+						PUBLIC	Tsugaru_Debug
 
 CODE					SEGMENT
 
@@ -106,9 +107,10 @@ SetINT46Handler			ENDP
 
 
 ;void SetUpDMA(unsigned int physAddr,unsigned int count);
-;[ESP]		EIP
-;[ESP+4]	physAddr
-;[ESP+8]	count
+;[ESP]		EFLAGS
+;[ESP+4]	EIP
+;[ESP+8]	physAddr
+;[ESP+12]	count
 SetUpDMA				PROC
 
 
@@ -116,12 +118,12 @@ SetUpDMA				PROC
 ; A2  Count
 ; AA  Mode/Control
 
-						PUSHF
+						PUSHFD
 						CLI
 						XOR  	AL,AL
 						OUT  	0A1H,AL	; CHANNEL
 
-						MOV		EAX,[EBP+4]
+						MOV		EAX,[ESP+8]
 						OUT		0A4H,AX
 						SHR		EAX,16
 						OUT		0A6H,AL
@@ -132,16 +134,40 @@ SetUpDMA				PROC
 						AND		AL,0FEH
 						OUT		0AFH,AL
 
-						MOV		AX,[EBP+8]
+						MOV		AX,[ESP+12]
 						OUT		0A2H,AX
 
 						MOV		AL,44H
 						OUT		0AAH,AL
-						POPF
+						POPFD
 
 						RET
 
 SetUpDMA				ENDP
+
+
+
+Tsugaru_Debug			PROC
+						PUSH	EBP
+						MOV		EBP,ESP
+						PUSH	EDX
+						PUSH	EBX
+
+						MOV		DX,2F12H	; TOWNSIO_VNDRV_ENABLE
+						MOV		AL,1
+						OUT		DX,AL		; Enable VNDRV
+
+
+						MOV		EBX,[EBP+8]
+						MOV		DX,2F18H	; TOWNSIO_VNDRV_AUXCOMMAND
+						MOV		AL,09H		; TOWNS_VNDRV_AUXCMD_PRINTCSTR
+						OUT		DX,AL
+
+						POP		EBX
+						POP		EDX
+						POP		EBP
+						RET
+Tsugaru_Debug			ENDP
 
 
 CODE					ENDS
