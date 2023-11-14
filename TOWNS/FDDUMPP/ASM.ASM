@@ -4,6 +4,7 @@
 						PUBLIC	_CLI
 						PUBLIC	_STI
 						PUBLIC	GetDMACount
+						PUBLIC	GetCS
 						PUBLIC	GetINT46Handler
 						PUBLIC	SetINT46Handler
 						PUBLIC	SetUpDMA
@@ -67,10 +68,19 @@ GetINT46Handler			ENDP
 
 
 
-; SetINT46Handler((void *)func)
+GetCS					PROC
+						MOV		AX,CS
+						MOVZX	EAX,AX
+						RET
+GetCS					ENDP
+
+
+
+; SetINT46Handler(unsigned int CS,void (*func)())
 ; [EBP]		Prev EBP
 ; [EBP+4]	EIP
-; [EBP+8]	HandlerEIP
+; [EBP+8]	HandlerCS
+; [EBP+12]	HandlerEIP
 SetINT46Handler			PROC
 						PUSH	EBP
 						MOV		EBP,ESP
@@ -79,9 +89,9 @@ SetINT46Handler			PROC
 						PUSH	DS
 
 						MOV		CL,46H
-						PUSH	CS
-						POP		DS
 						MOV		EDX,[EBP+8]
+						MOV		DS,DX
+						MOV		EDX,[EBP+12]
 						MOV		AX,2504H
 						INT		21H
 

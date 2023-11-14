@@ -444,7 +444,7 @@ struct PICMask
 	unsigned char m[2];
 };
 
-const struct PICMask PIC_ENABLE_FDC_ONLY={{0xB0,0xFF}};
+const struct PICMask PIC_ENABLE_FDC_ONLY={{0xBF,0xFF}};
 
 struct PICMask PIC_GetMask(void)
 {
@@ -498,7 +498,8 @@ extern void _STI();
 extern void _CLI();
 extern unsigned int GetDMACount(void);
 
-void Handle_INT46H(void)
+#pragma Calling_convention(_INTERRUPT|_CALLING_CONVENTION);
+_Far void Handle_INT46H(void)
 {
 	Palette(COLOR_DEBUG,255,0,0);
 
@@ -559,24 +560,51 @@ void Handle_INT46H(void)
 	inp(IO_DMA_STATUS); // BIOS Dummy reads
 
 	Palette(COLOR_DEBUG,255,255,255);
+
+	// PIC_INT46H_EOI();
+
+	// DOS-Extender intercepts INT 46H in its own handler, then redirect to this handler by CALLF.
+	// Must return by RETF.
+	// _Far is the keyword in High-C.
 }
+#pragma Calling_convention();
 
 
 
 ////////////////////////////////////////////////////////////
 // Interrupt
 
-unsigned int default_INT46H_HandlerPtr[2];
+struct INTHandler
+{
+	unsigned int selector,offset;
+};
+
+struct INTHandler default_INT46H_HandlerPtr;
 struct PICMask default_PICMask;
 
 // in ASM.ASM
 extern void GetINT46Handler(unsigned int *selector,unsigned int *EIP);
-extern void SetINT46Handler(void (*func)());
+extern void SetINT46Handler(unsigned int CS,unsigned int EIP);
+extern unsigned int GetCS(void);
 
+
+void INT46_RestoreHandler(struct INTHandler handler)
+{
+	SetINT46Handler(default_INT46H_HandlerPtr.selector,default_INT46H_HandlerPtr.offset);
+}
+
+struct INTHandler INT46_SaveHandler(void)
+{
+	struct INTHandler handler;
+	GetINT46Handler(&handler.selector,&handler.offset);
+	return handler;
+}
 
 void INT46_TakeOver(void)
 {
-	SetINT46Handler(Handle_INT46H);
+	// I want to go with _setpvect(0x46,Handle_INT46H); but _Handler Handle_INT46H(void)
+	// gives incompatible data type error.
+	SetINT46Handler(GetCS(),(unsigned int)Handle_INT46H);
 }
 
 
@@ -1314,9 +1342,6 @@ unsigned char FDC_ReadAddress(unsigned int  *accumTime)
 
 unsigned char FDC_ReadSectorReal(unsigned int  *accumTime,unsigned char C,unsigned char H,unsigned char R,unsigned char N)
 {
-	static unsigned char INT_EnableBits[4]; // Make sure it is in DS.
-	unsigned char INT_EnableBitsBackUp[4];
-
 	unsigned short t0,t,diff,initDMACounter;
 
 	Palette(COLOR_DEBUG,255,0,0);
@@ -1472,7 +1497,6 @@ unsigned char FDC_ReadTrack(unsigned short *readSize)
 
 		if(READTRACK_TIMEOUT<=accumTime)
 		{
-			int i;
 			// It does happen in real hardware, and unless Force Interrupt, FDC will never be ready again.
 			FDC_Command(FDCCMD_FORCEINTERRUPT);
 			outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
@@ -2354,13 +2378,12 @@ int main(int ac,char *av[])
 		// Confirmed!  Unless I mask timer interrupt, FDC gets irresponsive, probably because Disk BIOS was using
 		// timer for checking disk change, it did something to I/O, and messed up with FDC.
 
-		static unsigned char INT_EnableBits[4];
-		INT_GetEnableBits(INT_EnableBits);
-		INT_EnableBits[3]&=0xFE; // Is it really [3] b0 for INT 0?  FM Towns Techncial Databook says so.
-		INT_SetEnableBits(INT_EnableBits);
+		struct PICMask picmask=PIC_GetMask();
+		picmask.m[0]&=0xFE;  // Is it really [3] b0 for INT 0?  FM Towns Techncial Databook says so.
+		PIC_SetMask(picmask);
 	}
 
-	INT46_SaveHandler(default_INT46H_HandlerPtr);
+	default_INT46H_HandlerPtr=INT46_SaveHandler();
 	INT46_TakeOver();
 	signal(SIGINT,CtrlC);
 
