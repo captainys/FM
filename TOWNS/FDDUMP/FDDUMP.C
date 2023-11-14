@@ -82,12 +82,15 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 // Unstable-byte flags.  (Non-zero means unstable.)
 // Immediately preceding data (ID Mark, Sector, or Track Read) has unstable bytes.
-// 10h sz sz 00 00 00 00 00 00 00 00 00 00 00 00
-//    +1  sz  Lower-byte of the size in bytes.
-//    +2  sz  Higher-byte of the size in bytes.
+// 10h 00 00 00 00 00 00 00 00 00 00 00 00 sz sz
+//    +E  sz  Lower-byte of the size in bytes.
+//    +F  sz  Higher-byte of the size in bytes.
 //            The size is ((n+7)&~7) bytes, where n is the preceding data length.
 //            The size does NOT include the 16-byte header length.
 // (Data.  Padded to 16*N bytes.  Flag for byte i is data[i/8]&(1<<(i&7)). )
+// Note:  Initially sz was +1 and +2.  Changed to +E and +F.
+//        However, at the time of the change, no .RDD file with 10H tag existed.
+//        It shouldn't affect anything.
 
 
 // Next Track
