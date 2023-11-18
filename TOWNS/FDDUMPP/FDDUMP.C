@@ -15,7 +15,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
-#define VERSION "20231114"
+#define VERSION "20231117"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1367,7 +1367,7 @@ unsigned char FDC_ReadSectorReal(unsigned int  *accumTime,unsigned char C,unsign
 
 	initDMACounter=128<<(N&3);
 	SetUpDMA(DMABuf.physAddr,initDMACounter);
-	--initDMACounter;
+	// --initDMACounter;  Why was I decrementing it?
 	_STI();
 
 	Palette(COLOR_DEBUG,0,255,0);
