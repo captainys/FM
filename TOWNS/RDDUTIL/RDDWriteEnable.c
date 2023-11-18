@@ -56,6 +56,11 @@ int main(int ac,char *av[])
 			buf[0x13]&=0xFE;
 		}
 	}
+	else
+	{
+		printf("Begin Disk Tag is not immediately following the signature.\n");
+		return 1;
+	}
 
 
 

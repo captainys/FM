@@ -15,7 +15,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
-#define VERSION "20231117"
+#define VERSION "20231118"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -739,12 +739,14 @@ void EndSectorInfo(void)
 
 // Begin Disk
 // 00 vr mt fl 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
-//    vr  Version 
-//    mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
-//    fl  flags
-//        bit0  1:Write Protected  0:Write Enabled
-void RDD_MakeDiskHeader(unsigned char data[48],unsigned char restoreState,unsigned char mediaType,const char label[])
+//    +00 00  Begin Disk
+//    +01 vr  Version 
+//    +02 mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
+//    +03 fl  flags
+//            bit0  1:Write Protected  0:Write Enabled
+void RDD_MakeDiskHeader(unsigned char data[48],unsigned char restoreState,unsigned char forceWriteProtect,unsigned char mediaType,const char label[])
 {
+TSUGARU_DEBUGBREAK;
 	int i;
 	for(i=0; i<48; ++i)
 	{
@@ -753,7 +755,7 @@ void RDD_MakeDiskHeader(unsigned char data[48],unsigned char restoreState,unsign
 	data[0]=0x00; // Begin Disk
 	data[1]=RDD_VERSION; //
 	data[2]=mediaType;
-	data[3]|=((restoreState&0x40) ? 1 : 0);
+	data[3]|=(((restoreState&0x40) || 0!=forceWriteProtect) ? 1 : 0);
 	strncpy((char *)data+16,label,32);
 }
 
@@ -778,12 +780,12 @@ unsigned int RDD_WriteSignature(const char fName[])
 	return 0;
 }
 
-unsigned int RDD_WriteDiskHeader(const char fName[],unsigned char restoreState,unsigned char mediaType,const char label[])
+unsigned int RDD_WriteDiskHeader(const char fName[],unsigned char restoreState,unsigned char forceWriteProtect,unsigned char mediaType,const char label[])
 {
 	unsigned char data[48];
 	FILE *ofp;
 
-	RDD_MakeDiskHeader(data,restoreState,mediaType,label);
+	RDD_MakeDiskHeader(data,restoreState,forceWriteProtect,mediaType,label);
 
 	ofp=fopen(fName,"ab");
 	if(NULL==ofp)
@@ -2367,7 +2369,7 @@ int main(int ac,char *av[])
 		//printf("    -19200bps           Transmit the image at 19200bps\n");
 		//printf("    -38400bps           Transmit the image at 38400bps\n");
 		printf("    -name diskName      Specify disk name up to 16 chars.\n");
-		//printf("    -writeprotect       Write protect the disk image.\n");
+		printf("    -writeprotect       Write protect the disk image.\n");
 		printf("    -dontsort           Don't sort sectors (preserve interleave).\n");
 		printf("    -sort               Sort sectors.\n");
 		printf("    -log filename.txt   Write log file.\n");
@@ -2435,7 +2437,7 @@ int main(int ac,char *av[])
 		goto ERREND;
 	}
 
-	if(0!=RDD_WriteDiskHeader(cpi.outFName,RestoreState,cpi.mediaType,cpi.diskName))
+	if(0!=RDD_WriteDiskHeader(cpi.outFName,RestoreState,cpi.writeProtect,cpi.mediaType,cpi.diskName))
 	{
 		goto ERREND;
 	}
