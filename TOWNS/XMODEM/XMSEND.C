@@ -5,6 +5,8 @@
 
 #include "XMODEM.H"
 
+#define VERSION 20231119
+
 extern void RS232C_STI(void);
 extern void RS232C_CLI(void);
 extern void RS232C_INIT(int baudRate); // 2:38400bps  4:19200bps
@@ -26,11 +28,16 @@ unsigned char buffer[BUFFER_SIZE];
 void XModemSend(const char fName[],int baud)
 {
 	FILE *fp=fopen(fName,"rb");
+	unsigned int sz=0;
 	if(NULL==fp)
 	{
 		printf("Cannot open input file.\n");
 		exit(1);
 	}
+
+	fseek(fp,0,SEEK_END);
+	sz=ftell(fp);
+	fseek(fp,0,SEEK_SET);
 
 	printf("Now start XMODEM transfer on the receiver.\n");
 	WaitMS(500);
@@ -72,7 +79,7 @@ void XModemSend(const char fName[],int baud)
 
 		if(nBuffFilled<=nBuffUsed)
 		{
-			printf("Sent %d\n",totalSent);
+			printf("Sent %d/%d\n",totalSent,sz);
 			RS232C_STI();
 			nBuffFilled=fread(buffer,1,BUFFER_SIZE,fp);
 			RS232C_CLI();
@@ -169,6 +176,7 @@ void XModemSend(const char fName[],int baud)
 int main(int ac,char *av[])
 {
 	printf("XMSEND (XMODEM Send) Utility by CaptainYS\n");
+	printf("Version %d\n",VERSION);
 	printf("http://www.ysflight.com\n");
 
 	if(1==ac)

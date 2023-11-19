@@ -15,7 +15,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
-#define VERSION "20231118"
+#define VERSION "20231119"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -184,13 +184,6 @@ struct bufferInfo MakeDataBuffer(void)
 
 	return info;
 }
-
-
-
-
-
-
-
 
 
 
@@ -502,6 +495,26 @@ extern void _CLI();
 extern unsigned int GetDMACount(void);
 extern Tsugaru_Debug(const char str[]);
 
+void delayMilliseconds(unsigned int ms)
+{
+	_CLI();
+
+	unsigned int us=ms*1000;
+
+	unsigned short t0,accum=0;
+	t0=inpw(IO_FREERUN_TIMER);
+	while(accum<us)
+	{
+		unsigned short t,diff;
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		accum+=diff;
+		t0=t;
+	}
+
+	_STI();
+}
+
 #pragma Calling_convention(_INTERRUPT|_CALLING_CONVENTION);
 _Handler Handle_INT46H(void)
 {
@@ -746,7 +759,6 @@ void EndSectorInfo(void)
 //            bit0  1:Write Protected  0:Write Enabled
 void RDD_MakeDiskHeader(unsigned char data[48],unsigned char restoreState,unsigned char forceWriteProtect,unsigned char mediaType,const char label[])
 {
-TSUGARU_DEBUGBREAK;
 	int i;
 	for(i=0; i<48; ++i)
 	{
@@ -2130,6 +2142,11 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 					sectorDataCopy[j]=DMABuf.pages[0].data[j];
 				}
 				ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
+
+				delayMilliseconds(rand()%20);
+				// 300rpm->5 rotations per sec.  200ms per rotation.
+				// Add up to 20ms random delay before sending the next read command.
+				// Hopefully it will add fluctuation to the Corocoro bytes.
 
 				if(0==(ioErr&IOERR_LOST_DATA)) // && different from previous)
 				{
