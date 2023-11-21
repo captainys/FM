@@ -15,7 +15,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
-#define VERSION "20231119"
+#define VERSION "20231121"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +39,7 @@ struct PhysToLinear
 	unsigned char *data;
 };
 
+#define MAX_SECTOR_LENGTH 1024
 
 #define PAGE_SIZE 0x1000
 
@@ -86,6 +87,69 @@ void MakeUpLinearBuf(unsigned int numberOfBytes)
 		numberOfBytes-=copySize;
 	}
 }
+
+
+
+struct resampleBuffer
+{
+	unsigned int len,readTime;
+	unsigned char ioErr,is2ndGenCorocoro;
+	unsigned char data[MAX_SECTOR_LENGTH];
+};
+struct resampleBuffer *resample=NULL;
+
+void CaptureResamplingBuffer(struct resampleBuffer *buffer,unsigned char ioErr,unsigned int readTime,unsigned int len)
+{
+	int j;
+	buffer->ioErr=ioErr;
+	buffer->readTime=readTime;
+	buffer->len=len;
+	buffer->is2ndGenCorocoro=0;  // Tentatively
+	for(j=0; j<len; ++j)
+	{
+		buffer->data[j]=DMABuf.pages[0].data[j];
+	}
+}
+unsigned int Check2ndGenCorocoroProtect(struct resampleBuffer *buffer)
+{
+	int i;
+	unsigned int conditionMet=1; // Tentative
+	for(i=0; i<20; ++i)
+	{
+		if(0xF7!=buffer->data[i])
+		{
+			conditionMet=0;
+			break;
+		}
+	}
+	for(i=24; i<43; ++i)
+	{
+		if(0xF6!=buffer->data[i])
+		{
+			conditionMet=0;
+			break;
+		}
+	}
+
+	if(conditionMet)
+	{
+		buffer->is2ndGenCorocoro=1;
+		return 1;
+	}
+	buffer->is2ndGenCorocoro=0;
+	return 0;
+}
+unsigned int Count2ndGenCorocoroProtectSector(int nResample) // Within resampleBuffer
+{
+	int i,c=0;
+	for(i=0; i<nResample; ++i)
+	{
+		c+=Check2ndGenCorocoroProtect(&resample[i]);
+	}
+	return c;
+}
+
+
 
 /*
 This function finds physical addresses of the pages within _databuf, sort them, and find sequence of pages that
@@ -584,6 +648,8 @@ _Handler Handle_INT46H(void)
 	// DOS-Extender intercepts INT 46H in its own handler, then redirect to this handler by CALLF.
 	// Must return by RETF.
 	// _Far is the keyword in High-C.
+
+	return 0;
 }
 #pragma Calling_convention();
 
@@ -1934,14 +2000,203 @@ void FindHiddenLeaf(const char fName[],unsigned short readTrackSize,unsigned cha
 	}
 }
 
+void Analyze2ndGenCorocoroProtect(int nResample,unsigned char C,unsigned char H,unsigned char R,unsigned char N,unsigned int len)
+{
+	int j;
+
+	// Make it aware of 2nd-Gen Corocoro Protect
+	// successCount=Successfully read 20xF7, 4xunstable, 19xF6
+	unsigned int n2ndGenCorocoro=Count2ndGenCorocoroProtectSector(nResample);
+	if(0<n2ndGenCorocoro)
+	{
+		unsigned int step=4;
+		for(j=0; j<nResample && n2ndGenCorocoro<nResample/step; ++j)
+		{
+			while(0==resample[j].is2ndGenCorocoro)
+			{
+				int retryCnt;
+				for(retryCnt=0; retryCnt<nResample; ++retryCnt) // Try as many times as already tried.
+				{
+					unsigned int readTime;
+					unsigned char ioErr=FDC_ReadSector(&readTime,C,H,R,N);
+					CaptureResamplingBuffer(&resample[j],ioErr,readTime,len);
+					if(0!=Check2ndGenCorocoroProtect(&resample[j]))
+					{
+						++n2ndGenCorocoro;
+						break;
+					}
+				}
+			}
+		}
+
+		// Evenly distribute successfully-read 2nd-gen corocoro data appear first.
+		for(j=0; j<nResample; ++j)
+		{
+			unsigned int shouldBe=((0==j%step) ? 1 : 0);
+			if(shouldBe!=resample[j].is2ndGenCorocoro)
+			{
+				int k;
+				for(k=j+1; k<nResample; ++k)
+				{
+					if(shouldBe==resample[k].is2ndGenCorocoro)
+					{
+						struct resampleBuffer swp=resample[j];
+						resample[j]=resample[k];
+						resample[k]=swp;
+						break;
+					}
+				}
+			}
+		}
+	}
+}
+
+void ReadSector(struct IDMARK chrn,int FMorMFM,struct CommandParameterInfo *cpi)
+{
+	unsigned char C=chrn.chrn[0];
+	unsigned char H=chrn.chrn[1];
+	unsigned char R=chrn.chrn[2];
+	unsigned char N=chrn.chrn[3];
+	int nResample=0;
+	unsigned char ioErr=0;
+	unsigned char lostDataReadData=0;
+
+	unsigned int firstRetry=0;
+	for(firstRetry=0; firstRetry<cpi->firstRetryCount; ++firstRetry)
+	{
+		unsigned int  readTime;
+		ioErr=FDC_ReadSector(&readTime,C,H,R,N);
+
+		BeforeSectorInfo();
+
+		if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
+		{
+			lostDataReadData=1;
+			Color(IOErrToColor(ioErr));
+			printf("%02x%02x%02x%02x ",C,H,R,N);
+
+			AfterSectorInfo();
+		}
+		else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
+		{
+			lostDataReadData=0;
+			Color(IOErrToColor(ioErr));
+			printf("%02x%02x%02x%02x ",C,H,R,N);
+
+			AfterSectorInfo();
+
+			_STI();
+			RDD_WriteSectorData(cpi->outFName,chrn.chrn,ioErr,readTime,FMorMFM,0);
+
+			break;
+		}
+		else if(nResample<cpi->secondRetryCount)
+		{
+			unsigned int len=(128<<(chrn.chrn[3]&3));
+			CaptureResamplingBuffer(&resample[nResample],ioErr,readTime,len);
+			++nResample;
+			delayMilliseconds(rand()%20);
+		}
+	}
+
+	if(lostDataReadData)
+	{
+		LogError(ERRORLOG_TYPE_LOSTDATA,&chrn);
+	}
+	else if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.  Resample.
+	{
+		int j,len;
+		LogError(ERRORLOG_TYPE_CRC,&chrn);
+
+		len=(128<<(chrn.chrn[3]&3));
+		while(nResample<cpi->secondRetryCount)
+		{
+			unsigned int  readTime;
+
+			ioErr=FDC_ReadSector(&readTime,C,H,R,N);
+			if(0==ioErr) // Maybe disk was just unstable.  Succeeded.
+			{
+				Color(IOErrToColor(ioErr));
+				printf("%02x%02x%02x%02x ",C,H,R,N);
+
+				AfterSectorInfo();
+
+				_STI();
+				RDD_WriteSectorData(cpi->outFName,chrn.chrn,ioErr,readTime,FMorMFM,0);
+
+				nResample=0;
+
+				break;
+			}
+
+			delayMilliseconds(rand()%20);
+			// 300rpm->5 rotations per sec.  200ms per rotation.
+			// Add up to 20ms random delay before sending the next read command.
+			// Hopefully it will add fluctuation to the Corocoro bytes.
+
+			// Don't write right away.  Just store in the resample buffer.
+			CaptureResamplingBuffer(&resample[nResample],ioErr,readTime,len);
+			++nResample;
+		}
+
+		// If nResample is less than secondRetryCount, it means sector was read with no error somehow.
+		if(0<nResample)
+		{
+			int retry=0;
+			Analyze2ndGenCorocoroProtect(nResample,C,H,R,N,len);
+			for(retry=0; retry<nResample; ++retry)
+			{
+				unsigned char ioErr=resample[retry].ioErr;
+				unsigned int readTime=resample[retry].readTime;
+
+				if(0==(ioErr&IOERR_LOST_DATA)) // && different from previous)
+				{
+					unsigned int different=0;
+					unsigned int prev=(0<retry ? retry-1 : 0);
+					for(j=0; j<len; ++j)
+					{
+						if(resample[prev].data[j]!=resample[retry].data[j])
+						{
+							different=1;
+						}
+					}
+
+					if(0==retry || 0!=different)
+					{
+						BeforeSectorInfo();
+
+						Color(IOErrToColor(ioErr));
+						if(0!=resample[retry].is2ndGenCorocoro)
+						{
+							printf("%02x%02x%02x%02x@",C,H,R,N);
+						}
+						else
+						{
+							printf("%02x%02x%02x%02x ",C,H,R,N);
+						}
+
+						AfterSectorInfo();
+
+						_STI();
+						for(j=0; j<len; ++j) // Copy the data to the deck.
+						{
+							DMABuf.pages[0].data[j]=resample[retry].data[j];
+						}
+						RDD_WriteSectorData(cpi->outFName,chrn.chrn,ioErr,readTime,FMorMFM,1);
+					}
+				}
+			}
+		}
+	}
+}
+
 void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 {
 	int FMorMFM=CTL_MFM;
 	int i;
 	int nTrackSector=0;
 	unsigned char lostDataReadAddr=0;
-	unsigned char lostDataReadData=0;
-	unsigned char mfmTry,nFail=0;
+	unsigned char mfmTry;
 	unsigned short readTrackSize=0;
 	unsigned char ioErr=0;
 
@@ -1971,7 +2226,6 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	for(mfmTry=0; mfmTry<2; ++mfmTry)
 	{
 		unsigned int  accumTime=0;
-		unsigned short nFail=0;
 
 		controlByte&=(~CTL_MFM);
 		controlByte|=FMorMFM;
@@ -2089,92 +2343,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 	for(i=0; i<nTrackSector; ++i)
 	{
-		unsigned char retry,ioErr=0;
-		lostDataReadData=0;
-
-		for(retry=0; retry<cpi->firstRetryCount; ++retry)
-		{
-			unsigned int  readTime;
-			ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-			BeforeSectorInfo();
-
-			if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
-			{
-				lostDataReadData=1;
-				Color(IOErrToColor(ioErr));
-				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-				AfterSectorInfo();
-			}
-			else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
-			{
-				lostDataReadData=0;
-				Color(IOErrToColor(ioErr));
-				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-				AfterSectorInfo();
-
-				_STI();
-				RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,0);
-
-				break;
-			}
-		}
-
-		if(lostDataReadData)
-		{
-			LogError(ERRORLOG_TYPE_LOSTDATA,&idMark[i]);
-		}
-
-		if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.
-		{
-			int j,len;
-			LogError(ERRORLOG_TYPE_CRC,&idMark[i]);
-
-			len=(128<<(idMark[i].chrn[3]&3));
-			for(retry=0; retry<cpi->secondRetryCount; ++retry)
-			{
-				unsigned int  readTime;
-
-				for(j=0; j<len; ++j)
-				{
-					sectorDataCopy[j]=DMABuf.pages[0].data[j];
-				}
-				ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-				delayMilliseconds(rand()%20);
-				// 300rpm->5 rotations per sec.  200ms per rotation.
-				// Add up to 20ms random delay before sending the next read command.
-				// Hopefully it will add fluctuation to the Corocoro bytes.
-
-				if(0==(ioErr&IOERR_LOST_DATA)) // && different from previous)
-				{
-					unsigned int different=0;
-					for(j=0; j<len; ++j)
-					{
-						if(sectorDataCopy[j]!=DMABuf.pages[0].data[j])
-						{
-							different=1;
-						}
-						sectorDataCopy[j]=DMABuf.pages[0].data[j]; // For next comparison.
-					}
-
-					if(0==retry || 0!=different)
-					{
-						BeforeSectorInfo();
-
-						Color(IOErrToColor(ioErr));
-						printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-						AfterSectorInfo();
-
-						_STI();
-						RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,1);
-					}
-				}
-			}
-		}
+		ReadSector(idMark[i],FMorMFM,cpi);
 	}
 
 	outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=H ? CTL_SIDE : 0)|CTL_MFM);
@@ -2400,6 +2569,16 @@ int main(int ac,char *av[])
 		Color(2);
 		printf("This program requires Free-Run timer.\n");
 		printf("Needs to be FM TOWNS 2 UG or newer.\n");
+		Color(7);
+		return 1;
+	}
+
+	resample=(struct resampleBuffer *)malloc(sizeof(struct resampleBuffer)*cpi.secondRetryCount);
+	if(NULL==resample)
+	{
+		Color(2);
+		printf("Cannot allocate resampling buffer.\n");
+		printf("Need more RAM.\n");
 		Color(7);
 		return 1;
 	}
