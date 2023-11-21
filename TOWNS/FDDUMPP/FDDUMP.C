@@ -33,6 +33,81 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
+// RDD Output Data Data Format (.RDD  Real Disk Dump)
+// Signature (First 16 bytes)
+// 'R' 'E' 'A' 'L' 'D' 'I' 'S' 'K' 'D' 'U' 'M' 'P' 0 0 0 0 
+// Begin Disk
+// 00h vr mt fl cd 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+//    +1  vr  Version 
+//              1  Added 10h Unstable-byte flags.
+//    +2  mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
+//    +3  fl  flags
+//            bit0  1:Write Protected  0:Write Enabled
+//    +4  cd  Capture Device
+//            00:FM TOWNS
+//            FF:Converted from other data type.
+// (32 bytes name, 0 padded)
+// Begin Track
+// 01h cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+//    +1  cc  Cylinder
+//    +2  hh  Head
+// ID Mark
+// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+//     :
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +3  rr  Sector Number
+//    +4  nn  Length=128<<(n&3)
+//    +5  CRC  CRC of the address mark (not for the data)
+//    +6  CRC  CRC of the address mark (not for the data)
+//    +7  st  MB8877 status
+// Data
+// 03h cc hh rr nn st fl 00 00 00 00 <time  > <Length>
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +3  rr  Sector Number
+//    +4  nn  Length=128<<(n&3)
+//    +5  st  MB8877 status
+//    +6  fl  bit0=density flag(0:MFM 1:FM)
+//            bit1=resample flag(1 means Resample for unstable bytes)
+//            bit2=Probably Leaf-In-The-Forest Protect
+//    +B  (3 bytes) Microseconds for reading the sector.
+//    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
+// (Bytes padded to 16*N bytes)
+// Track Read
+// 04h cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +3  st  MB8877 status
+//    +E  (2 bytes) Number of bytes returned from Track Read.
+// (Bytes padded to 16*N bytes)
+// End of Track
+// 05h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+// End of File
+// 06h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+// Unstable-byte flags.  (Non-zero means unstable.)
+// Immediately preceding data (ID Mark, Sector, or Track Read) has unstable bytes.
+// 10h 00 00 00 00 00 00 00 00 00 00 00 00 sz sz
+//    +E  sz  Lower-byte of the size in bytes.
+//    +F  sz  Higher-byte of the size in bytes.
+//            The size is ((n+7)&~7) bytes, where n is the preceding data length.
+//            The size does NOT include the 16-byte header length.
+// (Data.  Padded to 16*N bytes.  Flag for byte i is data[i/8]&(1<<(i&7)). )
+// Note:  Initially sz was +1 and +2.  Changed to +E and +F.
+//        However, at the time of the change, no .RDD file with 10H tag existed.
+//        It shouldn't affect anything.
+
+
+// Next Track
+
+
+
+////////////////////////////////////////////////////////////////////////
+// DMA Buffer
+
 struct PhysToLinear
 {
 	unsigned int physAddr;
@@ -86,67 +161,6 @@ void MakeUpLinearBuf(unsigned int numberOfBytes)
 		++pageIdx;
 		numberOfBytes-=copySize;
 	}
-}
-
-
-
-struct resampleBuffer
-{
-	unsigned int len,readTime;
-	unsigned char ioErr,is2ndGenCorocoro;
-	unsigned char data[MAX_SECTOR_LENGTH];
-};
-struct resampleBuffer *resample=NULL;
-
-void CaptureResamplingBuffer(struct resampleBuffer *buffer,unsigned char ioErr,unsigned int readTime,unsigned int len)
-{
-	int j;
-	buffer->ioErr=ioErr;
-	buffer->readTime=readTime;
-	buffer->len=len;
-	buffer->is2ndGenCorocoro=0;  // Tentatively
-	for(j=0; j<len; ++j)
-	{
-		buffer->data[j]=DMABuf.pages[0].data[j];
-	}
-}
-unsigned int Check2ndGenCorocoroProtect(struct resampleBuffer *buffer)
-{
-	int i;
-	unsigned int conditionMet=1; // Tentative
-	for(i=0; i<20; ++i)
-	{
-		if(0xF7!=buffer->data[i])
-		{
-			conditionMet=0;
-			break;
-		}
-	}
-	for(i=24; i<43; ++i)
-	{
-		if(0xF6!=buffer->data[i])
-		{
-			conditionMet=0;
-			break;
-		}
-	}
-
-	if(conditionMet)
-	{
-		buffer->is2ndGenCorocoro=1;
-		return 1;
-	}
-	buffer->is2ndGenCorocoro=0;
-	return 0;
-}
-unsigned int Count2ndGenCorocoroProtectSector(int nResample) // Within resampleBuffer
-{
-	int i,c=0;
-	for(i=0; i<nResample; ++i)
-	{
-		c+=Check2ndGenCorocoroProtect(&resample[i]);
-	}
-	return c;
 }
 
 
@@ -251,75 +265,123 @@ struct bufferInfo MakeDataBuffer(void)
 
 
 
-// RDD Output Data Data Format (.RDD  Real Disk Dump)
-// Signature (First 16 bytes)
-// 'R' 'E' 'A' 'L' 'D' 'I' 'S' 'K' 'D' 'U' 'M' 'P' 0 0 0 0 
-// Begin Disk
-// 00h vr mt fl cd 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
-//    +1  vr  Version 
-//              1  Added 10h Unstable-byte flags.
-//    +2  mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
-//    +3  fl  flags
-//            bit0  1:Write Protected  0:Write Enabled
-//    +4  cd  Capture Device
-//            00:FM TOWNS
-//            FF:Converted from other data type.
-// (32 bytes name, 0 padded)
-// Begin Track
-// 01h cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
-//    +1  cc  Cylinder
-//    +2  hh  Head
-// ID Mark
-// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
-// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
-// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
-//     :
-//    +1  cc  Cylinder
-//    +2  hh  Head
-//    +3  rr  Sector Number
-//    +4  nn  Length=128<<(n&3)
-//    +5  CRC  CRC of the address mark (not for the data)
-//    +6  CRC  CRC of the address mark (not for the data)
-//    +7  st  MB8877 status
-// Data
-// 03h cc hh rr nn st fl 00 00 00 00 <time  > <Length>
-//    +1  cc  Cylinder
-//    +2  hh  Head
-//    +3  rr  Sector Number
-//    +4  nn  Length=128<<(n&3)
-//    +5  st  MB8877 status
-//    +6  fl  bit0=density flag(0:MFM 1:FM)
-//            bit1=resample flag(1 means Resample for unstable bytes)
-//            bit2=Probably Leaf-In-The-Forest Protect
-//    +B  (3 bytes) Microseconds for reading the sector.
-//    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
-// (Bytes padded to 16*N bytes)
-// Track Read
-// 04h cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
-//    +1  cc  Cylinder
-//    +2  hh  Head
-//    +3  st  MB8877 status
-//    +E  (2 bytes) Number of bytes returned from Track Read.
-// (Bytes padded to 16*N bytes)
-// End of Track
-// 05h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-// End of File
-// 06h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+////////////////////////////////////////////////////////////////
+// Resampling Buffer
 
-// Unstable-byte flags.  (Non-zero means unstable.)
-// Immediately preceding data (ID Mark, Sector, or Track Read) has unstable bytes.
-// 10h 00 00 00 00 00 00 00 00 00 00 00 00 sz sz
-//    +E  sz  Lower-byte of the size in bytes.
-//    +F  sz  Higher-byte of the size in bytes.
-//            The size is ((n+7)&~7) bytes, where n is the preceding data length.
-//            The size does NOT include the 16-byte header length.
-// (Data.  Padded to 16*N bytes.  Flag for byte i is data[i/8]&(1<<(i&7)). )
-// Note:  Initially sz was +1 and +2.  Changed to +E and +F.
-//        However, at the time of the change, no .RDD file with 10H tag existed.
-//        It shouldn't affect anything.
+struct resampleBuffer
+{
+	unsigned int len,readTime;
+	unsigned char ioErr,is2ndGenCorocoro;
+	unsigned char data[MAX_SECTOR_LENGTH];
+};
+struct resampleBuffer *resample=NULL;
+
+void CaptureResamplingBuffer(struct resampleBuffer *buffer,unsigned char ioErr,unsigned int readTime,unsigned int len)
+{
+	int j;
+	buffer->ioErr=ioErr;
+	buffer->readTime=readTime;
+	buffer->len=len;
+	buffer->is2ndGenCorocoro=0;  // Tentatively
+	for(j=0; j<len; ++j)
+	{
+		buffer->data[j]=DMABuf.pages[0].data[j];
+	}
+}
+unsigned int Check2ndGenCorocoroProtect(struct resampleBuffer *buffer)
+{
+	int i;
+	unsigned int conditionMet=1; // Tentative
+	for(i=0; i<20; ++i)
+	{
+		if(0xF7!=buffer->data[i])
+		{
+			conditionMet=0;
+			break;
+		}
+	}
+	for(i=24; i<43; ++i)
+	{
+		if(0xF6!=buffer->data[i])
+		{
+			conditionMet=0;
+			break;
+		}
+	}
+
+	if(conditionMet)
+	{
+		buffer->is2ndGenCorocoro=1;
+		return 1;
+	}
+	buffer->is2ndGenCorocoro=0;
+	return 0;
+}
+unsigned int Count2ndGenCorocoroProtectSector(int nResample) // Within resampleBuffer
+{
+	int i,c=0;
+	for(i=0; i<nResample; ++i)
+	{
+		c+=Check2ndGenCorocoroProtect(&resample[i]);
+	}
+	return c;
+}
 
 
-// Next Track
+
+////////////////////////////////////////////////////////////////
+// Disk Write Buffer
+
+
+#define WRITE_BUFFER_LEN 65536
+
+size_t fileWriteBufferFilled=0;
+unsigned char fileWriteBuffer[WRITE_BUFFER_LEN];
+
+size_t fwrite_buffered(const unsigned char data[],size_t unit,size_t len,const char fn[])
+{
+	len*=unit;
+	if(fileWriteBufferFilled+len<WRITE_BUFFER_LEN)
+	{
+		memcpy(fileWriteBuffer+fileWriteBufferFilled,data,len);
+		fileWriteBufferFilled+=len;
+		return len;
+	}
+	else
+	{
+		FILE *fp=fopen(fn,"ab");
+		if(NULL!=fp)
+		{
+			size_t len0=WRITE_BUFFER_LEN-fileWriteBufferFilled;
+			size_t len1=len-len0;
+			memcpy(fileWriteBuffer+fileWriteBufferFilled,data,len0);
+			fwrite(data,1,len0,fp);
+			fclose(fp);
+
+			memcpy(fileWriteBuffer,data+len0,len1);
+			fileWriteBufferFilled=len1;
+
+			return len;
+		}
+	}
+	return 0;
+}
+void fflush_buffered(const char fn[])
+{
+	if(0<fileWriteBufferFilled)
+	{
+		FILE *fp=fopen(fn,"ab");
+		if(NULL!=fp)
+		{
+			fwrite(fileWriteBuffer,1,fileWriteBufferFilled,fp);
+			fclose(fp);
+		}
+	}
+}
+
+
+////////////////////////////////////////////////////////////////
+// Main part
 
 
 unsigned int drvSel=1;    // Drive 0
@@ -2641,6 +2703,8 @@ int main(int ac,char *av[])
 	ReadDisk(&cpi);
 
 	RDD_WriteEndOfDisk(cpi.outFName);
+
+	fflush_buffered(cpi.outFName);
 
 	CleanUp();
 
