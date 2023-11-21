@@ -355,7 +355,7 @@ size_t fwrite_buffered(const unsigned char data[],size_t unit,size_t len,const c
 			size_t len0=WRITE_BUFFER_LEN-fileWriteBufferFilled;
 			size_t len1=len-len0;
 			memcpy(fileWriteBuffer+fileWriteBufferFilled,data,len0);
-			fwrite(data,1,len0,fp);
+			fwrite(fileWriteBuffer,1,WRITE_BUFFER_LEN,fp);
 			fclose(fp);
 
 			memcpy(fileWriteBuffer,data+len0,len1);
@@ -901,9 +901,9 @@ void RDD_MakeDiskHeader(unsigned char data[48],unsigned char restoreState,unsign
 
 unsigned int RDD_WriteSignature(const char fName[])
 {
+	FILE *fp=NULL;
 	char signature[16];
 	int i;
-	FILE *ofp;
 
 	for(i=0; i<16; ++i)
 	{
@@ -911,9 +911,13 @@ unsigned int RDD_WriteSignature(const char fName[])
 	}
 	strcpy(signature,"REALDISKDUMP");
 
-	ofp=fopen(fName,"wb");
-	fwrite(signature,1,16,ofp);
-	fclose(ofp);
+	fp=fopen(fName,"wb");
+	if(NULL==fp)
+	{
+		return 1;
+	}
+	fwrite(signature,1,16,fp);
+	fclose(fp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -923,20 +927,16 @@ unsigned int RDD_WriteSignature(const char fName[])
 unsigned int RDD_WriteDiskHeader(const char fName[],unsigned char restoreState,unsigned char forceWriteProtect,unsigned char mediaType,const char label[])
 {
 	unsigned char data[48];
-	FILE *ofp;
 
 	RDD_MakeDiskHeader(data,restoreState,forceWriteProtect,mediaType,label);
 
-	ofp=fopen(fName,"ab");
-	if(NULL==ofp)
+	if(48!=fwrite_buffered(data,1,48,fName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-	fwrite(data,1,48,ofp);
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -947,7 +947,6 @@ unsigned int RDD_WriteDiskHeader(const char fName[],unsigned char restoreState,u
 // 01 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 unsigned int RDD_WriteTrackHeader(const char fName[],unsigned char C,unsigned char H)
 {
-	FILE *ofp;
 	unsigned char data[16];
 	int i;
 	for(i=0; i<16; ++i)
@@ -958,16 +957,13 @@ unsigned int RDD_WriteTrackHeader(const char fName[],unsigned char C,unsigned ch
 	data[1]=C;
 	data[2]=H;
 
-	ofp=fopen(fName,"ab");
-	if(NULL==ofp)
+	if(16!=fwrite_buffered(data,1,16,fName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-	fwrite(data,1,16,ofp);
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -978,7 +974,6 @@ unsigned int RDD_WriteTrackHeader(const char fName[],unsigned char C,unsigned ch
 // 02 cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
 unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct IDMARK idMark[])
 {
-	FILE *ofp;
 	unsigned char data[16];
 	int i;
 	for(i=0; i<16; ++i)
@@ -986,15 +981,6 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 		data[i]=0;
 	}
 	data[0]=2;
-
-	ofp=fopen(fName,"ab");
-	if(NULL==ofp)
-	{
-		Color(2);
-		fprintf(stderr,"Cannot open output file.\n");
-		Color(7);
-		return 1;
-	}
 
 	for(i=0; i<numIDMarks; ++i)
 	{
@@ -1005,9 +991,14 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 		data[5]=idMark[i].chrn[4]; // CRC
 		data[6]=idMark[i].chrn[5]; // CRC
 		data[7]=idMark[i].chrn[7]; // FDC Status
-		fwrite(data,1,16,ofp);
+		if(16!=fwrite_buffered(data,1,16,fName))
+		{
+			Color(2);
+			fprintf(stderr,"Cannot open output file.\n");
+			Color(7);
+			return 1;
+		}
 	}
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -1021,7 +1012,6 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 //         bit1=resample flag(1 means Resample for unstable bytes)
 unsigned int RDD_WriteSectorData(const char fName[],const unsigned char CHRN[4],unsigned char FDCSta,unsigned int readTime,unsigned char FMorMFM,unsigned char isResample)
 {
-	FILE *ofp;
 	unsigned int actualSize=0; // MB8877 always reads 128<<N anyway.
 	unsigned char *actualSizePtr,*readTimePtr;
 	unsigned char data[16];
@@ -1059,19 +1049,14 @@ unsigned int RDD_WriteSectorData(const char fName[],const unsigned char CHRN[4],
 	data[14]=actualSizePtr[0];
 	data[15]=actualSizePtr[1];
 
-	ofp=fopen(fName,"ab");
-	if(NULL==ofp)
+	if(16!=fwrite_buffered(data,1,16,fName) ||
+	   actualSize!=fwrite_buffered(DMABuf.pages[0].data,1,actualSize,fName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-
-	fwrite(data,1,16,ofp);
-	fwrite(DMABuf.pages[0].data,1,actualSize,ofp);
-
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -1082,7 +1067,6 @@ unsigned int RDD_WriteSectorData(const char fName[],const unsigned char CHRN[4],
 // 04 cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
 unsigned int RDD_WriteTrack(const char outFName[],unsigned char C,unsigned char H,unsigned short readSize,unsigned char st)
 {
-	FILE *ofp;
 	unsigned int writeSize=0;
 	unsigned char *readSizePtr;
 	unsigned char data[16];
@@ -1100,23 +1084,18 @@ unsigned int RDD_WriteTrack(const char outFName[],unsigned char C,unsigned char 
 	data[14]=readSizePtr[0];
 	data[15]=readSizePtr[1];
 
-	ofp=fopen(outFName,"ab");
-	if(NULL==ofp)
+	writeSize=(readSize+15)&~0x000F;
+
+	MakeUpLinearBuf(writeSize);
+
+	if(16!=fwrite_buffered(data,1,16,outFName) ||
+	   writeSize!=fwrite_buffered(linearBuf,1,writeSize,outFName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-
-	writeSize=(readSize+15)&~0x000F;
-
-	fwrite(data,1,16,ofp);
-
-	MakeUpLinearBuf(writeSize);
-	fwrite(linearBuf,1,writeSize,ofp);
-
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -1125,21 +1104,15 @@ unsigned int RDD_WriteTrack(const char outFName[],unsigned char C,unsigned char 
 
 unsigned int RDD_WriteEndOfTrack(const char outFName[])
 {
-	FILE *ofp;
 	unsigned char data[16]={5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-	ofp=fopen(outFName,"ab");
-	if(NULL==ofp)
+	if(16!=fwrite_buffered(data,1,16,outFName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-
-	fwrite(data,1,16,ofp);
-
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 	WaitMicrosec(AFTER_SCSI_WAIT);
@@ -1150,21 +1123,15 @@ unsigned int RDD_WriteEndOfTrack(const char outFName[])
 
 unsigned int RDD_WriteEndOfDisk(const char outFName[])
 {
-	FILE *ofp;
 	unsigned char data[16]={6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-	ofp=fopen(outFName,"ab");
-	if(NULL==ofp)
+	if(16!=fwrite_buffered(data,1,16,outFName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-
-	fwrite(data,1,16,ofp);
-
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -2043,20 +2010,15 @@ void FindHiddenLeaf(const char fName[],unsigned short readTrackSize,unsigned cha
 			header[0x0C]=(microsec>>8)&0xFF;
 
 			{
-				FILE *ofp=fopen(fName,"ab");
-				if(NULL!=ofp)
-				{
-					fwrite(header,1,16,ofp);
-					fwrite(linearBuf+dataPtr,1,len,ofp);
-					fclose(ofp);
+				fwrite_buffered(header,1,16,fName);
+				fwrite_buffered(linearBuf+dataPtr,1,len,fName);
 
-					BeforeSectorInfo();
+				BeforeSectorInfo();
 
-					Color(IOErrToColor(header[4]));
-					printf("%02x%02x%02x%02x ",C,H,R,N);
+				Color(IOErrToColor(header[4]));
+				printf("%02x%02x%02x%02x ",C,H,R,N);
 
-					AfterSectorInfo();
-				}
+				AfterSectorInfo();
 			}
 		}
 	}
