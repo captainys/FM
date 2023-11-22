@@ -15,7 +15,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
-#define VERSION "20231122"
+#define VERSION "20231122C"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,6 +102,21 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 // Next Track
+
+
+
+
+
+//                                        		.386p 
+//                                        		ASSUME CS:CODE 
+//00000000                                CODE		SEGMENT 
+//00000000  FA                            		CLI 
+//00000001  FB                            		STI 
+//00000002                                CODE		ENDS 
+//                                        		END 
+
+#define __CLI _inline(0xFA)
+#define __STI _inline(0xFB)
 
 
 
@@ -285,10 +300,7 @@ void CaptureResamplingBuffer(struct resampleBuffer *buffer,unsigned char ioErr,u
 	buffer->len=len;
 	buffer->is2ndGenCorocoro=0;  // Tentatively
 	buffer->resampledFor1stGenCorocoro=0;
-	for(j=0; j<len; ++j)
-	{
-		buffer->data[j]=DMABuf.pages[0].data[j];
-	}
+	memcpy(buffer->data,DMABuf.pages[0].data,len);
 }
 unsigned int Check2ndGenCorocoroProtect(struct resampleBuffer *buffer)
 {
@@ -533,6 +545,42 @@ void LogErrorCH(unsigned int code,unsigned char C,unsigned char H)
 }
 
 
+enum
+{
+	SECTORLOG_INFO_NONE,
+	SECTORLOG_INFO_LEAF_IN_THE_FOREST,
+};
+
+#define MAX_SECTOR_LOG 256
+unsigned int numSectorLog=0;
+struct SectorLog {
+	unsigned char info;
+	unsigned char CHRN[4];
+	unsigned char ioErr;
+	char extChar;
+} sectorLog[MAX_SECTOR_LOG];
+
+void AddSectorLogInfo(unsigned char info)
+{
+	if(numSectorLog<MAX_SECTOR_LOG)
+	{
+		sectorLog[numSectorLog].info=info;
+		++numSectorLog;
+	}
+}
+void AddSectorLog(const unsigned char CHRN[4],unsigned char ioErr,char extChar)
+{
+	if(numSectorLog<MAX_SECTOR_LOG)
+	{
+		struct SectorLog *log=&sectorLog[numSectorLog++];
+		log->info=SECTORLOG_INFO_NONE;
+		*((unsigned int *)log->CHRN)=*((unsigned int *)CHRN);
+		log->ioErr=ioErr;
+		log->extChar=extChar;
+	}
+}
+
+
 
 #define IO_FDC_STATUS			0x200
 #define FDCSTA_BUSY				0x01
@@ -676,14 +724,12 @@ unsigned char IOErrToColor(unsigned char ioErr)
 }
 
 // In ASM.ASM
-extern void _STI();
-extern void _CLI();
 extern unsigned int GetDMACount(void);
 extern Tsugaru_Debug(const char str[]);
 
 void delayMilliseconds(unsigned int ms)
 {
-	_CLI();
+	__CLI;
 
 	unsigned int us=ms*1000;
 
@@ -698,7 +744,7 @@ void delayMilliseconds(unsigned int ms)
 		t0=t;
 	}
 
-	_STI();
+	__STI;
 }
 
 #pragma Calling_convention(_INTERRUPT|_CALLING_CONVENTION);
@@ -747,7 +793,7 @@ _Handler Handle_INT46H(void)
 		// Looks like if I force-interrupt for seek commands, FDC stops before the head actually moved.
 		outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
 
-		_CLI(); // Is it necessary?
+		__CLI; // Is it necessary?
 		outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
 	}
 	else
@@ -927,6 +973,35 @@ void EndSectorInfo(void)
 		printf("\n");
 	}
 }
+
+void PrintSectorLog(void)
+{
+	int i;
+	for(i=0; i<numSectorLog; ++i)
+	{
+		BeforeSectorInfo();
+		switch(sectorLog[i].info)
+		{
+		case SECTORLOG_INFO_NONE:
+			Color(IOErrToColor(sectorLog[i].ioErr));
+			printf("%02x%02x%02x%02x%c",
+				sectorLog[i].CHRN[0],
+				sectorLog[i].CHRN[1],
+				sectorLog[i].CHRN[2],
+				sectorLog[i].CHRN[3],
+				sectorLog[i].extChar
+				);
+			break;
+		case SECTORLOG_INFO_LEAF_IN_THE_FOREST:
+			Color(4);
+			printf("HIDNLEAF ");
+			break;
+		}
+		AfterSectorInfo();
+	}
+	numSectorLog=0;
+}
+
 
 ////////////////////////////////////////////////////////////
 
@@ -1269,7 +1344,7 @@ unsigned char ReadDriveStatusIO(void)
 
 int CheckDriveReady(void)
 {
-	_CLI();
+	__CLI;
 
 	unsigned int  accumTime=0;
 	unsigned short t0,t,diff;
@@ -1294,7 +1369,7 @@ int CheckDriveReady(void)
 		accumTime+=diff;
 	}
 
-	_STI();
+	__STI;
 
 	printf("Status %02xH\n",driveStatus);
 	printf("FDC Status %02x\n",inp(IO_FDC_STATUS));
@@ -1326,7 +1401,7 @@ void FDC_WaitIndexHole(void)
 {
 	unsigned int statusByte;
 
-	_CLI();
+	__CLI;
 
 	FDC_Command(FDCCMD_FORCEINTERRUPT);
 	FDC_WaitReady();
@@ -1343,7 +1418,7 @@ extern void SetUpDMA(unsigned int physAddr,unsigned int count);
 
 unsigned char FDC_Restore(void)
 {
-	_CLI();
+	__CLI;
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
 
@@ -1353,7 +1428,7 @@ unsigned char FDC_Restore(void)
 	INT46_DID_COME_IN=0;
 
 	FDC_WaitReady();
-	_STI();
+	__STI;
 	FDC_Command(FDCCMD_RESTORE);
 	WriteDriveControl(CTL_IRQEN);
 	while(0==INT46_DID_COME_IN)
@@ -1361,9 +1436,9 @@ unsigned char FDC_Restore(void)
 	}
 	WriteDriveControl(0);
 
-	_CLI();
+	__CLI;
 	PIC_SetMask(picmask);
-	_STI();
+	__STI;
 
 	currentCylinder=0;
 	printf("RESTORE Returned %02x\n",lastFDCStatus);
@@ -1412,7 +1487,7 @@ unsigned char FDC_Seek(unsigned char C)
 //03A4:00000C07 Write IO8:[0208] 12(FDC_DRIVE_STATUS_CONTROL)
 
 	FDC_WaitReady();
-	_CLI();
+	__CLI;
 
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
@@ -1431,7 +1506,7 @@ unsigned char FDC_Seek(unsigned char C)
 
 	Palette(COLOR_DEBUG,0,0,255);
 
-	_STI();
+	__STI;
 	WriteDriveControl(CTL_IRQEN);
 	FDC_Command(FDCCMD_SEEK);
 	while(0==INT46_DID_COME_IN)
@@ -1440,9 +1515,9 @@ unsigned char FDC_Seek(unsigned char C)
 	}
 	WriteDriveControl(0);
 
-	_CLI();
+	__CLI;
 	PIC_SetMask(picmask);
-	_STI();
+	__STI;
 
 	Palette(COLOR_DEBUG,0,255,255);
 
@@ -1466,7 +1541,7 @@ unsigned char FDC_ReadAddress(unsigned int  *accumTime)
 
 	*accumTime=0;
 
-	_CLI();
+	__CLI;
 	SelectDrive();
 	WriteDriveControl(0);
 
@@ -1474,13 +1549,13 @@ unsigned char FDC_ReadAddress(unsigned int  *accumTime)
 
 	Palette(COLOR_DEBUG,0,255,0);
 
-	_CLI();
+	__CLI;
 	INT46_DID_COME_IN=0;
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
 
 	FDC_WaitReady();
-	_STI();
+	__STI;
 
 	Palette(COLOR_DEBUG,0,0,255);
 
@@ -1526,7 +1601,7 @@ unsigned char FDC_ReadSectorReal(unsigned int  *accumTime,unsigned char C,unsign
 	*accumTime=0;
 
 
-	_CLI();
+	__CLI;
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
 
@@ -1537,7 +1612,7 @@ unsigned char FDC_ReadSectorReal(unsigned int  *accumTime,unsigned char C,unsign
 	initDMACounter=128<<(N&3);
 	SetUpDMA(DMABuf.physAddr,initDMACounter);
 	// --initDMACounter;  Why was I decrementing it?
-	_STI();
+	__STI;
 
 	Palette(COLOR_DEBUG,0,255,0);
 
@@ -1583,9 +1658,9 @@ unsigned char FDC_ReadSectorReal(unsigned int  *accumTime,unsigned char C,unsign
 	WriteDriveControl(0);
 
 
-	_CLI();
+	__CLI;
 	PIC_SetMask(picmask);
-	_STI();
+	__STI;
 
 
 	Palette(COLOR_DEBUG,255,255,255);
@@ -1619,10 +1694,10 @@ unsigned char FDC_ReadSector(unsigned int  *accumTime,unsigned char C,unsigned c
 
 unsigned char FDC_ReadTrack(unsigned short *readSize)
 {
-	_CLI();
+	__CLI;
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
-	_STI();
+	__STI;
 
 	unsigned int DMABufSize=DMABuf.numberOfPages*PAGE_SIZE;
 
@@ -1634,7 +1709,7 @@ unsigned char FDC_ReadTrack(unsigned short *readSize)
 
 		Palette(COLOR_DEBUG,255,0,0);
 
-		_CLI();
+		__CLI;
 
 		SelectDrive();
 		WriteDriveControl(0);
@@ -1643,11 +1718,11 @@ unsigned char FDC_ReadTrack(unsigned short *readSize)
 
 		Palette(COLOR_DEBUG,0,255,0);
 
-		_CLI();
+		__CLI;
 		INT46_DID_COME_IN=0;
 
 		FDC_WaitReady();
-		_STI();
+		__STI;
 
 		Palette(COLOR_DEBUG,0,0,255);
 
@@ -1686,9 +1761,9 @@ unsigned char FDC_ReadTrack(unsigned short *readSize)
 		}
 	}
 
-	_CLI();
+	__CLI;
 	PIC_SetMask(picmask);
-	_STI();
+	__STI;
 
 	{
 		unsigned short DMACount;
@@ -2010,10 +2085,7 @@ void FindHiddenLeaf(const char fName[],unsigned short readTrackSize,unsigned cha
 	unsigned char C,H,R,N;
 
 
-	BeforeSectorInfo();
-	Color(4);
-	printf("HIDNLEAF ");
-	AfterSectorInfo();
+	AddSectorLogInfo(SECTORLOG_INFO_LEAF_IN_THE_FOREST);
 
 
 	MakeUpLinearBuf(readTrackSize);
@@ -2032,11 +2104,13 @@ void FindHiddenLeaf(const char fName[],unsigned short readTrackSize,unsigned cha
 		{
 			unsigned short len=0;
 			unsigned short dataPtr,microsec;
+			unsigned char *chrn;
 
 			prevDataMarkPtr=dataMarkPtr;
 			dataMarkPtr=ptr;
 			dataPtr=ptr+3;
 
+			chrn=linearBuf+addrMarkPtr+3;
 			C=linearBuf[addrMarkPtr+3];
 			H=linearBuf[addrMarkPtr+4];
 			R=linearBuf[addrMarkPtr+5];
@@ -2073,12 +2147,7 @@ void FindHiddenLeaf(const char fName[],unsigned short readTrackSize,unsigned cha
 				fwrite_buffered(header,1,16,fName);
 				fwrite_buffered(linearBuf+dataPtr,1,len,fName);
 
-				BeforeSectorInfo();
-
-				Color(IOErrToColor(header[4]));
-				printf("%02x%02x%02x%02x ",C,H,R,N);
-
-				AfterSectorInfo();
+				AddSectorLog(chrn,IOERR_CRC,' ');
 			}
 		}
 	}
@@ -2188,28 +2257,18 @@ void ReadSector(struct IDMARK chrn,int FMorMFM,struct CommandParameterInfo *cpi)
 		unsigned int  readTime;
 		ioErr=FDC_ReadSector(&readTime,C,H,R,N);
 
-		BeforeSectorInfo();
-
 		if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
 		{
 			lostDataReadData=1;
-			Color(IOErrToColor(ioErr));
-			printf("%02x%02x%02x%02x ",C,H,R,N);
-
-			AfterSectorInfo();
+			AddSectorLog(chrn.chrn,ioErr,' ');
 		}
 		else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
 		{
 			lostDataReadData=0;
-			Color(IOErrToColor(ioErr));
-			printf("%02x%02x%02x%02x ",C,H,R,N);
-
-			AfterSectorInfo();
-
-			_STI();
+			AddSectorLog(chrn.chrn,ioErr,' ');
+			__STI;
 			RDD_WriteSectorData(cpi->outFName,chrn.chrn,ioErr,readTime,FMorMFM,0);
-
-			break;
+			return;
 		}
 		else if(nResample<cpi->secondRetryCount)
 		{
@@ -2237,17 +2296,10 @@ void ReadSector(struct IDMARK chrn,int FMorMFM,struct CommandParameterInfo *cpi)
 			ioErr=FDC_ReadSector(&readTime,C,H,R,N);
 			if(0==ioErr) // Maybe disk was just unstable.  Succeeded.
 			{
-				Color(IOErrToColor(ioErr));
-				printf("%02x%02x%02x%02x ",C,H,R,N);
-
-				AfterSectorInfo();
-
-				_STI();
+				AddSectorLog(chrn.chrn,ioErr,' ');
+				__STI;
 				RDD_WriteSectorData(cpi->outFName,chrn.chrn,ioErr,readTime,FMorMFM,0);
-
-				nResample=0;
-
-				break;
+				return;
 			}
 
 			delayMilliseconds(rand()%20);
@@ -2294,15 +2346,9 @@ void ReadSector(struct IDMARK chrn,int FMorMFM,struct CommandParameterInfo *cpi)
 						{
 							resampleCode='&';
 						}
+						AddSectorLog(chrn.chrn,ioErr,resampleCode);
 
-						BeforeSectorInfo();
-
-						Color(IOErrToColor(ioErr));
-						printf("%02x%02x%02x%02x%c",C,H,R,N,resampleCode);
-
-						AfterSectorInfo();
-
-						_STI();
+						__STI;
 						for(j=0; j<len; ++j) // Copy the data to the deck.
 						{
 							DMABuf.pages[0].data[j]=resample[retry].data[j];
@@ -2325,7 +2371,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	unsigned short readTrackSize=0;
 	unsigned char ioErr=0;
 
-	_STI();
+	__STI;
 	StartSectorInfo(C,H);
 
 	RDD_WriteTrackHeader(cpi->outFName,C,H);
@@ -2344,7 +2390,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	FDC_WaitIndexHole(); // Need to be immediately after seek.
 	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
 
-	_STI();
+	__STI;
 
 
 
@@ -2446,7 +2492,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 
 
-	_STI();
+	__STI;
 	RDD_WriteIDMark(cpi->outFName,nTrackSector,idMark);
 	if(0xFF!=ioErr)
 	{
@@ -2470,6 +2516,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	{
 		ReadSector(idMark[i],FMorMFM,cpi);
 	}
+	PrintSectorLog();
 
 	outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=H ? CTL_SIDE : 0)|CTL_MFM);
 
