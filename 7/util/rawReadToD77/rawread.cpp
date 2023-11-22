@@ -75,7 +75,7 @@ D77File::D77Disk::D77Sector FM7RawDiskRead::Sector::MakeD77Sector(long long int 
 		c=0;
 	}
 	d77sec.sectorDataSize=CalculateSize();
-	d77sec.sectorData=dat;
+	d77sec.data=dat;
 
 	return d77sec;
 }

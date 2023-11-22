@@ -1158,22 +1158,22 @@ void D77Analyzer::DumpSector(int diskId,int cyl,int side,int sec) const
 void D77Analyzer::DumpSector(const D77File::D77Disk::D77Sector &s) const
 {
 	printf("Disk:%d Track:%d Side:%d Sector:%d\n",diskId,s.cylinder,s.head,s.sector);
-	for(int i=0; i<s.sectorData.size(); ++i)
+	for(int i=0; i<s.data.size(); ++i)
 	{
 		if(0==i%16)
 		{
 			printf("%04x ",i);
 		}
-		printf(" %02x",s.sectorData[i]);
-		if(15==i%16 || i==s.sectorData.size()-1)
+		printf(" %02x",s.data[i]);
+		if(15==i%16 || i==s.data.size()-1)
 		{
 			printf("|");
 			int i0=(i&0xfffffff0);
 			for(int j=i0; j<=i; ++j)
 			{
-				if(' '<=s.sectorData[j] && s.sectorData[j]<128)
+				if(' '<=s.data[j] && s.data[j]<128)
 				{
-					printf("%c",s.sectorData[j]);
+					printf("%c",s.data[j]);
 				}
 				else
 				{
@@ -1191,7 +1191,7 @@ void D77Analyzer::DumpSectorToFile(const D77File::D77Disk::D77Sector &sec,std::s
 	FILE *fp=fopen(fName.c_str(),"wb");
 	if(nullptr!=fp)
 	{
-		fwrite(sec.sectorData.data(),1,sec.sectorData.size(),fp);
+		fwrite(sec.data.data(),1,sec.data.size(),fp);
 		fclose(fp);
 		printf("Wrote %s\n",fName);
 	}
@@ -1266,15 +1266,15 @@ void D77Analyzer::DiagnoseDuplicateSector(int diskId) const
 					if(s0.sector==s1.sector)
 					{
 						bool diff=false;
-						if(s0.sectorData.size()!=s1.sectorData.size())
+						if(s0.data.size()!=s1.data.size())
 						{
 							diff=true;
 						}
 						else
 						{
-							for(int i=0; i<s0.sectorData.size(); ++i)
+							for(int i=0; i<s0.data.size(); ++i)
 							{
-								if(s0.sectorData[i]!=s1.sectorData[i])
+								if(s0.data[i]!=s1.data[i])
 								{
 									diff=true;
 									break;
@@ -1369,7 +1369,7 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 							auto &sec=trkPtr->sector[idx];
 							for(int i=0; i<20; ++i)
 							{
-								if(sec.sectorData[i]!=0xF7)
+								if(sec.data[i]!=0xF7)
 								{
 									corocoro=false;
 									break;
@@ -1377,7 +1377,7 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 							}
 							for(int i=0; i<19; ++i)
 							{
-								if(sec.sectorData[i+24]!=0xF6)
+								if(sec.data[i+24]!=0xF6)
 								{
 									corocoro=false;
 									break;
@@ -1704,17 +1704,17 @@ void D77Analyzer::Compare(const std::vector <std::string> &argv) const
 			auto bSecPtr=bTrackPtr->FindSector(secLoc.sector);
 			if(nullptr!=aSecPtr && nullptr!=bSecPtr)
 			{
-				if(aSecPtr->sectorData.size()!=bSecPtr->sectorData.size())
+				if(aSecPtr->data.size()!=bSecPtr->data.size())
 				{
 					printf("Track %d Side %d Sector %d have different size.\n",secLoc.track,secLoc.side,secLoc.sector);
-					printf("ADisk %d bytes\n",(int)aSecPtr->sectorData.size());
-					printf("BDisk %d bytes\n",(int)bSecPtr->sectorData.size());
+					printf("ADisk %d bytes\n",(int)aSecPtr->data.size());
+					printf("BDisk %d bytes\n",(int)bSecPtr->data.size());
 				}
 				else
 				{
-					for(int i=0; i<aSecPtr->sectorData.size(); ++i)
+					for(int i=0; i<aSecPtr->data.size(); ++i)
 					{
-						if(aSecPtr->sectorData[i]!=bSecPtr->sectorData[i])
+						if(aSecPtr->data[i]!=bSecPtr->data[i])
 						{
 							printf("Different!  Track %d Side %d Sector %d (Offset %04x)\n",secLoc.track,secLoc.side,secLoc.sector,i);
 							goto NEXTSECTOR;
