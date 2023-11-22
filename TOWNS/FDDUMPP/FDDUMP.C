@@ -15,7 +15,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
-#define VERSION "20231121"
+#define VERSION "20231122"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -272,6 +272,7 @@ struct resampleBuffer
 {
 	unsigned int len,readTime;
 	unsigned char ioErr,is2ndGenCorocoro;
+	unsigned char resampledFor1stGenCorocoro;
 	unsigned char data[MAX_SECTOR_LENGTH];
 };
 struct resampleBuffer *resample=NULL;
@@ -283,6 +284,7 @@ void CaptureResamplingBuffer(struct resampleBuffer *buffer,unsigned char ioErr,u
 	buffer->readTime=readTime;
 	buffer->len=len;
 	buffer->is2ndGenCorocoro=0;  // Tentatively
+	buffer->resampledFor1stGenCorocoro=0;
 	for(j=0; j<len; ++j)
 	{
 		buffer->data[j]=DMABuf.pages[0].data[j];
@@ -325,6 +327,64 @@ unsigned int Count2ndGenCorocoroProtectSector(int nResample) // Within resampleB
 		c+=Check2ndGenCorocoroProtect(&resample[i]);
 	}
 	return c;
+}
+
+
+
+unsigned int Detect1stGenCorocoroProtect(int nResample)
+{
+	// 1st-Gen Corocoro Protect
+	// (1) First 256 bytes are 0xE5
+	// (2) Offset 0x100 and 0x101 do not change (probably 0x00).
+	// (3) Offset 0x120 to 0x123 must change.
+	// The checker expect offset 0x120 to 0x123 will not be the same twice in 10 samples.
+	// Every sample needs to be unique.
+	// FM77AV's MB8877+VFO will satisfy this condition.
+	// FMTOWNS's MB887+VFO often returns FF FF FF FF for 0x120 to 0x123.
+	// If FF FF FF FF twice in a row, needs to shuffle around.
+
+	// This seems to be from the same corocoro protect used in Archon for PC8801.
+	// In Archon for PC8801,
+	// C0 H0 R0 is a 256-byte sector, but the program reads it as a 512-byte sector.
+	// Then, the first 256 bytes will stay the same.
+	// 257th and 258th bytes stay the same because it is CRC code.
+	// Subsequent bytes are gap between sectors made unstable.
+	// The checker is indeed checking offset 0x120 to 0x123.
+
+	int i;
+	int foundDiff=0;
+	for(i=0; i<nResample; ++i)
+	{
+		if(resample[i].len<512)
+		{
+			return 0;
+		}
+
+		if(resample[i].data[0x100]!=resample[0].data[0x100] ||
+		   resample[i].data[0x101]!=resample[0].data[0x101])
+		{
+			return 0;
+		}
+
+		int j;
+		for(j=0; j<256; ++j)
+		{
+			if(0xE5!=resample[i].data[j])
+			{
+				return 0;
+			}
+		}
+
+		if(resample[i].data[0x120]!=resample[0].data[0x120] ||
+		   resample[i].data[0x121]!=resample[0].data[0x121] ||
+		   resample[i].data[0x122]!=resample[0].data[0x122] ||
+		   resample[i].data[0x123]!=resample[0].data[0x123])
+		{
+			foundDiff=1;
+		}
+	}
+
+	return foundDiff;
 }
 
 
@@ -2024,6 +2084,43 @@ void FindHiddenLeaf(const char fName[],unsigned short readTrackSize,unsigned cha
 	}
 }
 
+void Analyze1stGenCorocoroProtect(int nResample,unsigned char C,unsigned char H,unsigned char R,unsigned char N,unsigned int len)
+{
+	if(0==Detect1stGenCorocoroProtect(nResample))
+	{
+		return;
+	}
+
+	for(int i=0; i<nResample; ++i)
+	{
+		unsigned int this;
+		int needResample=0;
+	RESAMPLE_AND_RETRY:
+		this=*(unsigned int *)(resample[i].data+0x120);
+		needResample=0;
+		{
+			int j;
+			for(j=0; j<nResample; ++j)
+			{
+				unsigned int cmp=*(unsigned int *)(resample[j].data+0x120);
+				if(i!=j && cmp==this)
+				{
+					needResample=1;
+					break;
+				}
+			}
+		}
+		if(0!=needResample)
+		{
+			unsigned int readTime;
+			unsigned char ioErr=FDC_ReadSector(&readTime,C,H,R,N);
+			CaptureResamplingBuffer(&resample[i],ioErr,readTime,len);
+			resample[i].resampledFor1stGenCorocoro=1;
+			goto RESAMPLE_AND_RETRY;
+		}
+	}
+}
+
 void Analyze2ndGenCorocoroProtect(int nResample,unsigned char C,unsigned char H,unsigned char R,unsigned char N,unsigned int len)
 {
 	int j;
@@ -2168,6 +2265,7 @@ void ReadSector(struct IDMARK chrn,int FMorMFM,struct CommandParameterInfo *cpi)
 		{
 			int retry=0;
 			Analyze2ndGenCorocoroProtect(nResample,C,H,R,N,len);
+			Analyze1stGenCorocoroProtect(nResample,C,H,R,N,len);
 			for(retry=0; retry<nResample; ++retry)
 			{
 				unsigned char ioErr=resample[retry].ioErr;
@@ -2187,17 +2285,20 @@ void ReadSector(struct IDMARK chrn,int FMorMFM,struct CommandParameterInfo *cpi)
 
 					if(0==retry || 0!=different)
 					{
+						char resampleCode=' ';
+						if(0!=resample[retry].is2ndGenCorocoro)
+						{
+							resampleCode='@';
+						}
+						else if(0!=resample[retry].resampledFor1stGenCorocoro)
+						{
+							resampleCode='&';
+						}
+
 						BeforeSectorInfo();
 
 						Color(IOErrToColor(ioErr));
-						if(0!=resample[retry].is2ndGenCorocoro)
-						{
-							printf("%02x%02x%02x%02x@",C,H,R,N);
-						}
-						else
-						{
-							printf("%02x%02x%02x%02x ",C,H,R,N);
-						}
+						printf("%02x%02x%02x%02x%c",C,H,R,N,resampleCode);
 
 						AfterSectorInfo();
 
