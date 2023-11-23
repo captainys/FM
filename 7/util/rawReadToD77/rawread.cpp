@@ -62,10 +62,10 @@ D77File::D77Disk::D77Sector FM7RawDiskRead::Sector::MakeD77Sector(long long int 
 	//	};
 
 	D77File::D77Disk::D77Sector d77sec;
-	d77sec.cylinder=C;
-	d77sec.head=H;
-	d77sec.sector=R;
-	d77sec.sizeShift=N;
+	d77sec.C()=C;
+	d77sec.H()=H;
+	d77sec.R()=R;
+	d77sec.N()=N;
 	d77sec.nSectorTrack=(short)nSectorTrack;
 	d77sec.density=density;
 	d77sec.deletedData=(0x0E==errCode ? 0x10 : 0);  // FM-7 BIOS Error Code 0E
@@ -74,7 +74,7 @@ D77File::D77Disk::D77Sector FM7RawDiskRead::Sector::MakeD77Sector(long long int 
 	{
 		c=0;
 	}
-	d77sec.sectorDataSize=CalculateSize();
+	// d77sec.sectorDataSize=CalculateSize();  No longer used
 	d77sec.data=dat;
 
 	return d77sec;

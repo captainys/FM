@@ -207,16 +207,12 @@ public:
 		class D77Sector : public HasUnstableByteFlags
 		{
 		public:
-			unsigned char cylinder;
-			unsigned char head;
-			unsigned char sector;
-			unsigned char sizeShift;  // 128<<sizeShift=size
+			unsigned char CHRN[4];
 			unsigned short nSectorTrack;
 			unsigned char density;
 			unsigned char deletedData;
 			unsigned char crcStatus;
 			unsigned char reservedByte[5];
-			unsigned short sectorDataSize; // Excluding the header.
 			std::vector <unsigned char> data;
 
 			bool resampled=false;  // true if the sector was sampled multiple times for replicating unstable-byte or Corocoro protect.
@@ -224,14 +220,17 @@ public:
 
 			unsigned int nanosecPerByte=0;
 
-			inline unsigned char &C(void){return cylinder;}
-			inline unsigned char C(void) const{return cylinder;}
-			inline unsigned char &H(void){return head;}
-			inline unsigned char H(void) const{return head;}
-			inline unsigned char &R(void){return sector;}
-			inline unsigned char R(void) const{return sector;}
-			inline unsigned char &N(void){return sizeShift;}
-			inline unsigned char N(void) const{return sizeShift;}
+			inline unsigned char &C(void){return CHRN[0];}
+			inline unsigned char C(void) const{return CHRN[0];}
+			inline unsigned char &H(void){return CHRN[1];}
+			inline unsigned char H(void) const{return CHRN[1];}
+			inline unsigned char &R(void){return CHRN[2];}
+			inline unsigned char R(void) const{return CHRN[2];}
+			inline unsigned char &N(void){return CHRN[3];}
+			inline unsigned char N(void) const{return CHRN[3];}// 128<<N()=size
+
+			// Left for gradual transition.
+			unsigned short sectorDataSize(void) const{return data.size();}
 
 			D77Sector();
 			~D77Sector();

@@ -102,9 +102,9 @@ D77File::D77Disk::D77Sector::~D77Sector()
 }
 void D77File::D77Disk::D77Sector::CleanUp(void)
 {
-	cylinder=0;
+	C()=0;
 	H()=0;
-	sector=0;
+	R()=0;
 	N()=0;  // 128<<N()=size
 	nSectorTrack=0;
 	density=0;
@@ -119,21 +119,20 @@ void D77File::D77Disk::D77Sector::CleanUp(void)
 	{
 		c=0;
 	}
-	sectorDataSize=0; // Including the header.
 	data.clear();
 	unstableBytes.clear();
 }
 bool D77File::D77Disk::D77Sector::SameCHR(const D77Sector &s) const
 {
-	return (cylinder==s.C() &&
+	return (C()==s.C() &&
 	        H()==s.H() &&
-	        sector==s.R());
+	        R()==s.R());
 }
 bool D77File::D77Disk::D77Sector::SameCHRN(const D77Sector &s) const
 {
-	return (cylinder==s.C() &&
+	return (C()==s.C() &&
 	        H()==s.H() &&
-	        sector==s.R() &&
+	        R()==s.R() &&
 	        N()==s.N());
 }
 bool D77File::D77Disk::D77Sector::SameCHRNandActualSize(const D77Sector &s) const
@@ -162,11 +161,10 @@ bool D77File::D77Disk::D77Sector::Make(int trk,int sid,int secId,int secSize)
 		break;
 	}
 	CleanUp();
-	cylinder=trk;
-	H()=sid;
-	sector=secId;
+	this->C()=trk;
+	this->H()=sid;
+	this->R()=secId;
 	this->N()=N;
-	sectorDataSize=secSize;
 	data.resize(secSize);
 	resampled=false;
 	for(auto &b : data)
@@ -393,8 +391,7 @@ bool D77File::D77Disk::D77Track::SetSectorCHRN(int secId,int C,int H,int R,int N
 		sector[secId-1].H()=H;
 		sector[secId-1].R()=R;
 		sector[secId-1].N()=N;
-		sector[secId-1].sectorDataSize=(128<<(N&3));
-		sector[secId-1].data.resize(sector[secId-1].sectorDataSize);
+		sector[secId-1].data.resize(128<<(N&3));
 		return true;
 	}
 	return false;
@@ -770,7 +767,7 @@ std::vector <unsigned char> D77File::D77Disk::MakeD77Image(void) const
 				{
 					d77Img.push_back(s.reservedByte[i]);
 				}
-				UnsignedShortToWord(buf,s.sectorDataSize);
+				UnsignedShortToWord(buf,s.sectorDataSize());
 				d77Img.push_back(buf[0]);
 				d77Img.push_back(buf[1]);
 				for(auto d : s.data)
@@ -1362,22 +1359,32 @@ D77File::D77Disk::D77Track D77File::D77Disk::MakeTrackData(const unsigned char t
 		sec.density=sectorPtr[6];
 		sec.deletedData=sectorPtr[7];
 		sec.crcStatus=sectorPtr[8];
+
+		if(1==sec.crcStatus)
+		{
+			// CRC Status can be one of:
+			//   0,
+			//   D77_SECTOR_STATUS_CRC=0xB0,
+			//   D77_SECTOR_STATUS_RECORD_NOT_FOUND=0xF0,
+			// But, if it is 1, it may be created by my buggy D77 generator :-P
+			sec.crcStatus=D77_SECTOR_STATUS_CRC;
+		}
+
 		for(int i=0; i<5; ++i)
 		{
 			sec.reservedByte[i]=sectorPtr[9+i];
 		}
-		sec.sectorDataSize=WordToUnsignedShort(sectorPtr+0x0e);
+		long long int sectorLen=WordToUnsignedShort(sectorPtr+0x0e);
 
-		auto nextSectorOffset=sectorOffset+0x10+sec.sectorDataSize;
+		auto nextSectorOffset=sectorOffset+0x10+sectorLen;
 
 		long long int sizeFromShift=(128<<(sec.N()&3));
-		long long int sizeFromDataSize=sec.sectorDataSize;
-		if(sizeFromShift!=sizeFromDataSize)
+		if(sizeFromShift!=sectorLen)
 		{
 			printf("Broken Data.  Sector size doesn't match number of bytes for the sector.\n");
 			printf("  Cyl:%d Head:%d Sec:%d\n",sec.C(),sec.H(),sec.R());
 			printf("  From shift:%d\n",(int)sizeFromShift);
-			printf("  From data size:%d\n",(int)sizeFromDataSize);
+			printf("  From data size:%d\n",(int)sectorLen);
 			break;
 		}
 
@@ -1422,7 +1429,6 @@ void D77File::D77Disk::CreateStandardFormatted(void)
 			sec.R()=j;
 			sec.N()=1;
 			sec.nSectorTrack=16;
-			sec.sectorDataSize=256;
 			sec.data.resize(256);
 			for(auto &b : sec.data)
 			{
@@ -1800,7 +1806,6 @@ bool D77File::D77Disk::ResizeSector(int trk,int sid,int sec,int newSize)
 
 				auto curSize=s.data.size();
 				s.N()=newN;
-				s.sectorDataSize=newSize;
 				s.data.resize(newSize);
 
 				for(auto i=curSize; i<newSize; ++i)
@@ -2045,7 +2050,7 @@ bool D77File::D77Disk::DeleteSectorByIndex(int trk,int sid,int sectorIdx)
 		{
 			auto &s0=t.sector[sectorIdx];
 			printf("Deleted %dth sector in Track %d Side %d\n",sectorIdx,trk,sid);
-			printf("(Sector Track:%d Side:%d Sector:%d)\n",s0.C(),s0.H(),s0.sector);
+			printf("(Sector Track:%d Side:%d Sector:%d)\n",s0.C(),s0.H(),s0.R());
 
 			t.sector.erase(t.sector.begin()+sectorIdx);
 			modified=true;
