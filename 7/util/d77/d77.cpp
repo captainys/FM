@@ -762,7 +762,7 @@ std::vector <unsigned char> D77File::D77Disk::MakeD77Image(void) const
 				d77Img.push_back(buf[1]);
 				d77Img.push_back(s.density);
 				d77Img.push_back(s.deletedData);
-				d77Img.push_back(s.crcStatus!=0 ? 0xb0 : 0);
+				d77Img.push_back(s.crcStatus);
 				for(int i=0; i<5; ++i)
 				{
 					d77Img.push_back(s.reservedByte[i]);
