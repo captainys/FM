@@ -89,6 +89,11 @@ const unsigned char pulseWidthSource[3]={100,125,175};
 #define PIN_POWER 13
 #define PIN_STATUS 8
 
+// For FM77AV Wired Connection
+#define PIN_KSDATA   12
+#define PIN_KDETECT  4
+
+
 // PIN9=PB1 (PortB bit 1)
 #define SetPin9High  PORTB|=_BV(1);
 #define SetPin9Low   PORTB&=~_BV(1);
@@ -102,6 +107,9 @@ const unsigned char pulseWidthSource[3]={100,125,175};
 #define SetPin3High  PORTD|=_BV(3);
 #define SetPin3Low   PORTD&=~_BV(3);
 
+// PIN12=PB4 PortB bit 4
+#define SetPin12High PORTB|=_BV(4);
+#define SetPin12Low PORTB&=~_BV(4);
 // PIN13=PB5 PortB bit 5
 #define SetPin13High PORTB|=_BV(5);
 #define SetPin13Low PORTB&=~_BV(5);
@@ -150,6 +158,10 @@ void setup() {
   pinMode(PIN_OC2A,OUTPUT);
   pinMode(PIN_OC2B,OUTPUT);
 
+  pinMode(PIN_KSDATA,OUTPUT);
+  pinMode(PIN_KDETECT,OUTPUT);
+  digitalWrite(PIN_KDETECT,0);
+
   // Reset timers 1 and 2
   TCCR1A=0;
   TCCR1B=0;
@@ -172,6 +184,7 @@ void setup() {
   OCR2A=0;
   OCR2B=0;
 
+  SetPin12High;
   SetPin13Low;
   SetPin8Low;
   SetPin9and10Low;
@@ -196,6 +209,7 @@ void SendCycleHWPWM(unsigned int cycle[])
     // Timer 1 pre-scalar is 1x.
     // Need to start toggling within 8 cycles.  0.5us error.
     SET_OC1A_OC1B_TOGGLE;
+    SetPin12Low;
 
     auto w=cycle[i]<<1;
     while(TCNT2<w)
@@ -209,6 +223,7 @@ void SendCycleHWPWM(unsigned int cycle[])
 
     TCNT2=0;
     SET_OC1A_OC1B_LOW;
+    SetPin12High;
     w=cycle[i+1]<<1;
     while(TCNT2<w)
     {
@@ -222,6 +237,7 @@ void SendCycleHWPWM(unsigned int cycle[])
 
   SET_OC1A_OC1B_LOW;
   SetPin9and10Low;
+  SetPin12High;
 
   interrupts();
 }
