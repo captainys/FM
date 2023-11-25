@@ -50,6 +50,12 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
+// Memo:
+// KSDATA seems to be reverse from Infra Red.
+// The timing for emitting IR light is LOW for KSDATA.
+
+
+
 #define SERIAL_BPS 115200
 // Confirmed to work up to 440000bps.
 // Stopped working at 460000bps.
@@ -83,21 +89,11 @@ const unsigned char pulseWidthSource[3]={100,125,175};
 #define NOTIFY_READY 'C'
 #define NOTIFY_FAIL 'F'
 
-// 50% duty cycle: On and off within 1/38000 sec.  Must togle every 1/76000 sec.
-#define TIMER_THRESHOLD_38K_WITH_1xPRESCALE ((F_CPU/38000)/2)
-// Experiment with FM77AV40 IR LED receiver:  19000Hz No response 34000-36000 drops key.  38000 perfect.  40000 drops keys.
-
-#define PWM_TIMER_THRESHOLD TIMER_THRESHOLD_38K_WITH_1xPRESCALE
-
 // Succeeded Xfinity remote
-
-#define PIN_OC1A 9
-#define PIN_OC1B 10
-#define PIN_OC2A 11
-#define PIN_OC2B 3
 
 #define PIN_KDETECT 12
 #define PIN_KSDATA 13
+#define PIN_VCCIN 11  // Unused.
 #define PIN_STATUS 8
 
 // PIN9=PB1 (PortB bit 1)
@@ -126,27 +122,6 @@ const unsigned char pulseWidthSource[3]={100,125,175};
 #define SetPin9and10Low PORTB&=~(_BV(1)|_BV(2));
 
 
-#define SET_CTC_MODE {TCCR1B=bit(CS10)|bit(WGM12);}
-// TCCR1B  WGM10=0,WGM11=0,WGM12=1 means CTC mode
-//         CS10=1,CS11=0,CS12=0 means 1x pre-scale (no scaling).
-//         CS10=0,CS11=0,CS12=0 means timer stop.
-
-#define SET_OC1A_OC1B_TOGGLE {TCCR1A=bit(COM1A0)|bit(COM1B0);}
-// ATmega 328 datasheet pp.134
-// TCCR1A  COM1A0=1, COM1B0=1 means toggle OC1A and OC1B on compare match
-
-#define SET_OC1A_OC1B_LOW {TCCR1A=(bit(COM1A1)|bit(COM1B1));TCCR1C=(bit(FOC1A)|bit(FOC1B));TCCR1C=0;}
-// TCCR1A=(bit(COM1A1)|bit(COM1B1));  // Clear OC1A low on compare match
-// TCCR1C=(bit(FOC1A)|bit(FOC1B));    // Force match
-// TCCR1C=0;                          // Do I need to clear?
-
-
-// Failed Attmept:
-// For each HIGH pulse, force OC1A to be HIGH, and then start timer.  This approach didn't work.
-// Probable reason is that it makes the first duty cycle slightly shorter.
-// This method FM77AV40 misses one in every 80 to 100 key strokes.
-
-
 
 void setup() {
   for(int i=0; i<30; ++i)
@@ -158,27 +133,13 @@ void setup() {
 
   pinMode(PIN_KDETECT,OUTPUT);
   pinMode(PIN_KSDATA,OUTPUT);
+  pinMode(PIN_VCCIN,INPUT);
   pinMode(PIN_STATUS,OUTPUT);
 
-  pinMode(PIN_OC1A,OUTPUT);
-  pinMode(PIN_OC1B,OUTPUT);
-  pinMode(PIN_OC2A,OUTPUT);
-  pinMode(PIN_OC2B,OUTPUT);
-
   // Reset timers 1 and 2
-  TCCR1A=0;
-  TCCR1B=0;
   TCCR2A=0;
   TCCR2B=0;
-  TCNT1=0;
   TCNT2=0;
-
-  // Timer 1 (8-bit) for 38K PWM IR LED output
-  // ATmega 328 datasheet pp.134
-  OCR1A=PWM_TIMER_THRESHOLD;
-  OCR1B=0;
-
-  SET_OC1A_OC1B_LOW;
 
   // Timer 2 for measuring 1us tick.
   TCCR2A=0;
@@ -188,7 +149,7 @@ void setup() {
   OCR2B=0;
 
   digitalWrite(PIN_KDETECT,LOW);
-  digitalWrite(PIN_KSDATA,LOW);
+  digitalWrite(PIN_KSDATA,HIGH);
   SetPin8Low;
   SetPin9and10Low;
 }
