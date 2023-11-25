@@ -15,7 +15,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
-#define VERSION "20231122C"
+#define VERSION "20231122D"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1900,7 +1900,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 
 	for(i=3; i<ac; ++i)
 	{
-		if(0==strcmp(av[i],"-STARTTRK") || 0==strcmp(av[i],"-starttrk"))
+		if(0==strcmp(av[i],"-STARTTRK") || 0==strcmp(av[i],"-starttrk") || 0==strcmp(av[i],"-ST") || 0==strcmp(av[i],"-st"))
 		{
 			if(i+1<ac)
 			{
@@ -1913,7 +1913,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 				return -1;
 			}
 		}
-		else if(0==strcmp(av[i],"-ENDTRK") || 0==strcmp(av[i],"-endtrk"))
+		else if(0==strcmp(av[i],"-ENDTRK") || 0==strcmp(av[i],"-endtrk") || 0==strcmp(av[i],"-EN") || 0==strcmp(av[i],"-en"))
 		{
 			if(i+1<ac)
 			{
@@ -1931,7 +1931,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 			cpi->listOnly=1;
 			printf("List-Only Mode.\n");
 		}
-		else if(0==strcmp(av[i],"-OUT") || 0==strcmp(av[i],"-out"))
+		else if(0==strcmp(av[i],"-OUT") || 0==strcmp(av[i],"-out") || 0==strcmp(av[i],"-O") || 0==strcmp(av[i],"-o"))
 		{
 			if(i+1<ac)
 			{
@@ -1965,7 +1965,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 		{
 			cpi->baudRate=38400;
 		}
-		else if(0==strcmp(av[i],"-NAME") || 0==strcmp(av[i],"-name"))
+		else if(0==strcmp(av[i],"-NAME") || 0==strcmp(av[i],"-name") || 0==strcmp(av[i],"-N") || 0==strcmp(av[i],"-n"))
 		{
 			if(i+1<ac)
 			{
@@ -1978,7 +1978,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 				return -1;
 			}
 		}
-		else if(0==strcmp(av[i],"-WRITEPROTECT") || 0==strcmp(av[i],"-writeprotect"))
+		else if(0==strcmp(av[i],"-WRITEPROTECT") || 0==strcmp(av[i],"-writeprotect") || 0==strcmp(av[i],"-WP") || 0==strcmp(av[i],"-wp"))
 		{
 			cpi->writeProtect=1;
 		}
@@ -2720,14 +2720,14 @@ int main(int ac,char *av[])
 		printf("    2HD,1232KB       2HD 1232K Disk\n");
 		printf("    (For 1440KB, use 2HD.)\n");
 		printf("  Options:\n");
-		printf("    -starttrk trackNum  Start track (Between 0 and 76 if 2HD)\n");
-		printf("    -endtrk   trackNum  End track (Between 0 and 76 if 2HD)\n");
+		printf("    -st trackNum        Start track (Between 0 and 76 if 2HD)\n");
+		printf("    -en trackNum        End track (Between 0 and 76 if 2HD)\n");
 		//printf("    -listonly           List track info only.  No RS232C transmission\n");
-		printf("    -out filename.rdd   Save image to .rdd (Real Disk Dump) file.\n");
+		printf("    -o filename.rdd     Save image to .rdd (Real Disk Dump) file.\n");
 		//printf("    -19200bps           Transmit the image at 19200bps\n");
 		//printf("    -38400bps           Transmit the image at 38400bps\n");
-		printf("    -name diskName      Specify disk name up to 16 chars.\n");
-		printf("    -writeprotect       Write protect the disk image.\n");
+		printf("    -n diskName         Specify disk name up to 16 chars.\n");
+		printf("    -wp                 Write protect the disk image.\n");
 		printf("    -dontsort           Don't sort sectors (preserve interleave).\n");
 		printf("    -sort               Sort sectors.\n");
 		printf("    -log filename.txt   Write log file.\n");
