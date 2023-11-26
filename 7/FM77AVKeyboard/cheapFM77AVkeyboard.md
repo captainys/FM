@@ -143,11 +143,11 @@ If your tester probe is too thick to touch metal pins in the RJ connector, you c
 
 ワイヤーを識別したら、ワイヤーに固いピンをはんだ付けします。+5Vは使わないので、GND, KDETECT, KSDATAの3本の先にピンをつけてください。写真だとちょっとわかりにくいですが、こんな感じにします。なお、根元が弱そうだったのでエポキシ樹脂で補強してありますが、しなくても多分大丈夫です。
 
-多分正式には、こんな感じのピン https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/1658670-1/1279941 にクリンプするのが正しいんだと思うんですが、僕はクリンプする道具を持ってません。。。。どこかにあったんだよなあ。どこにやったっけ?
+多分正式には、こんな感じのピン https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/1658670-1/1279941 にクリンプするのが正しいんだと思うんですが、僕はクリンプする道具を持ってません。。。。どこかにあったんだよなあ。どこにやったっけ? (築城: 敗北。クリンプツール見つけたけどピンが太すぎてArduinoのコネクタに入らんかった。)
 
 Once you identify wires, then solder hard pins on GND, KDETECT, and KSDATA wires.  You don't need +5V.  It is a bit hard to see from the picture, but it should become like the following image.  I put some epoxy resin to support strength where the pin is connected to the wire, but it is optional.
 
-Probably, it is better to use a pin like https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/1658670-1/1279941  But, I don't have a crimp tool.  .... I think I do.  Where did I misplace it????
+Probably, it is better to use a pin like https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/1658670-1/1279941  But, I don't have a crimp tool.  .... I think I do.  Where did I misplace it????  (Update: Fail.  I found it.  But, it turned out the pin was too thick to go into Arduino's connector.)
 
 <img src="images/pinattached.png">
 
