@@ -766,7 +766,7 @@ static const uint32_t keyTranslationMap[256] PROGMEM =  // Supposed to be 1024 b
 0x80000023,
 0x8000003f,
 0x80000022,
-0x00000000,
+0x00000011,
 0x00000000,
 0x00000000,
 0x00000000,
@@ -1046,7 +1046,93 @@ void KeyRelease(uint32_t avkey)
 }
 void TerminalMode(unsigned char recv)
 {
+  static unsigned int nESCSeq=0;
+  static unsigned char lastESCChar=0;
+
+  if(27==recv) // Start ESC Sequence
+  {
+    nESCSeq=1;
+    Serial.println((int)recv);
+    return;
+  }
+  if(1==nESCSeq && '['==recv)
+  {
+    nESCSeq=2;
+    Serial.println((int)recv);
+    return;
+  }
+  if(2==nESCSeq && ('1'==recv || '2'==recv))
+  {
+    nESCSeq=3;
+    lastESCChar=recv;
+    Serial.println((int)recv);
+    return;
+  }
+
   auto comb=FM77AVGetKeyComb(recv);
+  if(2==nESCSeq)
+  {
+    switch(recv)
+    {
+    case 'A':
+      comb.keyCode=AVKEY_UP;
+      comb.shift=false;
+      comb.ctrl=false;
+      comb.graph=false;
+      comb.kana=false;
+      break;
+    case 'B':
+      comb.keyCode=AVKEY_DOWN;
+      comb.shift=false;
+      comb.ctrl=false;
+      comb.graph=false;
+      comb.kana=false;
+      break;
+    case 'C':
+      comb.keyCode=AVKEY_RIGHT;
+      comb.shift=false;
+      comb.ctrl=false;
+      comb.graph=false;
+      comb.kana=false;
+      break;
+    case 'D':
+      comb.keyCode=AVKEY_LEFT;
+      comb.shift=false;
+      comb.ctrl=false;
+      comb.graph=false;
+      comb.kana=false;
+      break;
+    }
+  }
+  else if(3==nESCSeq && '~'==recv) // Was there such a ESC sequence???
+  {
+    switch(lastESCChar)
+    {
+    case '1':
+      comb.keyCode=AVKEY_HOME;
+      comb.shift=false;
+      comb.ctrl=false;
+      comb.graph=false;
+      comb.kana=false;
+      break;
+    case '2':
+      comb.keyCode=AVKEY_INS;
+      comb.shift=false;
+      comb.ctrl=false;
+      comb.graph=false;
+      comb.kana=false;
+      break;
+    case '4': // END
+      break;
+    case '5': // PgUp
+      break;
+    case '6': // PgDown
+      break;
+    }
+  }
+
+  nESCSeq=0;
+
   if(AVKEY_NULL!=comb.keyCode)
   {
     if(comb.kana)

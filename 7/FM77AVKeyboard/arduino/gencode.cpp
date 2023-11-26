@@ -161,6 +161,7 @@ void FM77AVMakeMap(void)
     keyTranslationMap[i]=0;
   }
   FM77AVSetKeyComb( 3  , AVKEY_BREAK,         false,false,false);    // Ctrl+C
+  FM77AVSetKeyComb(127 , AVKEY_DEL,           false,false,false);    // Ctrl+C
   FM77AVSetKeyComb('\t', AVKEY_TAB,           false,false,false);
   FM77AVSetKeyComb(0x0d ,AVKEY_RETURN,        false,false,false);
   FM77AVSetKeyComb(0x0a ,AVKEY_RETURN,        false,false,false);
