@@ -357,7 +357,7 @@ void D77Analyzer::ProcessCommand(const std::vector <std::string> &argv)
 					if(nullptr!=secPtr)
 					{
 						DumpSectorByIndex(diskId,cyl,side,sec);
-						sec=secPtr->sector; // For next sector.
+						sec=secPtr->R(); // For next sector.
 					}
 					else
 					{
@@ -1134,7 +1134,7 @@ void D77Analyzer::DumpSector(int diskId,int cyl,int side,int sec) const
 		auto trackPtr=diskPtr->FindTrack(cyl,side);
 		for(auto &s : trackPtr->sector)
 		{
-			if(s.sector==sec)
+			if(s.R()==sec)
 			{
 				appeared=true;
 				DumpSector(s);
@@ -1157,23 +1157,23 @@ void D77Analyzer::DumpSector(int diskId,int cyl,int side,int sec) const
 
 void D77Analyzer::DumpSector(const D77File::D77Disk::D77Sector &s) const
 {
-	printf("Disk:%d Track:%d Side:%d Sector:%d\n",diskId,s.cylinder,s.head,s.sector);
-	for(int i=0; i<s.sectorData.size(); ++i)
+	printf("Disk:%d Track:%d Side:%d Sector:%d\n",diskId,s.C(),s.H(),s.R());
+	for(int i=0; i<s.data.size(); ++i)
 	{
 		if(0==i%16)
 		{
 			printf("%04x ",i);
 		}
-		printf(" %02x",s.sectorData[i]);
-		if(15==i%16 || i==s.sectorData.size()-1)
+		printf(" %02x",s.data[i]);
+		if(15==i%16 || i==s.data.size()-1)
 		{
 			printf("|");
 			int i0=(i&0xfffffff0);
 			for(int j=i0; j<=i; ++j)
 			{
-				if(' '<=s.sectorData[j] && s.sectorData[j]<128)
+				if(' '<=s.data[j] && s.data[j]<128)
 				{
-					printf("%c",s.sectorData[j]);
+					printf("%c",s.data[j]);
 				}
 				else
 				{
@@ -1191,7 +1191,7 @@ void D77Analyzer::DumpSectorToFile(const D77File::D77Disk::D77Sector &sec,std::s
 	FILE *fp=fopen(fName.c_str(),"wb");
 	if(nullptr!=fp)
 	{
-		fwrite(sec.sectorData.data(),1,sec.sectorData.size(),fp);
+		fwrite(sec.data.data(),1,sec.data.size(),fp);
 		fclose(fp);
 		printf("Wrote %s\n",fName);
 	}
@@ -1263,18 +1263,18 @@ void D77Analyzer::DiagnoseDuplicateSector(int diskId) const
 				for(int j=i+1; j<t.sector.size(); ++j)
 				{
 					auto &s1=t.sector[j];
-					if(s0.sector==s1.sector)
+					if(s0.R()==s1.R())
 					{
 						bool diff=false;
-						if(s0.sectorData.size()!=s1.sectorData.size())
+						if(s0.data.size()!=s1.data.size())
 						{
 							diff=true;
 						}
 						else
 						{
-							for(int i=0; i<s0.sectorData.size(); ++i)
+							for(int i=0; i<s0.data.size(); ++i)
 							{
-								if(s0.sectorData[i]!=s1.sectorData[i])
+								if(s0.data[i]!=s1.data[i])
 								{
 									diff=true;
 									break;
@@ -1282,7 +1282,7 @@ void D77Analyzer::DiagnoseDuplicateSector(int diskId) const
 							}
 						}
 
-						printf("Duplicate Sector Track:%d Side:%d Sector:%d ",s0.cylinder,s0.head,s0.sector);
+						printf("Duplicate Sector Track:%d Side:%d Sector:%d ",s0.C(),s0.H(),s0.R());
 						if(true==diff)
 						{
 							printf("!!!Different Content!!!\n");
@@ -1349,10 +1349,10 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 				{
 					auto &si=trkPtr->sector[i];
 					auto &sj=trkPtr->sector[j];
-					if(sj.cylinder==si.cylinder &&
-					   sj.head==si.head &&
-					   sj.sector==si.sector &&
-					   sj.sizeShift==si.sizeShift)
+					if(sj.C()==si.C() &&
+					   sj.H()==si.H() &&
+					   sj.R()==si.R() &&
+					   sj.N()==si.N())
 					{
 						duplicateIdx.push_back(j);
 					}
@@ -1361,7 +1361,7 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 				{
 					int toLeave=duplicateIdx[0];
 					// Which sector to leave?
-					if(0xF7==trkPtr->sector[i].sector)
+					if(0xF7==trkPtr->sector[i].R())
 					{
 						for(auto idx : duplicateIdx)
 						{
@@ -1369,7 +1369,7 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 							auto &sec=trkPtr->sector[idx];
 							for(int i=0; i<20; ++i)
 							{
-								if(sec.sectorData[i]!=0xF7)
+								if(sec.data[i]!=0xF7)
 								{
 									corocoro=false;
 									break;
@@ -1377,7 +1377,7 @@ void D77Analyzer::DeleteDuplicateSector(int diskId)
 							}
 							for(int i=0; i<19; ++i)
 							{
-								if(sec.sectorData[i+24]!=0xF6)
+								if(sec.data[i+24]!=0xF6)
 								{
 									corocoro=false;
 									break;
@@ -1704,17 +1704,17 @@ void D77Analyzer::Compare(const std::vector <std::string> &argv) const
 			auto bSecPtr=bTrackPtr->FindSector(secLoc.sector);
 			if(nullptr!=aSecPtr && nullptr!=bSecPtr)
 			{
-				if(aSecPtr->sectorData.size()!=bSecPtr->sectorData.size())
+				if(aSecPtr->data.size()!=bSecPtr->data.size())
 				{
 					printf("Track %d Side %d Sector %d have different size.\n",secLoc.track,secLoc.side,secLoc.sector);
-					printf("ADisk %d bytes\n",(int)aSecPtr->sectorData.size());
-					printf("BDisk %d bytes\n",(int)bSecPtr->sectorData.size());
+					printf("ADisk %d bytes\n",(int)aSecPtr->data.size());
+					printf("BDisk %d bytes\n",(int)bSecPtr->data.size());
 				}
 				else
 				{
-					for(int i=0; i<aSecPtr->sectorData.size(); ++i)
+					for(int i=0; i<aSecPtr->data.size(); ++i)
 					{
-						if(aSecPtr->sectorData[i]!=bSecPtr->sectorData[i])
+						if(aSecPtr->data[i]!=bSecPtr->data[i])
 						{
 							printf("Different!  Track %d Side %d Sector %d (Offset %04x)\n",secLoc.track,secLoc.side,secLoc.sector,i);
 							goto NEXTSECTOR;
@@ -1792,28 +1792,28 @@ void D77Analyzer::Franken(const std::vector <std::string> &argv)
 						for(int j=i+1; j<trkA->sector.size(); ++j)
 						{
 							auto &secJ=trkA->sector[j];
-							if(secI.cylinder==secJ.cylinder &&
-							   secI.head==secJ.head &&
-							   secI.sector==secJ.sector &&
-							   secI.sizeShift==secJ.sizeShift)
+							if(secI.C()==secJ.C() &&
+							   secI.H()==secJ.H() &&
+							   secI.R()==secJ.R() &&
+							   secI.N()==secJ.N())
 							{
 								if(0==secI.crcStatus && 0!=secJ.crcStatus)
 								{
 									printf("Erase C%d H%d R%d N%d\n",
-									   secJ.cylinder,
-									   secJ.head,
-									   secJ.sector,
-									   secJ.sizeShift);
+									   secJ.C(),
+									   secJ.H(),
+									   secJ.R(),
+									   secJ.N());
 									trkA->sector.erase(trkA->sector.begin()+j);
 									goto RETRY;
 								}
 								else if(0!=secI.crcStatus && 0==secJ.crcStatus)
 								{
 									printf("Erase C%d H%d R%d N%d\n",
-									   secI.cylinder,
-									   secI.head,
-									   secI.sector,
-									   secI.sizeShift);
+									   secI.C(),
+									   secI.H(),
+									   secI.R(),
+									   secI.N());
 									trkA->sector.erase(trkA->sector.begin()+i);
 									goto RETRY;
 								}
@@ -1828,19 +1828,19 @@ void D77Analyzer::Franken(const std::vector <std::string> &argv)
 							bool foundInTrackA=false;
 							for(auto &secI : trkA->sector)
 							{
-								if(secI.cylinder==secJ.cylinder &&
-								   secI.head==secJ.head &&
-								   secI.sector==secJ.sector &&
-								   secI.sizeShift==secJ.sizeShift)
+								if(secI.C()==secJ.C() &&
+								   secI.H()==secJ.H() &&
+								   secI.R()==secJ.R() &&
+								   secI.N()==secJ.N())
 								{
 									foundInTrackA=true;
 									if(0!=secI.crcStatus && 0==secJ.crcStatus)
 									{
 										printf("Replace C%d H%d R%d N%d\n",
-										   secI.cylinder,
-										   secI.head,
-										   secI.sector,
-										   secI.sizeShift);
+										   secI.C(),
+										   secI.H(),
+										   secI.R(),
+										   secI.N());
 										secI=secJ;
 									}
 								}
@@ -1848,10 +1848,10 @@ void D77Analyzer::Franken(const std::vector <std::string> &argv)
 							if(true!=foundInTrackA)
 							{
 								printf("Added C%d H%d R%d N%d\n",
-								   secJ.cylinder,
-								   secJ.head,
-								   secJ.sector,
-								   secJ.sizeShift);
+								   secJ.C(),
+								   secJ.H(),
+								   secJ.R(),
+								   secJ.N());
 								trkA->sector.push_back(secJ);
 							}
 						}

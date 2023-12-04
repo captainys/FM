@@ -37,6 +37,7 @@ int main(int ac,char *av[])
 	}
 
 
+	bool endOfFile=false;
 	bool corrected=false;
 	unsigned int ptr=16;
 	int C=0,H=0;
@@ -45,6 +46,9 @@ int main(int ac,char *av[])
 	{
 		switch(data[ptr])
 		{
+		default:
+			printf("Undefined tag 0x%02x at offset 0x%08x\n",data[ptr],ptr);
+			return 1;
 		case 0:
 			// Begin Disk
 			ptr+=48;
@@ -109,6 +113,7 @@ int main(int ac,char *av[])
 			break;
 		case 6:
 			// End of File
+			endOfFile=true;
 			ptr=data.size();
 			break;
 		case 0x10:
@@ -123,7 +128,11 @@ int main(int ac,char *av[])
 		}
 	}
 
-
+	if(true!=endOfFile)
+	{
+		printf("Missing End of File tag.\n");
+		return 1;
+	}
 
 	if(true!=corrected)
 	{

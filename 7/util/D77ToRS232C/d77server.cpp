@@ -94,7 +94,7 @@ std::vector <unsigned char> MakeTrackDump(const D77File::D77Disk &dsk,int trk,in
 				int sizeShift=0;
 
 				long long int secSize=128;
-				while(secSize<(long long int)secPtr->sectorData.size())
+				while(secSize<(long long int)secPtr->data.size())
 				{
 					++sizeShift;
 					secSize<<=1;
@@ -106,9 +106,9 @@ std::vector <unsigned char> MakeTrackDump(const D77File::D77Disk &dsk,int trk,in
 				dump.push_back(sizeShift);
 				for(int i=0; i<secSize; ++i)
 				{
-					if(i<secPtr->sectorData.size())
+					if(i<secPtr->data.size())
 					{
-						dump.push_back(secPtr->sectorData[i]);
+						dump.push_back(secPtr->data[i]);
 					}
 					else
 					{

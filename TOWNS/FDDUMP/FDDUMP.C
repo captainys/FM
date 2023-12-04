@@ -13,7 +13,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 << LICENSE */
 
-#define VERSION "20231112"
+#define VERSION "20231117"
 
 // For Open Watcom C
 #include <stdio.h>
@@ -1290,7 +1290,7 @@ unsigned char FDC_ReadSectorReal(uint32_t *accumTime,uint8_t C,uint8_t H,uint8_t
 	CLI();
 	initDMACounter=128<<(N&3);
 	SetUpDMA(DMABuf,initDMACounter);
-	--initDMACounter;
+	// --initDMACounter;  Why was I decrementing after writing to the counter?
 	STI();
 
 	Palette(COLOR_DEBUG,0,255,0);

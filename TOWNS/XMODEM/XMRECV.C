@@ -5,6 +5,8 @@
 
 #include "XMODEM.H"
 
+#define VERSION 20231119
+
 extern void RS232C_STI(void);
 extern void RS232C_CLI(void);
 extern void RS232C_INIT(int baudRate); // 2:38400bps  4:19200bps
@@ -197,6 +199,7 @@ EOT:
 int main(int ac,char *av[])
 {
 	printf("XMRECV (XMODEM Receive) Utility by CaptainYS\n");
+	printf("Version %d\n",VERSION);
 	printf("http://www.ysflight.com\n");
 	Wait10ms();  // Let Towns console emulator flush.
 

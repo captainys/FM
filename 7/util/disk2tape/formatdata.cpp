@@ -27,7 +27,7 @@ bool FormatData::MakeFormatData(const D77File::D77Disk &dsk)
 			formatData.push_back((unsigned char)(trkPtr->sector.size()));
 			for(auto &s : trkPtr->sector)
 			{
-				int sectorId=s.sector;
+				int sectorId=s.R();
 				if(sectorId==0xf5 || sectorId==0xf6 || sectorId==0xf7)
 				{
 					printf("0x%02x sector found.\n",sectorId);
@@ -37,7 +37,7 @@ bool FormatData::MakeFormatData(const D77File::D77Disk &dsk)
 					return false;
 				}
 				formatData.push_back((unsigned char)sectorId);
-				formatData.push_back((unsigned char)s.sizeShift);
+				formatData.push_back((unsigned char)s.N());
 				formatData.push_back(0);
 			}
 		}

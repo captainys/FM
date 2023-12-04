@@ -15,7 +15,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
-#define VERSION "20231114"
+#define VERSION "20231122D"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,12 +33,103 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 
 
+// RDD Output Data Data Format (.RDD  Real Disk Dump)
+// Signature (First 16 bytes)
+// 'R' 'E' 'A' 'L' 'D' 'I' 'S' 'K' 'D' 'U' 'M' 'P' 0 0 0 0 
+// Begin Disk
+// 00h vr mt fl cd 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+//    +1  vr  Version 
+//              1  Added 10h Unstable-byte flags.
+//    +2  mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
+//    +3  fl  flags
+//            bit0  1:Write Protected  0:Write Enabled
+//    +4  cd  Capture Device
+//            00:FM TOWNS
+//            FF:Converted from other data type.
+// (32 bytes name, 0 padded)
+// Begin Track
+// 01h cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
+//    +1  cc  Cylinder
+//    +2  hh  Head
+// ID Mark
+// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
+//     :
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +3  rr  Sector Number
+//    +4  nn  Length=128<<(n&3)
+//    +5  CRC  CRC of the address mark (not for the data)
+//    +6  CRC  CRC of the address mark (not for the data)
+//    +7  st  MB8877 status
+// Data
+// 03h cc hh rr nn st fl 00 00 00 00 <time  > <Length>
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +3  rr  Sector Number
+//    +4  nn  Length=128<<(n&3)
+//    +5  st  MB8877 status
+//    +6  fl  bit0=density flag(0:MFM 1:FM)
+//            bit1=resample flag(1 means Resample for unstable bytes)
+//            bit2=Probably Leaf-In-The-Forest Protect
+//    +B  (3 bytes) Microseconds for reading the sector.
+//    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
+// (Bytes padded to 16*N bytes)
+// Track Read
+// 04h cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
+//    +1  cc  Cylinder
+//    +2  hh  Head
+//    +3  st  MB8877 status
+//    +E  (2 bytes) Number of bytes returned from Track Read.
+// (Bytes padded to 16*N bytes)
+// End of Track
+// 05h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+// End of File
+// 06h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+// Unstable-byte flags.  (Non-zero means unstable.)
+// Immediately preceding data (ID Mark, Sector, or Track Read) has unstable bytes.
+// 10h 00 00 00 00 00 00 00 00 00 00 00 00 sz sz
+//    +E  sz  Lower-byte of the size in bytes.
+//    +F  sz  Higher-byte of the size in bytes.
+//            The size is ((n+7)&~7) bytes, where n is the preceding data length.
+//            The size does NOT include the 16-byte header length.
+// (Data.  Padded to 16*N bytes.  Flag for byte i is data[i/8]&(1<<(i&7)). )
+// Note:  Initially sz was +1 and +2.  Changed to +E and +F.
+//        However, at the time of the change, no .RDD file with 10H tag existed.
+//        It shouldn't affect anything.
+
+
+// Next Track
+
+
+
+
+
+//                                        		.386p 
+//                                        		ASSUME CS:CODE 
+//00000000                                CODE		SEGMENT 
+//00000000  FA                            		CLI 
+//00000001  FB                            		STI 
+//00000002                                CODE		ENDS 
+//                                        		END 
+
+#define __CLI _inline(0xFA)
+#define __STI _inline(0xFB)
+
+
+
+////////////////////////////////////////////////////////////////////////
+// DMA Buffer
+
 struct PhysToLinear
 {
 	unsigned int physAddr;
 	unsigned char *data;
 };
 
+#define MAX_SECTOR_LENGTH 1024
 
 #define PAGE_SIZE 0x1000
 
@@ -86,6 +177,8 @@ void MakeUpLinearBuf(unsigned int numberOfBytes)
 		numberOfBytes-=copySize;
 	}
 }
+
+
 
 /*
 This function finds physical addresses of the pages within _databuf, sort them, and find sequence of pages that
@@ -187,82 +280,180 @@ struct bufferInfo MakeDataBuffer(void)
 
 
 
+////////////////////////////////////////////////////////////////
+// Resampling Buffer
+
+struct resampleBuffer
+{
+	unsigned int len,readTime;
+	unsigned char ioErr,is2ndGenCorocoro;
+	unsigned char resampledFor1stGenCorocoro;
+	unsigned char data[MAX_SECTOR_LENGTH];
+};
+struct resampleBuffer *resample=NULL;
+
+void CaptureResamplingBuffer(struct resampleBuffer *buffer,unsigned char ioErr,unsigned int readTime,unsigned int len)
+{
+	int j;
+	buffer->ioErr=ioErr;
+	buffer->readTime=readTime;
+	buffer->len=len;
+	buffer->is2ndGenCorocoro=0;  // Tentatively
+	buffer->resampledFor1stGenCorocoro=0;
+	memcpy(buffer->data,DMABuf.pages[0].data,len);
+}
+unsigned int Check2ndGenCorocoroProtect(struct resampleBuffer *buffer)
+{
+	int i;
+	unsigned int conditionMet=1; // Tentative
+	for(i=0; i<20; ++i)
+	{
+		if(0xF7!=buffer->data[i])
+		{
+			conditionMet=0;
+			break;
+		}
+	}
+	for(i=24; i<43; ++i)
+	{
+		if(0xF6!=buffer->data[i])
+		{
+			conditionMet=0;
+			break;
+		}
+	}
+
+	if(conditionMet)
+	{
+		buffer->is2ndGenCorocoro=1;
+		return 1;
+	}
+	buffer->is2ndGenCorocoro=0;
+	return 0;
+}
+unsigned int Count2ndGenCorocoroProtectSector(int nResample) // Within resampleBuffer
+{
+	int i,c=0;
+	for(i=0; i<nResample; ++i)
+	{
+		c+=Check2ndGenCorocoroProtect(&resample[i]);
+	}
+	return c;
+}
 
 
 
+unsigned int Detect1stGenCorocoroProtect(int nResample)
+{
+	// 1st-Gen Corocoro Protect
+	// (1) First 256 bytes are 0xE5
+	// (2) Offset 0x100 and 0x101 do not change (probably 0x00).
+	// (3) Offset 0x120 to 0x123 must change.
+	// The checker expect offset 0x120 to 0x123 will not be the same twice in 10 samples.
+	// Every sample needs to be unique.
+	// FM77AV's MB8877+VFO will satisfy this condition.
+	// FMTOWNS's MB887+VFO often returns FF FF FF FF for 0x120 to 0x123.
+	// If FF FF FF FF twice in a row, needs to shuffle around.
+
+	// This seems to be from the same corocoro protect used in Archon for PC8801.
+	// In Archon for PC8801,
+	// C0 H0 R0 is a 256-byte sector, but the program reads it as a 512-byte sector.
+	// Then, the first 256 bytes will stay the same.
+	// 257th and 258th bytes stay the same because it is CRC code.
+	// Subsequent bytes are gap between sectors made unstable.
+	// The checker is indeed checking offset 0x120 to 0x123.
+
+	int i;
+	int foundDiff=0;
+	for(i=0; i<nResample; ++i)
+	{
+		if(resample[i].len<512)
+		{
+			return 0;
+		}
+
+		if(resample[i].data[0x100]!=resample[0].data[0x100] ||
+		   resample[i].data[0x101]!=resample[0].data[0x101])
+		{
+			return 0;
+		}
+
+		int j;
+		for(j=0; j<256; ++j)
+		{
+			if(0xE5!=resample[i].data[j])
+			{
+				return 0;
+			}
+		}
+
+		if(resample[i].data[0x120]!=resample[0].data[0x120] ||
+		   resample[i].data[0x121]!=resample[0].data[0x121] ||
+		   resample[i].data[0x122]!=resample[0].data[0x122] ||
+		   resample[i].data[0x123]!=resample[0].data[0x123])
+		{
+			foundDiff=1;
+		}
+	}
+
+	return foundDiff;
+}
 
 
 
-
-// RDD Output Data Data Format (.RDD  Real Disk Dump)
-// Signature (First 16 bytes)
-// 'R' 'E' 'A' 'L' 'D' 'I' 'S' 'K' 'D' 'U' 'M' 'P' 0 0 0 0 
-// Begin Disk
-// 00h vr mt fl cd 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
-//    +1  vr  Version 
-//              1  Added 10h Unstable-byte flags.
-//    +2  mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
-//    +3  fl  flags
-//            bit0  1:Write Protected  0:Write Enabled
-//    +4  cd  Capture Device
-//            00:FM TOWNS
-//            FF:Converted from other data type.
-// (32 bytes name, 0 padded)
-// Begin Track
-// 01h cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
-//    +1  cc  Cylinder
-//    +2  hh  Head
-// ID Mark
-// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
-// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
-// 02h cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
-//     :
-//    +1  cc  Cylinder
-//    +2  hh  Head
-//    +3  rr  Sector Number
-//    +4  nn  Length=128<<(n&3)
-//    +5  CRC  CRC of the address mark (not for the data)
-//    +6  CRC  CRC of the address mark (not for the data)
-//    +7  st  MB8877 status
-// Data
-// 03h cc hh rr nn st fl 00 00 00 00 <time  > <Length>
-//    +1  cc  Cylinder
-//    +2  hh  Head
-//    +3  rr  Sector Number
-//    +4  nn  Length=128<<(n&3)
-//    +5  st  MB8877 status
-//    +6  fl  bit0=density flag(0:MFM 1:FM)
-//            bit1=resample flag(1 means Resample for unstable bytes)
-//            bit2=Probably Leaf-In-The-Forest Protect
-//    +B  (3 bytes) Microseconds for reading the sector.
-//    +E  (2 bytes) Length.  Currently always match (128<<(nn&3)).
-// (Bytes padded to 16*N bytes)
-// Track Read
-// 04h cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
-//    +1  cc  Cylinder
-//    +2  hh  Head
-//    +3  st  MB8877 status
-//    +E  (2 bytes) Number of bytes returned from Track Read.
-// (Bytes padded to 16*N bytes)
-// End of Track
-// 05h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-// End of File
-// 06h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-
-// Unstable-byte flags.  (Non-zero means unstable.)
-// Immediately preceding data (ID Mark, Sector, or Track Read) has unstable bytes.
-// 10h 00 00 00 00 00 00 00 00 00 00 00 00 sz sz
-//    +E  sz  Lower-byte of the size in bytes.
-//    +F  sz  Higher-byte of the size in bytes.
-//            The size is ((n+7)&~7) bytes, where n is the preceding data length.
-//            The size does NOT include the 16-byte header length.
-// (Data.  Padded to 16*N bytes.  Flag for byte i is data[i/8]&(1<<(i&7)). )
-// Note:  Initially sz was +1 and +2.  Changed to +E and +F.
-//        However, at the time of the change, no .RDD file with 10H tag existed.
-//        It shouldn't affect anything.
+////////////////////////////////////////////////////////////////
+// Disk Write Buffer
 
 
-// Next Track
+#define WRITE_BUFFER_LEN 65536
+
+size_t fileWriteBufferFilled=0;
+unsigned char fileWriteBuffer[WRITE_BUFFER_LEN];
+
+size_t fwrite_buffered(const unsigned char data[],size_t unit,size_t len,const char fn[])
+{
+	len*=unit;
+	if(fileWriteBufferFilled+len<WRITE_BUFFER_LEN)
+	{
+		memcpy(fileWriteBuffer+fileWriteBufferFilled,data,len);
+		fileWriteBufferFilled+=len;
+		return len;
+	}
+	else
+	{
+		FILE *fp=fopen(fn,"ab");
+		if(NULL!=fp)
+		{
+			size_t len0=WRITE_BUFFER_LEN-fileWriteBufferFilled;
+			size_t len1=len-len0;
+			memcpy(fileWriteBuffer+fileWriteBufferFilled,data,len0);
+			fwrite(fileWriteBuffer,1,WRITE_BUFFER_LEN,fp);
+			fclose(fp);
+
+			memcpy(fileWriteBuffer,data+len0,len1);
+			fileWriteBufferFilled=len1;
+
+			return len;
+		}
+	}
+	return 0;
+}
+void fflush_buffered(const char fn[])
+{
+	if(0<fileWriteBufferFilled)
+	{
+		FILE *fp=fopen(fn,"ab");
+		if(NULL!=fp)
+		{
+			fwrite(fileWriteBuffer,1,fileWriteBufferFilled,fp);
+			fclose(fp);
+		}
+	}
+}
+
+
+////////////////////////////////////////////////////////////////
+// Main part
 
 
 unsigned int drvSel=1;    // Drive 0
@@ -350,6 +541,42 @@ void LogErrorCH(unsigned int code,unsigned char C,unsigned char H)
 			errLogTail->next=newLog;
 			errLogTail=newLog;
 		}
+	}
+}
+
+
+enum
+{
+	SECTORLOG_INFO_NONE,
+	SECTORLOG_INFO_LEAF_IN_THE_FOREST,
+};
+
+#define MAX_SECTOR_LOG 256
+unsigned int numSectorLog=0;
+struct SectorLog {
+	unsigned char info;
+	unsigned char CHRN[4];
+	unsigned char ioErr;
+	char extChar;
+} sectorLog[MAX_SECTOR_LOG];
+
+void AddSectorLogInfo(unsigned char info)
+{
+	if(numSectorLog<MAX_SECTOR_LOG)
+	{
+		sectorLog[numSectorLog].info=info;
+		++numSectorLog;
+	}
+}
+void AddSectorLog(const unsigned char CHRN[4],unsigned char ioErr,char extChar)
+{
+	if(numSectorLog<MAX_SECTOR_LOG)
+	{
+		struct SectorLog *log=&sectorLog[numSectorLog++];
+		log->info=SECTORLOG_INFO_NONE;
+		*((unsigned int *)log->CHRN)=*((unsigned int *)CHRN);
+		log->ioErr=ioErr;
+		log->extChar=extChar;
 	}
 }
 
@@ -497,10 +724,28 @@ unsigned char IOErrToColor(unsigned char ioErr)
 }
 
 // In ASM.ASM
-extern void _STI();
-extern void _CLI();
 extern unsigned int GetDMACount(void);
 extern Tsugaru_Debug(const char str[]);
+
+void delayMilliseconds(unsigned int ms)
+{
+	__CLI;
+
+	unsigned int us=ms*1000;
+
+	unsigned short t0,accum=0;
+	t0=inpw(IO_FREERUN_TIMER);
+	while(accum<us)
+	{
+		unsigned short t,diff;
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		accum+=diff;
+		t0=t;
+	}
+
+	__STI;
+}
 
 #pragma Calling_convention(_INTERRUPT|_CALLING_CONVENTION);
 _Handler Handle_INT46H(void)
@@ -548,7 +793,7 @@ _Handler Handle_INT46H(void)
 		// Looks like if I force-interrupt for seek commands, FDC stops before the head actually moved.
 		outp(IO_FDC_COMMAND,FDCCMD_FORCEINTERRUPT);
 
-		_CLI(); // Is it necessary?
+		__CLI; // Is it necessary?
 		outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
 	}
 	else
@@ -571,6 +816,8 @@ _Handler Handle_INT46H(void)
 	// DOS-Extender intercepts INT 46H in its own handler, then redirect to this handler by CALLF.
 	// Must return by RETF.
 	// _Far is the keyword in High-C.
+
+	return 0;
 }
 #pragma Calling_convention();
 
@@ -727,6 +974,35 @@ void EndSectorInfo(void)
 	}
 }
 
+void PrintSectorLog(void)
+{
+	int i;
+	for(i=0; i<numSectorLog; ++i)
+	{
+		BeforeSectorInfo();
+		switch(sectorLog[i].info)
+		{
+		case SECTORLOG_INFO_NONE:
+			Color(IOErrToColor(sectorLog[i].ioErr));
+			printf("%02x%02x%02x%02x%c",
+				sectorLog[i].CHRN[0],
+				sectorLog[i].CHRN[1],
+				sectorLog[i].CHRN[2],
+				sectorLog[i].CHRN[3],
+				sectorLog[i].extChar
+				);
+			break;
+		case SECTORLOG_INFO_LEAF_IN_THE_FOREST:
+			Color(4);
+			printf("HIDNLEAF ");
+			break;
+		}
+		AfterSectorInfo();
+	}
+	numSectorLog=0;
+}
+
+
 ////////////////////////////////////////////////////////////
 
 
@@ -739,11 +1015,12 @@ void EndSectorInfo(void)
 
 // Begin Disk
 // 00 vr mt fl 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
-//    vr  Version 
-//    mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
-//    fl  flags
-//        bit0  1:Write Protected  0:Write Enabled
-void RDD_MakeDiskHeader(unsigned char data[48],unsigned char restoreState,unsigned char mediaType,const char label[])
+//    +00 00  Begin Disk
+//    +01 vr  Version 
+//    +02 mt  media type (Compatible with D77.  0:2D  0x10:2DD  0x20:2HD)
+//    +03 fl  flags
+//            bit0  1:Write Protected  0:Write Enabled
+void RDD_MakeDiskHeader(unsigned char data[48],unsigned char restoreState,unsigned char forceWriteProtect,unsigned char mediaType,const char label[])
 {
 	int i;
 	for(i=0; i<48; ++i)
@@ -753,15 +1030,15 @@ void RDD_MakeDiskHeader(unsigned char data[48],unsigned char restoreState,unsign
 	data[0]=0x00; // Begin Disk
 	data[1]=RDD_VERSION; //
 	data[2]=mediaType;
-	data[3]|=((restoreState&0x40) ? 1 : 0);
+	data[3]|=(((restoreState&0x40) || 0!=forceWriteProtect) ? 1 : 0);
 	strncpy((char *)data+16,label,32);
 }
 
 unsigned int RDD_WriteSignature(const char fName[])
 {
+	FILE *fp=NULL;
 	char signature[16];
 	int i;
-	FILE *ofp;
 
 	for(i=0; i<16; ++i)
 	{
@@ -769,32 +1046,32 @@ unsigned int RDD_WriteSignature(const char fName[])
 	}
 	strcpy(signature,"REALDISKDUMP");
 
-	ofp=fopen(fName,"wb");
-	fwrite(signature,1,16,ofp);
-	fclose(ofp);
+	fp=fopen(fName,"wb");
+	if(NULL==fp)
+	{
+		return 1;
+	}
+	fwrite(signature,1,16,fp);
+	fclose(fp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
 	return 0;
 }
 
-unsigned int RDD_WriteDiskHeader(const char fName[],unsigned char restoreState,unsigned char mediaType,const char label[])
+unsigned int RDD_WriteDiskHeader(const char fName[],unsigned char restoreState,unsigned char forceWriteProtect,unsigned char mediaType,const char label[])
 {
 	unsigned char data[48];
-	FILE *ofp;
 
-	RDD_MakeDiskHeader(data,restoreState,mediaType,label);
+	RDD_MakeDiskHeader(data,restoreState,forceWriteProtect,mediaType,label);
 
-	ofp=fopen(fName,"ab");
-	if(NULL==ofp)
+	if(48!=fwrite_buffered(data,1,48,fName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-	fwrite(data,1,48,ofp);
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -805,7 +1082,6 @@ unsigned int RDD_WriteDiskHeader(const char fName[],unsigned char restoreState,u
 // 01 cc hh 00 00 00 00 00 00 00 00 00 00 00 00 00 (16 bytes)
 unsigned int RDD_WriteTrackHeader(const char fName[],unsigned char C,unsigned char H)
 {
-	FILE *ofp;
 	unsigned char data[16];
 	int i;
 	for(i=0; i<16; ++i)
@@ -816,16 +1092,13 @@ unsigned int RDD_WriteTrackHeader(const char fName[],unsigned char C,unsigned ch
 	data[1]=C;
 	data[2]=H;
 
-	ofp=fopen(fName,"ab");
-	if(NULL==ofp)
+	if(16!=fwrite_buffered(data,1,16,fName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-	fwrite(data,1,16,ofp);
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -836,7 +1109,6 @@ unsigned int RDD_WriteTrackHeader(const char fName[],unsigned char C,unsigned ch
 // 02 cc hh rr nn <CRC> st 00 00 00 00 00 00 00 00
 unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct IDMARK idMark[])
 {
-	FILE *ofp;
 	unsigned char data[16];
 	int i;
 	for(i=0; i<16; ++i)
@@ -844,15 +1116,6 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 		data[i]=0;
 	}
 	data[0]=2;
-
-	ofp=fopen(fName,"ab");
-	if(NULL==ofp)
-	{
-		Color(2);
-		fprintf(stderr,"Cannot open output file.\n");
-		Color(7);
-		return 1;
-	}
 
 	for(i=0; i<numIDMarks; ++i)
 	{
@@ -863,9 +1126,14 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 		data[5]=idMark[i].chrn[4]; // CRC
 		data[6]=idMark[i].chrn[5]; // CRC
 		data[7]=idMark[i].chrn[7]; // FDC Status
-		fwrite(data,1,16,ofp);
+		if(16!=fwrite_buffered(data,1,16,fName))
+		{
+			Color(2);
+			fprintf(stderr,"Cannot open output file.\n");
+			Color(7);
+			return 1;
+		}
 	}
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -879,7 +1147,6 @@ unsigned int RDD_WriteIDMark(const char fName[],unsigned int numIDMarks,struct I
 //         bit1=resample flag(1 means Resample for unstable bytes)
 unsigned int RDD_WriteSectorData(const char fName[],const unsigned char CHRN[4],unsigned char FDCSta,unsigned int readTime,unsigned char FMorMFM,unsigned char isResample)
 {
-	FILE *ofp;
 	unsigned int actualSize=0; // MB8877 always reads 128<<N anyway.
 	unsigned char *actualSizePtr,*readTimePtr;
 	unsigned char data[16];
@@ -917,19 +1184,14 @@ unsigned int RDD_WriteSectorData(const char fName[],const unsigned char CHRN[4],
 	data[14]=actualSizePtr[0];
 	data[15]=actualSizePtr[1];
 
-	ofp=fopen(fName,"ab");
-	if(NULL==ofp)
+	if(16!=fwrite_buffered(data,1,16,fName) ||
+	   actualSize!=fwrite_buffered(DMABuf.pages[0].data,1,actualSize,fName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-
-	fwrite(data,1,16,ofp);
-	fwrite(DMABuf.pages[0].data,1,actualSize,ofp);
-
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -940,7 +1202,6 @@ unsigned int RDD_WriteSectorData(const char fName[],const unsigned char CHRN[4],
 // 04 cc hh st 00 00 00 00 00 00 00 00 00 <nBytes>
 unsigned int RDD_WriteTrack(const char outFName[],unsigned char C,unsigned char H,unsigned short readSize,unsigned char st)
 {
-	FILE *ofp;
 	unsigned int writeSize=0;
 	unsigned char *readSizePtr;
 	unsigned char data[16];
@@ -958,23 +1219,18 @@ unsigned int RDD_WriteTrack(const char outFName[],unsigned char C,unsigned char 
 	data[14]=readSizePtr[0];
 	data[15]=readSizePtr[1];
 
-	ofp=fopen(outFName,"ab");
-	if(NULL==ofp)
+	writeSize=(readSize+15)&~0x000F;
+
+	MakeUpLinearBuf(writeSize);
+
+	if(16!=fwrite_buffered(data,1,16,outFName) ||
+	   writeSize!=fwrite_buffered(linearBuf,1,writeSize,outFName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-
-	writeSize=(readSize+15)&~0x000F;
-
-	fwrite(data,1,16,ofp);
-
-	MakeUpLinearBuf(writeSize);
-	fwrite(linearBuf,1,writeSize,ofp);
-
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -983,21 +1239,15 @@ unsigned int RDD_WriteTrack(const char outFName[],unsigned char C,unsigned char 
 
 unsigned int RDD_WriteEndOfTrack(const char outFName[])
 {
-	FILE *ofp;
 	unsigned char data[16]={5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-	ofp=fopen(outFName,"ab");
-	if(NULL==ofp)
+	if(16!=fwrite_buffered(data,1,16,outFName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-
-	fwrite(data,1,16,ofp);
-
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 	WaitMicrosec(AFTER_SCSI_WAIT);
@@ -1008,21 +1258,15 @@ unsigned int RDD_WriteEndOfTrack(const char outFName[])
 
 unsigned int RDD_WriteEndOfDisk(const char outFName[])
 {
-	FILE *ofp;
 	unsigned char data[16]={6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-	ofp=fopen(outFName,"ab");
-	if(NULL==ofp)
+	if(16!=fwrite_buffered(data,1,16,outFName))
 	{
 		Color(2);
 		fprintf(stderr,"Cannot open output file.\n");
 		Color(7);
 		return 1;
 	}
-
-	fwrite(data,1,16,ofp);
-
-	fclose(ofp);
 
 	WaitMicrosec(AFTER_SCSI_WAIT);
 
@@ -1100,7 +1344,7 @@ unsigned char ReadDriveStatusIO(void)
 
 int CheckDriveReady(void)
 {
-	_CLI();
+	__CLI;
 
 	unsigned int  accumTime=0;
 	unsigned short t0,t,diff;
@@ -1125,7 +1369,7 @@ int CheckDriveReady(void)
 		accumTime+=diff;
 	}
 
-	_STI();
+	__STI;
 
 	printf("Status %02xH\n",driveStatus);
 	printf("FDC Status %02x\n",inp(IO_FDC_STATUS));
@@ -1157,7 +1401,7 @@ void FDC_WaitIndexHole(void)
 {
 	unsigned int statusByte;
 
-	_CLI();
+	__CLI;
 
 	FDC_Command(FDCCMD_FORCEINTERRUPT);
 	FDC_WaitReady();
@@ -1174,7 +1418,7 @@ extern void SetUpDMA(unsigned int physAddr,unsigned int count);
 
 unsigned char FDC_Restore(void)
 {
-	_CLI();
+	__CLI;
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
 
@@ -1184,7 +1428,7 @@ unsigned char FDC_Restore(void)
 	INT46_DID_COME_IN=0;
 
 	FDC_WaitReady();
-	_STI();
+	__STI;
 	FDC_Command(FDCCMD_RESTORE);
 	WriteDriveControl(CTL_IRQEN);
 	while(0==INT46_DID_COME_IN)
@@ -1192,9 +1436,9 @@ unsigned char FDC_Restore(void)
 	}
 	WriteDriveControl(0);
 
-	_CLI();
+	__CLI;
 	PIC_SetMask(picmask);
-	_STI();
+	__STI;
 
 	currentCylinder=0;
 	printf("RESTORE Returned %02x\n",lastFDCStatus);
@@ -1243,7 +1487,7 @@ unsigned char FDC_Seek(unsigned char C)
 //03A4:00000C07 Write IO8:[0208] 12(FDC_DRIVE_STATUS_CONTROL)
 
 	FDC_WaitReady();
-	_CLI();
+	__CLI;
 
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
@@ -1262,7 +1506,7 @@ unsigned char FDC_Seek(unsigned char C)
 
 	Palette(COLOR_DEBUG,0,0,255);
 
-	_STI();
+	__STI;
 	WriteDriveControl(CTL_IRQEN);
 	FDC_Command(FDCCMD_SEEK);
 	while(0==INT46_DID_COME_IN)
@@ -1271,9 +1515,9 @@ unsigned char FDC_Seek(unsigned char C)
 	}
 	WriteDriveControl(0);
 
-	_CLI();
+	__CLI;
 	PIC_SetMask(picmask);
-	_STI();
+	__STI;
 
 	Palette(COLOR_DEBUG,0,255,255);
 
@@ -1297,7 +1541,7 @@ unsigned char FDC_ReadAddress(unsigned int  *accumTime)
 
 	*accumTime=0;
 
-	_CLI();
+	__CLI;
 	SelectDrive();
 	WriteDriveControl(0);
 
@@ -1305,13 +1549,13 @@ unsigned char FDC_ReadAddress(unsigned int  *accumTime)
 
 	Palette(COLOR_DEBUG,0,255,0);
 
-	_CLI();
+	__CLI;
 	INT46_DID_COME_IN=0;
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
 
 	FDC_WaitReady();
-	_STI();
+	__STI;
 
 	Palette(COLOR_DEBUG,0,0,255);
 
@@ -1357,7 +1601,7 @@ unsigned char FDC_ReadSectorReal(unsigned int  *accumTime,unsigned char C,unsign
 	*accumTime=0;
 
 
-	_CLI();
+	__CLI;
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
 
@@ -1367,8 +1611,8 @@ unsigned char FDC_ReadSectorReal(unsigned int  *accumTime,unsigned char C,unsign
 
 	initDMACounter=128<<(N&3);
 	SetUpDMA(DMABuf.physAddr,initDMACounter);
-	--initDMACounter;
-	_STI();
+	// --initDMACounter;  Why was I decrementing it?
+	__STI;
 
 	Palette(COLOR_DEBUG,0,255,0);
 
@@ -1414,9 +1658,9 @@ unsigned char FDC_ReadSectorReal(unsigned int  *accumTime,unsigned char C,unsign
 	WriteDriveControl(0);
 
 
-	_CLI();
+	__CLI;
 	PIC_SetMask(picmask);
-	_STI();
+	__STI;
 
 
 	Palette(COLOR_DEBUG,255,255,255);
@@ -1450,10 +1694,10 @@ unsigned char FDC_ReadSector(unsigned int  *accumTime,unsigned char C,unsigned c
 
 unsigned char FDC_ReadTrack(unsigned short *readSize)
 {
-	_CLI();
+	__CLI;
 	struct PICMask picmask=PIC_GetMask();
 	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
-	_STI();
+	__STI;
 
 	unsigned int DMABufSize=DMABuf.numberOfPages*PAGE_SIZE;
 
@@ -1465,7 +1709,7 @@ unsigned char FDC_ReadTrack(unsigned short *readSize)
 
 		Palette(COLOR_DEBUG,255,0,0);
 
-		_CLI();
+		__CLI;
 
 		SelectDrive();
 		WriteDriveControl(0);
@@ -1474,11 +1718,11 @@ unsigned char FDC_ReadTrack(unsigned short *readSize)
 
 		Palette(COLOR_DEBUG,0,255,0);
 
-		_CLI();
+		__CLI;
 		INT46_DID_COME_IN=0;
 
 		FDC_WaitReady();
-		_STI();
+		__STI;
 
 		Palette(COLOR_DEBUG,0,0,255);
 
@@ -1517,9 +1761,9 @@ unsigned char FDC_ReadTrack(unsigned short *readSize)
 		}
 	}
 
-	_CLI();
+	__CLI;
 	PIC_SetMask(picmask);
-	_STI();
+	__STI;
 
 	{
 		unsigned short DMACount;
@@ -1656,7 +1900,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 
 	for(i=3; i<ac; ++i)
 	{
-		if(0==strcmp(av[i],"-STARTTRK") || 0==strcmp(av[i],"-starttrk"))
+		if(0==strcmp(av[i],"-STARTTRK") || 0==strcmp(av[i],"-starttrk") || 0==strcmp(av[i],"-ST") || 0==strcmp(av[i],"-st"))
 		{
 			if(i+1<ac)
 			{
@@ -1669,7 +1913,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 				return -1;
 			}
 		}
-		else if(0==strcmp(av[i],"-ENDTRK") || 0==strcmp(av[i],"-endtrk"))
+		else if(0==strcmp(av[i],"-ENDTRK") || 0==strcmp(av[i],"-endtrk") || 0==strcmp(av[i],"-EN") || 0==strcmp(av[i],"-en"))
 		{
 			if(i+1<ac)
 			{
@@ -1687,7 +1931,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 			cpi->listOnly=1;
 			printf("List-Only Mode.\n");
 		}
-		else if(0==strcmp(av[i],"-OUT") || 0==strcmp(av[i],"-out"))
+		else if(0==strcmp(av[i],"-OUT") || 0==strcmp(av[i],"-out") || 0==strcmp(av[i],"-O") || 0==strcmp(av[i],"-o"))
 		{
 			if(i+1<ac)
 			{
@@ -1721,7 +1965,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 		{
 			cpi->baudRate=38400;
 		}
-		else if(0==strcmp(av[i],"-NAME") || 0==strcmp(av[i],"-name"))
+		else if(0==strcmp(av[i],"-NAME") || 0==strcmp(av[i],"-name") || 0==strcmp(av[i],"-N") || 0==strcmp(av[i],"-n"))
 		{
 			if(i+1<ac)
 			{
@@ -1734,7 +1978,7 @@ int RecognizeCommandParameter(struct CommandParameterInfo *cpi,int ac,char *av[]
 				return -1;
 			}
 		}
-		else if(0==strcmp(av[i],"-WRITEPROTECT") || 0==strcmp(av[i],"-writeprotect"))
+		else if(0==strcmp(av[i],"-WRITEPROTECT") || 0==strcmp(av[i],"-writeprotect") || 0==strcmp(av[i],"-WP") || 0==strcmp(av[i],"-wp"))
 		{
 			cpi->writeProtect=1;
 		}
@@ -1841,10 +2085,7 @@ void FindHiddenLeaf(const char fName[],unsigned short readTrackSize,unsigned cha
 	unsigned char C,H,R,N;
 
 
-	BeforeSectorInfo();
-	Color(4);
-	printf("HIDNLEAF ");
-	AfterSectorInfo();
+	AddSectorLogInfo(SECTORLOG_INFO_LEAF_IN_THE_FOREST);
 
 
 	MakeUpLinearBuf(readTrackSize);
@@ -1863,11 +2104,13 @@ void FindHiddenLeaf(const char fName[],unsigned short readTrackSize,unsigned cha
 		{
 			unsigned short len=0;
 			unsigned short dataPtr,microsec;
+			unsigned char *chrn;
 
 			prevDataMarkPtr=dataMarkPtr;
 			dataMarkPtr=ptr;
 			dataPtr=ptr+3;
 
+			chrn=linearBuf+addrMarkPtr+3;
 			C=linearBuf[addrMarkPtr+3];
 			H=linearBuf[addrMarkPtr+4];
 			R=linearBuf[addrMarkPtr+5];
@@ -1901,19 +2144,217 @@ void FindHiddenLeaf(const char fName[],unsigned short readTrackSize,unsigned cha
 			header[0x0C]=(microsec>>8)&0xFF;
 
 			{
-				FILE *ofp=fopen(fName,"ab");
-				if(NULL!=ofp)
+				fwrite_buffered(header,1,16,fName);
+				fwrite_buffered(linearBuf+dataPtr,1,len,fName);
+
+				AddSectorLog(chrn,IOERR_CRC,' ');
+			}
+		}
+	}
+}
+
+void Analyze1stGenCorocoroProtect(int nResample,unsigned char C,unsigned char H,unsigned char R,unsigned char N,unsigned int len)
+{
+	if(0==Detect1stGenCorocoroProtect(nResample))
+	{
+		return;
+	}
+
+	for(int i=0; i<nResample; ++i)
+	{
+		unsigned int this;
+		int needResample=0;
+	RESAMPLE_AND_RETRY:
+		this=*(unsigned int *)(resample[i].data+0x120);
+		needResample=0;
+		{
+			int j;
+			for(j=0; j<nResample; ++j)
+			{
+				unsigned int cmp=*(unsigned int *)(resample[j].data+0x120);
+				if(i!=j && cmp==this)
 				{
-					fwrite(header,1,16,ofp);
-					fwrite(linearBuf+dataPtr,1,len,ofp);
-					fclose(ofp);
+					needResample=1;
+					break;
+				}
+			}
+		}
+		if(0!=needResample)
+		{
+			unsigned int readTime;
+			unsigned char ioErr=FDC_ReadSector(&readTime,C,H,R,N);
+			CaptureResamplingBuffer(&resample[i],ioErr,readTime,len);
+			resample[i].resampledFor1stGenCorocoro=1;
+			goto RESAMPLE_AND_RETRY;
+		}
+	}
+}
 
-					BeforeSectorInfo();
+void Analyze2ndGenCorocoroProtect(int nResample,unsigned char C,unsigned char H,unsigned char R,unsigned char N,unsigned int len)
+{
+	int j;
 
-					Color(IOErrToColor(header[4]));
-					printf("%02x%02x%02x%02x ",C,H,R,N);
+	// Make it aware of 2nd-Gen Corocoro Protect
+	// successCount=Successfully read 20xF7, 4xunstable, 19xF6
+	unsigned int n2ndGenCorocoro=Count2ndGenCorocoroProtectSector(nResample);
+	if(0<n2ndGenCorocoro)
+	{
+		unsigned int step=4;
+		for(j=0; j<nResample && n2ndGenCorocoro<nResample/step; ++j)
+		{
+			while(0==resample[j].is2ndGenCorocoro)
+			{
+				int retryCnt;
+				for(retryCnt=0; retryCnt<nResample; ++retryCnt) // Try as many times as already tried.
+				{
+					unsigned int readTime;
+					unsigned char ioErr=FDC_ReadSector(&readTime,C,H,R,N);
+					CaptureResamplingBuffer(&resample[j],ioErr,readTime,len);
+					if(0!=Check2ndGenCorocoroProtect(&resample[j]))
+					{
+						++n2ndGenCorocoro;
+						break;
+					}
+				}
+			}
+		}
 
-					AfterSectorInfo();
+		// Evenly distribute successfully-read 2nd-gen corocoro data appear first.
+		for(j=0; j<nResample; ++j)
+		{
+			unsigned int shouldBe=((0==j%step) ? 1 : 0);
+			if(shouldBe!=resample[j].is2ndGenCorocoro)
+			{
+				int k;
+				for(k=j+1; k<nResample; ++k)
+				{
+					if(shouldBe==resample[k].is2ndGenCorocoro)
+					{
+						struct resampleBuffer swp=resample[j];
+						resample[j]=resample[k];
+						resample[k]=swp;
+						break;
+					}
+				}
+			}
+		}
+	}
+}
+
+void ReadSector(struct IDMARK chrn,int FMorMFM,struct CommandParameterInfo *cpi)
+{
+	unsigned char C=chrn.chrn[0];
+	unsigned char H=chrn.chrn[1];
+	unsigned char R=chrn.chrn[2];
+	unsigned char N=chrn.chrn[3];
+	int nResample=0;
+	unsigned char ioErr=0;
+	unsigned char lostDataReadData=0;
+
+	unsigned int firstRetry=0;
+	for(firstRetry=0; firstRetry<cpi->firstRetryCount; ++firstRetry)
+	{
+		unsigned int  readTime;
+		ioErr=FDC_ReadSector(&readTime,C,H,R,N);
+
+		if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
+		{
+			lostDataReadData=1;
+			AddSectorLog(chrn.chrn,ioErr,' ');
+		}
+		else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
+		{
+			lostDataReadData=0;
+			AddSectorLog(chrn.chrn,ioErr,' ');
+			__STI;
+			RDD_WriteSectorData(cpi->outFName,chrn.chrn,ioErr,readTime,FMorMFM,0);
+			return;
+		}
+		else if(nResample<cpi->secondRetryCount)
+		{
+			unsigned int len=(128<<(chrn.chrn[3]&3));
+			CaptureResamplingBuffer(&resample[nResample],ioErr,readTime,len);
+			++nResample;
+			delayMilliseconds(rand()%20);
+		}
+	}
+
+	if(lostDataReadData)
+	{
+		LogError(ERRORLOG_TYPE_LOSTDATA,&chrn);
+	}
+	else if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.  Resample.
+	{
+		int j,len;
+		LogError(ERRORLOG_TYPE_CRC,&chrn);
+
+		len=(128<<(chrn.chrn[3]&3));
+		while(nResample<cpi->secondRetryCount)
+		{
+			unsigned int  readTime;
+
+			ioErr=FDC_ReadSector(&readTime,C,H,R,N);
+			if(0==ioErr) // Maybe disk was just unstable.  Succeeded.
+			{
+				AddSectorLog(chrn.chrn,ioErr,' ');
+				__STI;
+				RDD_WriteSectorData(cpi->outFName,chrn.chrn,ioErr,readTime,FMorMFM,0);
+				return;
+			}
+
+			delayMilliseconds(rand()%20);
+			// 300rpm->5 rotations per sec.  200ms per rotation.
+			// Add up to 20ms random delay before sending the next read command.
+			// Hopefully it will add fluctuation to the Corocoro bytes.
+
+			// Don't write right away.  Just store in the resample buffer.
+			CaptureResamplingBuffer(&resample[nResample],ioErr,readTime,len);
+			++nResample;
+		}
+
+		// If nResample is less than secondRetryCount, it means sector was read with no error somehow.
+		if(0<nResample)
+		{
+			int retry=0;
+			Analyze2ndGenCorocoroProtect(nResample,C,H,R,N,len);
+			Analyze1stGenCorocoroProtect(nResample,C,H,R,N,len);
+			for(retry=0; retry<nResample; ++retry)
+			{
+				unsigned char ioErr=resample[retry].ioErr;
+				unsigned int readTime=resample[retry].readTime;
+
+				if(0==(ioErr&IOERR_LOST_DATA)) // && different from previous)
+				{
+					unsigned int different=0;
+					unsigned int prev=(0<retry ? retry-1 : 0);
+					for(j=0; j<len; ++j)
+					{
+						if(resample[prev].data[j]!=resample[retry].data[j])
+						{
+							different=1;
+						}
+					}
+
+					if(0==retry || 0!=different)
+					{
+						char resampleCode=' ';
+						if(0!=resample[retry].is2ndGenCorocoro)
+						{
+							resampleCode='@';
+						}
+						else if(0!=resample[retry].resampledFor1stGenCorocoro)
+						{
+							resampleCode='&';
+						}
+						AddSectorLog(chrn.chrn,ioErr,resampleCode);
+
+						__STI;
+						for(j=0; j<len; ++j) // Copy the data to the deck.
+						{
+							DMABuf.pages[0].data[j]=resample[retry].data[j];
+						}
+						RDD_WriteSectorData(cpi->outFName,chrn.chrn,ioErr,readTime,FMorMFM,1);
+					}
 				}
 			}
 		}
@@ -1926,12 +2367,11 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	int i;
 	int nTrackSector=0;
 	unsigned char lostDataReadAddr=0;
-	unsigned char lostDataReadData=0;
-	unsigned char mfmTry,nFail=0;
+	unsigned char mfmTry;
 	unsigned short readTrackSize=0;
 	unsigned char ioErr=0;
 
-	_STI();
+	__STI;
 	StartSectorInfo(C,H);
 
 	RDD_WriteTrackHeader(cpi->outFName,C,H);
@@ -1950,14 +2390,13 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 	FDC_WaitIndexHole(); // Need to be immediately after seek.
 	// 1 second=5 revolutions for 2D/2DD, 6 revolutions for 2HD
 
-	_STI();
+	__STI;
 
 
 
 	for(mfmTry=0; mfmTry<2; ++mfmTry)
 	{
 		unsigned int  accumTime=0;
-		unsigned short nFail=0;
 
 		controlByte&=(~CTL_MFM);
 		controlByte|=FMorMFM;
@@ -2053,7 +2492,7 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 
 
-	_STI();
+	__STI;
 	RDD_WriteIDMark(cpi->outFName,nTrackSector,idMark);
 	if(0xFF!=ioErr)
 	{
@@ -2075,88 +2514,9 @@ void ReadTrack(unsigned char C,unsigned char H,struct CommandParameterInfo *cpi)
 
 	for(i=0; i<nTrackSector; ++i)
 	{
-		unsigned char retry,ioErr=0;
-		lostDataReadData=0;
-
-		for(retry=0; retry<cpi->firstRetryCount; ++retry)
-		{
-			unsigned int  readTime;
-			ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-			BeforeSectorInfo();
-
-			if(0!=(ioErr&IOERR_LOST_DATA)) // Don't add garbage if lost data
-			{
-				lostDataReadData=1;
-				Color(IOErrToColor(ioErr));
-				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-				AfterSectorInfo();
-			}
-			else if(0==(ioErr&IOERR_CRC)) // No retry if no CRC error.
-			{
-				lostDataReadData=0;
-				Color(IOErrToColor(ioErr));
-				printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-				AfterSectorInfo();
-
-				_STI();
-				RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,0);
-
-				break;
-			}
-		}
-
-		if(lostDataReadData)
-		{
-			LogError(ERRORLOG_TYPE_LOSTDATA,&idMark[i]);
-		}
-
-		if(0!=(ioErr&IOERR_CRC))  // If finally I couldn't read without CRC error.
-		{
-			int j,len;
-			LogError(ERRORLOG_TYPE_CRC,&idMark[i]);
-
-			len=(128<<(idMark[i].chrn[3]&3));
-			for(retry=0; retry<cpi->secondRetryCount; ++retry)
-			{
-				unsigned int  readTime;
-
-				for(j=0; j<len; ++j)
-				{
-					sectorDataCopy[j]=DMABuf.pages[0].data[j];
-				}
-				ioErr=FDC_ReadSector(&readTime,idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-				if(0==(ioErr&IOERR_LOST_DATA)) // && different from previous)
-				{
-					unsigned int different=0;
-					for(j=0; j<len; ++j)
-					{
-						if(sectorDataCopy[j]!=DMABuf.pages[0].data[j])
-						{
-							different=1;
-						}
-						sectorDataCopy[j]=DMABuf.pages[0].data[j]; // For next comparison.
-					}
-
-					if(0==retry || 0!=different)
-					{
-						BeforeSectorInfo();
-
-						Color(IOErrToColor(ioErr));
-						printf("%02x%02x%02x%02x ",idMark[i].chrn[0],idMark[i].chrn[1],idMark[i].chrn[2],idMark[i].chrn[3]);
-
-						AfterSectorInfo();
-
-						_STI();
-						RDD_WriteSectorData(cpi->outFName,idMark[i].chrn,ioErr,readTime,FMorMFM,1);
-					}
-				}
-			}
-		}
+		ReadSector(idMark[i],FMorMFM,cpi);
 	}
+	PrintSectorLog();
 
 	outp(IO_FDC_DRIVE_CONTROL,controlByte|(0!=H ? CTL_SIDE : 0)|CTL_MFM);
 
@@ -2360,14 +2720,14 @@ int main(int ac,char *av[])
 		printf("    2HD,1232KB       2HD 1232K Disk\n");
 		printf("    (For 1440KB, use 2HD.)\n");
 		printf("  Options:\n");
-		printf("    -starttrk trackNum  Start track (Between 0 and 76 if 2HD)\n");
-		printf("    -endtrk   trackNum  End track (Between 0 and 76 if 2HD)\n");
+		printf("    -st trackNum        Start track (Between 0 and 76 if 2HD)\n");
+		printf("    -en trackNum        End track (Between 0 and 76 if 2HD)\n");
 		//printf("    -listonly           List track info only.  No RS232C transmission\n");
-		printf("    -out filename.rdd   Save image to .rdd (Real Disk Dump) file.\n");
+		printf("    -o filename.rdd     Save image to .rdd (Real Disk Dump) file.\n");
 		//printf("    -19200bps           Transmit the image at 19200bps\n");
 		//printf("    -38400bps           Transmit the image at 38400bps\n");
-		printf("    -name diskName      Specify disk name up to 16 chars.\n");
-		//printf("    -writeprotect       Write protect the disk image.\n");
+		printf("    -n diskName         Specify disk name up to 16 chars.\n");
+		printf("    -wp                 Write protect the disk image.\n");
 		printf("    -dontsort           Don't sort sectors (preserve interleave).\n");
 		printf("    -sort               Sort sectors.\n");
 		printf("    -log filename.txt   Write log file.\n");
@@ -2381,6 +2741,16 @@ int main(int ac,char *av[])
 		Color(2);
 		printf("This program requires Free-Run timer.\n");
 		printf("Needs to be FM TOWNS 2 UG or newer.\n");
+		Color(7);
+		return 1;
+	}
+
+	resample=(struct resampleBuffer *)malloc(sizeof(struct resampleBuffer)*cpi.secondRetryCount);
+	if(NULL==resample)
+	{
+		Color(2);
+		printf("Cannot allocate resampling buffer.\n");
+		printf("Need more RAM.\n");
 		Color(7);
 		return 1;
 	}
@@ -2435,7 +2805,7 @@ int main(int ac,char *av[])
 		goto ERREND;
 	}
 
-	if(0!=RDD_WriteDiskHeader(cpi.outFName,RestoreState,cpi.mediaType,cpi.diskName))
+	if(0!=RDD_WriteDiskHeader(cpi.outFName,RestoreState,cpi.writeProtect,cpi.mediaType,cpi.diskName))
 	{
 		goto ERREND;
 	}
@@ -2443,6 +2813,8 @@ int main(int ac,char *av[])
 	ReadDisk(&cpi);
 
 	RDD_WriteEndOfDisk(cpi.outFName);
+
+	fflush_buffered(cpi.outFName);
 
 	CleanUp();
 

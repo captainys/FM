@@ -1,8 +1,6 @@
 						.386p
 						ASSUME	CS:CODE
 
-						PUBLIC	_CLI
-						PUBLIC	_STI
 						PUBLIC	GetDMACount
 						PUBLIC	GetCS
 						PUBLIC	GetINT46Handler
@@ -11,21 +9,6 @@
 						PUBLIC	Tsugaru_Debug
 
 CODE					SEGMENT
-
-
-
-_CLI					PROC
-						CLI
-						RET
-_CLI					ENDP
-
-
-
-_STI					PROC
-						STI
-						RET
-_STI					ENDP
-
 
 
 
