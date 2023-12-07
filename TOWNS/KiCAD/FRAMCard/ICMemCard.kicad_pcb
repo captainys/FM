@@ -1719,7 +1719,7 @@
     (stroke (width 0.05) (type default)) (layer "Edge.Cuts") (tstamp fa37b42f-d2c0-4a84-8b7c-919d5eb48764))
   (gr_line (start 120.79518 52.8828) (end 120.79879 53.94599)
     (stroke (width 0.05) (type default)) (layer "Edge.Cuts") (tstamp fe62fd45-a01d-4f04-b829-6d9a4626978f))
-  (gr_text "FM TOWNS RESCUE BOOT MEMORY CARD\nUsing HIROSE NX1 PCMCIA FRAME\nby Captain YS  http://www.ysflight.com\nVer. 20231127" (at 123.825 66.548) (layer "B.SilkS") (tstamp 00000000-0000-0000-0000-0000625e994e)
+  (gr_text "FM TOWNS RESCUE BOOT MEMORY CARD\nUsing HIROSE NX1 PCMCIA FRAME\nby Captain YS  http://www.ysflight.com\nVer. 20231206" (at 123.825 66.548) (layer "B.SilkS") (tstamp 00000000-0000-0000-0000-0000625e994e)
     (effects (font (size 1.5 1.5) (thickness 0.3)) (justify left mirror))
   )
   (gr_text "Write\nEnabled" (at 65.9765 88.4555) (layer "B.SilkS") (tstamp 00000000-0000-0000-0000-000062d48d39)
