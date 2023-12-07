@@ -35,6 +35,7 @@ READ_HIGHB				PROC
 						PUSH	DS
 						PUSH	DI
 						PUSH	CX
+						PUSH	EDX	; Why was it missing until 12/6/2023????
 						PUSH	SI
 
 						XCHG	EDX,ESI
