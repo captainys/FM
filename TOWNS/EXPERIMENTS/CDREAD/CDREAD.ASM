@@ -188,6 +188,12 @@ READ_LOOP_NOSIRQ_BUT_DEI:
 
 
 BREAK_READ_LOOP:
+							MOV		AL,3	; Channel 3 SCSI
+							OUT		IO_DMA_CHANNEL,AL
+
+							IN		AX,IO_DMA_COUNT_LOW
+							MOV		[LAST_DMA_COUNT],AX
+
 							CALL	DEBUG_PALETTE_WHITE
 
 							MOV		AL,0C0H	; CDC IRQ Clear (80H), DMAE IRQ Clear (40H)
@@ -196,6 +202,12 @@ BREAK_READ_LOOP:
 
 							MOV		EDI,OFFSET MSG_READ_DONE
 							CALL	PRINT_CSTR
+							CALL	PRINT_CRLF
+
+							MOV		EDI,OFFSET MSG_LAST_DMA_COUNT
+							CALL	PRINT_CSTR
+							MOVZX	EAX,WORD PTR [LAST_DMA_COUNT]
+							CALL	PRINT_EAX
 							CALL	PRINT_CRLF
 
 							; TSUGARU_DEBUG_BREAK
@@ -426,7 +438,7 @@ CDC_DMA_RESET				PROC
 
 							; Unless this mode is set, CPU will freeze when DTS flag is set.
 							; Presumably CPU and DMA fights for memory bus.
-							MOV		AL,54H		; Single-Mode (Free Bus every byte or word), AUTOI, IO to MEM
+							MOV		AL,44H		; Single-Mode (Free Bus every byte or word), IO to MEM (AUTOI 10H is off)
 							OUT		IO_DMA_MODE_CONTROL,AL
 
 							RET
@@ -680,14 +692,14 @@ PRINT_AL				ENDP
 
 PRINT_EAX				PROC
 
+						ROL		EAX,8
 						CALL	PRINT_AL
-						ROR		EAX,8
+						ROL		EAX,8
 						CALL	PRINT_AL
-						ROR		EAX,8
+						ROL		EAX,8
 						CALL	PRINT_AL
-						ROR		EAX,8
+						ROL		EAX,8
 						CALL	PRINT_AL
-						ROR		EAX,8
 						RET
 
 PRINT_EAX				ENDP
@@ -935,13 +947,14 @@ CDSTATUS					DD		99999999h
 
 DATABUF						DB		16384 dup (077h) ; buffer for 8 sectors times 2KB
 DATA_STORE_PTR				DD		OFFSET DATABUF
-
+LAST_DMA_COUNT				DW		0
 
 MSG_PREMATURE				DB		'Premature Termination',0
 MSG_IO_ERROR				DB		'IO Error',0
 MSG_UNKNOWN_ERROR			DB		'Unknown Error',0
 MSG_READ_DONE				DB		'Read Done',0
 MSG_STATUS_TIMEOUT			DB		'Status Time Out',0
+MSG_LAST_DMA_COUNT			DB		'Last DMA Count:',0
 
 FILENAME					DB		'CDREAD.BIN',0
 
