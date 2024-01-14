@@ -1,0 +1,99 @@
+#ifndef DISKIMG_H_IS_INCLUDED
+#define DISKIMG_H_IS_INCLUDED
+
+#include "DEF.H"
+
+#define MAX_NUM_TRACKS         163
+
+
+
+#define FLAG_CRC_ERROR         1
+#define FLAG_DELETED_DATA      2
+#define FLAG_RECORD_NOT_FOUND  4
+
+
+
+typedef struct AddrMark
+{
+	unsigned char CHRN[4],flags;
+} ADDRMARK;
+
+void AddrMark_Init(ADDRMARK *addr);
+
+typedef struct Sector
+{
+	unsigned char CHRN[4],flags;
+	unsigned int numBytes;
+	unsigned char *data;
+} SECTOR;
+
+void Sector_Init(SECTOR *sector);
+void Sector_Alloc(SECTOR *sector,unsigned int len);
+void Sector_Destroy(SECTOR *sector);
+
+typedef struct Track
+{
+	unsigned density;
+	unsigned char C,H;
+	unsigned int numAddrMarks;
+	ADDRMARK *addrMarks;
+	unsigned int numSectors;
+	SECTOR *sectors;
+} TRACK;
+
+void Track_Init(TRACK *track);
+int Track_Prepare(TRACK *track,int C,int H,int numAddrMarks,int numSectors);
+void Track_Destroy(TRACK *track);
+
+typedef struct DiskProp
+{
+	unsigned char writeProtected;
+	unsigned char mediaType;
+	unsigned int numTracks;
+} DISKPROP;
+
+typedef struct Disk
+{
+	DISKPROP prop;
+	TRACK tracks[MAX_NUM_TRACKS];
+} DISK;
+
+
+#define D77_HEADER_LENGTH 0x20
+
+#define D77_MEDIATYPE_2D       0
+#define D77_MEDIATYPE_2DD   0x10
+#define D77_MEDIATYPE_2HD   0x20
+#define D77_MEDIATYPE_1D    0x30
+#define D77_MEDIATYPE_1DD   0x40
+
+#define D77_DENSITY_FM      0x40
+#define D77_DENSITY_MFM        0
+
+#define D77_DATAMARK_NORMAL     0
+#define D77_DATAMARK_DELETED 0x10
+
+#define D77_SECTOR_STATUS_CRC              0xB0
+#define D77_SECTOR_STATUS_RECORD_NOT_FOUND 0xF0
+
+#define D77_HEADER_OFFSET_WRITEPROT 0x1a
+#define D77_HEADER_OFFSET_MEDIATYPE 0x1b
+#define D77_HEADER_OFFSET_DISKSIZE  0x1c
+
+typedef struct D77Reader
+{
+	FILE *fp;
+	DISKPROP prop;
+	unsigned long diskSize;
+	unsigned char header_basic[D77_HEADER_LENGTH];
+	unsigned long trackPtr[MAX_NUM_TRACKS];
+} D77READER;
+
+D77READER *D77Reader_Create(void);
+int D77Reader_Begin(D77READER *reader,const char fn[]);
+int D77Reader_ReadTrack(TRACK *track,D77READER *reader,unsigned int trackPos);
+void D77Reader_DestroyTrack(TRACK *track);
+int D77Reader_End(D77READER *reader);
+void D77Reader_Destroy(D77READER *);
+
+#endif
