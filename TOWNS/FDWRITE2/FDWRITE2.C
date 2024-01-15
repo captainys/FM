@@ -156,6 +156,41 @@ int RecognizeCommandParameterInfo(struct CommandParameterInfo *cpi,int ac,char *
 	return ERROR_NONE;
 }
 
+void MakeFormatData(unsigned char formatData[],size_t max_len,size_t formatLen,TRACK *track)
+{
+	unsigned int len;
+	int crunchLevel;
+	for(crunchLevel=0; crunchLevel<3; ++crunchLevel)
+	{
+		Track_MakeFormatData(&len,formatData,max_len,track,crunchLevel);
+		if(len<=formatLen)
+		{
+			break;
+		}
+		printf("Overbyte.  Crunch %d\n",crunchLevel);
+	}
+}
+
+void WriteSectors(struct FDC_IOConfig fdcConfig,struct bufferInfo DMABuf,TRACK *track)
+{
+	int sec;
+	for(sec=0; sec<track->numSectors; ++sec)
+	{
+		if(0==(track->sectors[sec].flags&FLAG_RECORD_NOT_FOUND))
+		{
+			FDC_WriteSector(fdcConfig,DMABuf,
+					track->sectors[sec].CHRN[0],
+					track->sectors[sec].CHRN[1],
+					track->sectors[sec].CHRN[2],
+					track->sectors[sec].CHRN[3],
+					track->sectors[sec].numBytes,
+					track->sectors[sec].data,
+					0!=(track->sectors[sec].flags&FLAG_DELETED_DATA),
+					0!=(track->sectors[sec].flags&FLAG_CRC_ERROR));
+		}
+	}
+}
+
 int WriteBackD77(struct CommandParameterInfo *cpi)
 {
 	int err;
@@ -228,38 +263,12 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 
 		Track_Print(&trk);
 
-		{
-			int crunchLevel;
-			for(crunchLevel=0; crunchLevel<3; ++crunchLevel)
-			{
-				unsigned int len;
-				Track_MakeFormatData(&len,formatData,FORMAT_LEN_MAX,&trk,crunchLevel);
-				if(len<=formatLen)
-				{
-					break;
-				}
-				printf("Crunch %d\n",crunchLevel);
-			}
-		}
+		MakeFormatData(formatData,FORMAT_LEN_MAX,formatLen,&trk);
 
 		FDC_Seek(fdcConfig,trk.C);
 		FDC_WriteTrack(&bytesWritten,fdcConfig,DMABuf,formatLen,formatData);
 
-		{
-			int sec;
-			for(sec=0; sec<trk.numSectors; ++sec)
-			{
-				FDC_WriteSector(fdcConfig,DMABuf,
-						trk.sectors[sec].CHRN[0],
-						trk.sectors[sec].CHRN[1],
-						trk.sectors[sec].CHRN[2],
-						trk.sectors[sec].CHRN[3],
-						trk.sectors[sec].numBytes,
-						trk.sectors[sec].data,
-						0!=(trk.sectors[sec].flags&FLAG_DELETED_DATA),
-						0!=(trk.sectors[sec].flags&FLAG_CRC_ERROR));
-			}
-		}
+		WriteSectors(fdcConfig,DMABuf,&trk);
 
 		Track_Destroy(&trk);
 	}
@@ -344,38 +353,12 @@ int WriteBackRDD(struct CommandParameterInfo *cpi)
 
 		Track_Print(&trk);
 
-		{
-			int crunchLevel;
-			for(crunchLevel=0; crunchLevel<3; ++crunchLevel)
-			{
-				unsigned int len;
-				Track_MakeFormatData(&len,formatData,FORMAT_LEN_MAX,&trk,crunchLevel);
-				if(len<=formatLen)
-				{
-					break;
-				}
-				printf("Crunch %d\n",crunchLevel);
-			}
-		}
+		MakeFormatData(formatData,FORMAT_LEN_MAX,formatLen,&trk);
 
 		FDC_Seek(fdcConfig,trk.C);
 		FDC_WriteTrack(&bytesWritten,fdcConfig,DMABuf,formatLen,formatData);
 
-		{
-			int sec;
-			for(sec=0; sec<trk.numSectors; ++sec)
-			{
-				FDC_WriteSector(fdcConfig,DMABuf,
-						trk.sectors[sec].CHRN[0],
-						trk.sectors[sec].CHRN[1],
-						trk.sectors[sec].CHRN[2],
-						trk.sectors[sec].CHRN[3],
-						trk.sectors[sec].numBytes,
-						trk.sectors[sec].data,
-						0!=(trk.sectors[sec].flags&FLAG_DELETED_DATA),
-						0!=(trk.sectors[sec].flags&FLAG_CRC_ERROR));
-			}
-		}
+		WriteSectors(fdcConfig,DMABuf,&trk);
 
 		Track_Destroy(&trk);
 	}
@@ -449,38 +432,14 @@ int WriteBackBIN(struct CommandParameterInfo *cpi)
 
 		Track_Print(&trk);
 
-		{
-			int crunchLevel;
-			for(crunchLevel=0; crunchLevel<3; ++crunchLevel)
-			{
-				unsigned int len;
-				Track_MakeFormatData(&len,formatData,FORMAT_LEN_MAX,&trk,crunchLevel);
-				if(len<=formatLen)
-				{
-					break;
-				}
-				printf("Crunch %d\n",crunchLevel);
-			}
-		}
+		MakeFormatData(formatData,FORMAT_LEN_MAX,formatLen,&trk);
 
 		FDC_Seek(fdcConfig,trk.C);
 		FDC_WriteTrack(&bytesWritten,fdcConfig,DMABuf,formatLen,formatData);
 
-		{
-			int sec;
-			for(sec=0; sec<trk.numSectors; ++sec)
-			{
-				FDC_WriteSector(fdcConfig,DMABuf,
-						trk.sectors[sec].CHRN[0],
-						trk.sectors[sec].CHRN[1],
-						trk.sectors[sec].CHRN[2],
-						trk.sectors[sec].CHRN[3],
-						trk.sectors[sec].numBytes,
-						trk.sectors[sec].data,
-						0!=(trk.sectors[sec].flags&FLAG_DELETED_DATA),
-						0!=(trk.sectors[sec].flags&FLAG_CRC_ERROR));
-			}
-		}
+		WriteSectors(fdcConfig,DMABuf,&trk);
+
+		WriteSectors(fdcConfig,DMABuf,&trk);
 
 		Track_Destroy(&trk);
 	}
