@@ -134,6 +134,18 @@ struct FDC_IOConfig FDC_GetIOConfig(unsigned int drive,unsigned int mode)
 	return cfg;
 }
 
+void FDC_SetSide(struct FDC_IOConfig *cfgPtr,int H)
+{
+	if(0==H)
+	{
+		cfgPtr->controlByte&=~CTL_SIDE;
+	}
+	else
+	{
+		cfgPtr->controlByte|=CTL_SIDE;
+	}
+}
+
 int FDC_GetNumberOfCylinders(unsigned int mode)
 {
 	switch(mode)
@@ -692,6 +704,103 @@ unsigned char FDC_WriteTrack(unsigned long *writeSize,struct FDC_IOConfig cfg,st
 		DMACount=lastDMACount;
 		++DMACount;
 		*writeSize=DMABufSize-DMACount;
+	}
+
+	return lastFDCStatus;
+}
+
+unsigned char FDC_WriteSector(struct FDC_IOConfig cfg,struct bufferInfo DMABuf,
+    unsigned char C,unsigned char H,unsigned char R,unsigned char N,
+    unsigned int len,const unsigned char data[],
+    unsigned char deletedData,unsigned char crcError)
+{
+	unsigned short t0,t,diff,initDMACounter;
+	unsigned char cmd=FDCCMD_WRITESECTOR;
+	unsigned int accumTime=0;
+	if(deletedData)
+	{
+		cmd|=1;
+	}
+
+	WriteToDMABuf(DMABuf,len,data);
+
+	Palette(COLOR_DEBUG,255,0,0);
+
+	__CLI;
+	struct PICMask picmask=PIC_GetMask();
+	PIC_SetMask(PIC_ENABLE_FDC_ONLY);
+
+
+	FDC_SelectDrive(cfg);
+	FDC_WriteDriveControl(cfg,0);
+
+	initDMACounter=128<<(N&3);
+	SetUpDMAOut(DMABuf.physAddr,initDMACounter);
+	__STI;
+
+	Palette(COLOR_DEBUG,0,255,0);
+
+	INT46_DID_COME_IN=0;
+
+	outp(IO_FDC_CYLINDER,C);
+	outp(IO_FDC_SECTOR,R);
+	FDC_WaitReady();
+
+	Palette(COLOR_DEBUG,0,0,255);
+
+	FDC_WriteDriveControl(cfg,CTL_IRQEN);
+	FDC_Command(cmd);
+	t0=inpw(IO_FREERUN_TIMER);
+
+	Palette(COLOR_DEBUG,0,255,255);
+
+	// Memo: Make sure to write 44H to I/O AAh.
+	//       Otherwise, apparently CPU and DMA fights each other for control of RAM access, and lock up.
+	// First loop until the DMA counter starts moving.
+	while(0==INT46_DID_COME_IN && accumTime<READSECTOR_TIMEOUT)
+	{
+		Palette(COLOR_DEBUG,rand(),rand(),rand());
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		accumTime+=diff;
+		if(inpw(IO_DMA_COUNT_LOW)!=initDMACounter)
+		{
+			accumTime=0;
+			break;
+		}
+		t0=t;
+	}
+	// Second loop for measuring how long it takes to read a sector.
+	while(0==INT46_DID_COME_IN && accumTime<READSECTOR_TIMEOUT)
+	{
+		Palette(COLOR_DEBUG,rand(),rand(),rand());
+		t=inpw(IO_FREERUN_TIMER);
+		diff=t-t0;
+		accumTime+=diff;
+		t0=t;
+
+		if(crcError && 0==inpw(IO_DMA_COUNT_LOW))
+		{
+			FDC_Command(FDCCMD_FORCEINTERRUPT);
+			outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
+		}
+	}
+	FDC_WriteDriveControl(cfg,0);
+
+
+	__CLI;
+	PIC_SetMask(picmask);
+	__STI;
+
+
+	Palette(COLOR_DEBUG,255,255,255);
+
+	if(READSECTOR_TIMEOUT<=accumTime)
+	{
+		// It does happen in real hardware, and unless Force Interrupt, FDC will never be ready again.
+		FDC_Command(FDCCMD_FORCEINTERRUPT);
+		outp(IO_DMA_MASK,inp(IO_DMA_MASK)|1);
+		return 0xFF;
 	}
 
 	return lastFDCStatus;

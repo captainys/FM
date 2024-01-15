@@ -211,6 +211,7 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 			}
 		}
 		fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
+		FDC_SetSide(&fdcConfig,trk.H);
 
 		printf("C%02d H%02d\n",trk.C,trk.H);
 		for(i=0; i<trk.numAddrMarks; ++i)
@@ -236,16 +237,24 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 			}
 		}
 
-		if(0==trk.H)
-		{
-			fdcConfig.controlByte&=~CTL_SIDE;
-		}
-		else
-		{
-			fdcConfig.controlByte|=CTL_SIDE;
-		}
 		FDC_Seek(fdcConfig,trk.C);
 		FDC_WriteTrack(&bytesWritten,fdcConfig,DMABuf,formatLen,formatData);
+
+		{
+			int sec;
+			for(sec=0; sec<trk.numSectors; ++sec)
+			{
+				FDC_WriteSector(fdcConfig,DMABuf,
+						trk.sectors[sec].CHRN[0],
+						trk.sectors[sec].CHRN[1],
+						trk.sectors[sec].CHRN[2],
+						trk.sectors[sec].CHRN[3],
+						trk.sectors[sec].numBytes,
+						trk.sectors[sec].data,
+						0!=(trk.sectors[sec].flags&FLAG_DELETED_DATA),
+						0!=(trk.sectors[sec].flags&FLAG_CRC_ERROR));
+			}
+		}
 
 		Track_Destroy(&trk);
 	}

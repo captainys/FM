@@ -26,6 +26,7 @@
 #define FDCCMD_READTRACK		0xE0
 #define FDCCMD_WRITETRACK		0xF0
 #define FDCCMD_READSECTOR		0x80
+#define FDCCMD_WRITESECTOR		0xA0
 #define FDCCMD_FORCEINTERRUPT	0xD0
 
 #define IO_FDC_CYLINDER			0x202
@@ -107,5 +108,10 @@ unsigned char FDC_ReadSectorReal(struct FDC_IOConfig cfg,struct bufferInfo DMABu
 unsigned char FDC_ReadSector(struct FDC_IOConfig cfg,struct bufferInfo DMABuf,unsigned int  *accumTime,unsigned char C,unsigned char H,unsigned char R,unsigned char N);
 unsigned char FDC_ReadTrack(struct FDC_IOConfig cfg,struct bufferInfo DMABuf,unsigned short *readSize);
 unsigned char FDC_WriteTrack(unsigned long *writeSize,struct FDC_IOConfig cfg,struct bufferInfo DMABuf,unsigned int len,unsigned char data[]);
+unsigned char FDC_WriteSector(struct FDC_IOConfig cfg,struct bufferInfo DMABuf,
+    unsigned char C,unsigned char H,unsigned char R,unsigned char N,
+    unsigned int len,const unsigned char data[],
+    unsigned char deletedData,unsigned char crcError);
+
 
 #endif
