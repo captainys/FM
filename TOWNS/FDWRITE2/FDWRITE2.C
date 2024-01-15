@@ -10,11 +10,11 @@
 #include "FDC.H"
 #include "PIC.H"
 #include "TIMER.H"
+#include "UTIL.H"
 
 
 
 static struct bufferInfo DMABuf;
-static unsigned char formatData[FORMAT_LEN_MAX];
 static _Handler default_INT46H_Handler;
 static struct PICMask default_PICMask;
 
@@ -191,7 +191,6 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 	FDC_Restore(fdcConfig);
 	for(trackPos=0; trackPos<reader->prop.numTracks; ++trackPos)
 	{
-		int i;
 		unsigned long bytesWritten;
 		TRACK trk;
 		D77Reader_ReadTrack(&trk,reader,trackPos);
@@ -213,15 +212,7 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 		fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
 		FDC_SetSide(&fdcConfig,trk.H);
 
-		printf("C%02d H%02d\n",trk.C,trk.H);
-		for(i=0; i<trk.numAddrMarks; ++i)
-		{
-			printf("%02x%02x%02x%02x ",trk.addrMarks[i].CHRN[0],trk.addrMarks[i].CHRN[1],trk.addrMarks[i].CHRN[2],trk.addrMarks[i].CHRN[3]);
-			if(7==i%8 || i+1==trk.numAddrMarks)
-			{
-				printf("\n");
-			}
-		}
+		Track_Print(&trk);
 
 		{
 			int crunchLevel;
@@ -266,6 +257,112 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 
 int WriteBackRDD(struct CommandParameterInfo *cpi)
 {
+	int err;
+	struct FDC_IOConfig fdcConfig;
+	static unsigned char formatData[FORMAT_LEN_MAX];
+
+	RDDREADER *reader=RDDReader_Create();
+
+	err=RDDReader_Begin(reader,cpi->imageFileName);
+	if(ERROR_NONE!=err)
+	{
+		RDDReader_Destroy(reader);
+		return err;
+	}
+
+	err=VerifyDiskWritable(&reader->prop);
+	if(ERROR_NONE!=err)
+	{
+		RDDReader_Destroy(reader);
+		return err;
+	}
+
+	unsigned int mode=MODE_2HD_1232K,formatLen=FORMAT_LEN_2HD_1232KB;
+	switch(reader->prop.mediaType)
+	{
+	case D77_MEDIATYPE_2HD:
+		mode=MODE_2HD_1232K;
+		formatLen=FORMAT_LEN_2HD_1232KB;
+		break;
+	case D77_MEDIATYPE_2D:
+		mode=MODE_2D;
+		formatLen=FORMAT_LEN_2DD;
+		break;
+	case D77_MEDIATYPE_2DD:
+		mode=MODE_2DD;
+		formatLen=FORMAT_LEN_2DD;
+		break;
+	}
+
+	fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
+	FDC_Restore(fdcConfig);
+	while(1)
+	{
+		unsigned long bytesWritten;
+		TRACK trk;
+		err=RDDReader_ReadTrack(&trk,reader);
+		if(ERROR_NONE!=err)
+		{
+			break;
+		}
+
+		if(D77_MEDIATYPE_2HD==reader->prop.mediaType)
+		{
+			unsigned int kb=IdentifyDiskSizeInKB(&reader->prop,&trk);
+			if(1440==kb)
+			{
+				mode=MODE_2HD_1440K;
+				formatLen=FORMAT_LEN_2HD_1440KB;
+			}
+			else
+			{
+				mode=MODE_2HD_1232K;
+				formatLen=FORMAT_LEN_2HD_1232KB;
+			}
+		}
+		fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
+		FDC_SetSide(&fdcConfig,trk.H);
+
+		Track_Print(&trk);
+
+		{
+			int crunchLevel;
+			for(crunchLevel=0; crunchLevel<3; ++crunchLevel)
+			{
+				unsigned int len;
+				Track_MakeFormatData(&len,formatData,FORMAT_LEN_MAX,&trk,crunchLevel);
+				if(len<=formatLen)
+				{
+					break;
+				}
+				printf("Crunch %d\n",crunchLevel);
+			}
+		}
+
+		FDC_Seek(fdcConfig,trk.C);
+		FDC_WriteTrack(&bytesWritten,fdcConfig,DMABuf,formatLen,formatData);
+
+		{
+			int sec;
+			for(sec=0; sec<trk.numSectors; ++sec)
+			{
+				FDC_WriteSector(fdcConfig,DMABuf,
+						trk.sectors[sec].CHRN[0],
+						trk.sectors[sec].CHRN[1],
+						trk.sectors[sec].CHRN[2],
+						trk.sectors[sec].CHRN[3],
+						trk.sectors[sec].numBytes,
+						trk.sectors[sec].data,
+						0!=(trk.sectors[sec].flags&FLAG_DELETED_DATA),
+						0!=(trk.sectors[sec].flags&FLAG_CRC_ERROR));
+			}
+		}
+
+		Track_Destroy(&trk);
+	}
+
+	RDDReader_Destroy(reader);
+
 	return ERROR_NONE;
 }
 

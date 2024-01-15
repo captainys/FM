@@ -210,6 +210,28 @@ int Track_MakeFormatData(unsigned int *len,unsigned char data[],unsigned long ma
 	return err;
 }
 
+void Track_Print(TRACK *track)
+{
+	int i;
+	printf("C%02dH%02d ",track->C,track->H);
+	for(i=0; i<track->numAddrMarks; ++i)
+	{
+		printf("%02x%02x%02x%02x ",track->addrMarks[i].CHRN[0],track->addrMarks[i].CHRN[1],track->addrMarks[i].CHRN[2],track->addrMarks[i].CHRN[3]);
+		if(i+1==track->numAddrMarks)
+		{
+			printf("\n");
+		}
+		else if(7==i%8)
+		{
+			printf("\n       ");
+		}
+	}
+	if(0==track->numAddrMarks)
+	{
+		printf("No Sectors\n");
+	}
+}
+
 int VerifyDiskWritable(const DISKPROP *prop)
 {
 	switch(prop->mediaType)
@@ -577,7 +599,7 @@ int RDDReader_Begin(RDDREADER *reader,const char fn[])
 			goto CLOSE_AND_RETURN;
 		}
 
-		if(48!=fread(buf,1,16,reader->fp))
+		if(48!=fread(buf,1,48,reader->fp))
 		{
 			err=ERROR_TOO_SHORT;
 			goto CLOSE_AND_RETURN;
@@ -636,7 +658,7 @@ int RDDReader_ReadTrack(TRACK *track,RDDREADER *reader)
 		switch(buf[0])
 		{
 		case RDDCMD_END_DISK:
-			// End of Disk without End of Track
+			fprintf(stderr,"End of Disk before End of Track.\n",buf[0]);
 			return ERROR_BROKEN_DATA;
 		case RDDCMD_IDMARK:
 			++numAddrMarks;
@@ -647,13 +669,26 @@ int RDDReader_ReadTrack(TRACK *track,RDDREADER *reader)
 			s=RDD_PADDED_SIZE(s);
 			fseek(reader->fp,ftell(reader->fp)+s,SEEK_SET);
 			break;
+		case RDDCMD_END_TRACK:
+			break;
 		case RDDCMD_TRACK_READ:
 		case RDDCMD_UNSTABLE_BYTES:
-		default:
+		case RDDCMD_RESERVED07H:
+		case RDDCMD_RESERVED08H:
+		case RDDCMD_RESERVED09H:
+		case RDDCMD_RESERVED0AH:
+		case RDDCMD_RESERVED0BH:
+		case RDDCMD_RESERVED0CH:
+		case RDDCMD_RESERVED0DH:
+		case RDDCMD_RESERVED0EH:
+		case RDDCMD_RESERVED0FH:
 			s=WordToUnsignedShort(buf+0x0E);
 			s=RDD_PADDED_SIZE(s);
 			fseek(reader->fp,ftell(reader->fp)+s,SEEK_SET);
 			break;
+		default:
+			fprintf(stderr,"Unknown RDD tag 0x%02x.\n",buf[0]);
+			return ERROR_BROKEN_DATA;
 		}
 		if(RDDCMD_END_TRACK==buf[0])
 		{
@@ -699,6 +734,11 @@ int RDDReader_ReadTrack(TRACK *track,RDDREADER *reader)
 			s=WordToUnsignedShort(buf+0x0E);
 			s=RDD_PADDED_SIZE(s);
 
+			track->sectors[sector].CHRN[0]=buf[1];
+			track->sectors[sector].CHRN[1]=buf[2];
+			track->sectors[sector].CHRN[2]=buf[3];
+			track->sectors[sector].CHRN[3]=buf[4];
+
 			Sector_Alloc(&track->sectors[sector],s);
 			fread(track->sectors[sector].data,1,s,reader->fp);
 
@@ -713,20 +753,33 @@ int RDDReader_ReadTrack(TRACK *track,RDDREADER *reader)
 
 			++sector;
 			break;
+		case RDDCMD_BEGIN_TRACK:
+		case RDDCMD_END_TRACK:
+			break;
 		case RDDCMD_TRACK_READ:
 		case RDDCMD_UNSTABLE_BYTES:
-		default:
+		case RDDCMD_RESERVED07H:
+		case RDDCMD_RESERVED08H:
+		case RDDCMD_RESERVED09H:
+		case RDDCMD_RESERVED0AH:
+		case RDDCMD_RESERVED0BH:
+		case RDDCMD_RESERVED0CH:
+		case RDDCMD_RESERVED0DH:
+		case RDDCMD_RESERVED0EH:
+		case RDDCMD_RESERVED0FH:
 			s=WordToUnsignedShort(buf+0x0E);
 			s=RDD_PADDED_SIZE(s);
 			fseek(reader->fp,ftell(reader->fp)+s,SEEK_SET);
 			break;
+		default:
+			fprintf(stderr,"Unknown RDD tag 0x%02x.\n",buf[0]);
+			return ERROR_BROKEN_DATA;
 		}
 		if(RDDCMD_END_TRACK==buf[0])
 		{
 			break;
 		}
 	}
-
 	for(addrMark=0; addrMark<track->numAddrMarks; ++addrMark)
 	{
 		unsigned char recordNotFound=FLAG_RECORD_NOT_FOUND; // Tentative

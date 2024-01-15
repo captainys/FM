@@ -15,4 +15,9 @@ size_t GetFileSize(const char fileName[]);
 
 unsigned int IdentifyFileType(const char fileName[]);
 
+
+// In ASM.ASM
+extern Tsugaru_Debug(const char str[]);
+
+
 #endif

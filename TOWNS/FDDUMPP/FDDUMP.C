@@ -88,6 +88,12 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 // End of File
 // 06h 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 
+// Reserved
+// 07h to 0Fh
+//    +E  sz  Lower-byte of the size in bytes.
+//    +F  sz  Higher-byte of the size in bytes.
+//   Size used in file is zero-padded to 16*N bytes.
+
 // Unstable-byte flags.  (Non-zero means unstable.)
 // Immediately preceding data (ID Mark, Sector, or Track Read) has unstable bytes.
 // 10h 00 00 00 00 00 00 00 00 00 00 00 00 sz sz

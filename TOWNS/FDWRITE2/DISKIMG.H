@@ -69,6 +69,8 @@ void Track_Destroy(TRACK *track);
 */
 int Track_MakeFormatData(unsigned int *len,unsigned char data[],unsigned long maxLen,const TRACK *track,unsigned char crunchGapLevel);
 
+void Track_Print(TRACK *track);
+
 #define FORMAT_LEN_2DD          6198
 #define FORMAT_LEN_2HD_1232KB  10416
 #define FORMAT_LEN_2HD_1440KB  12934
@@ -133,13 +135,22 @@ int D77Reader_End(D77READER *reader);
 void D77Reader_Destroy(D77READER *);
 
 
-#define RDDCMD_BEGIN_DISK        0
-#define RDDCMD_BEGIN_TRACK       1
-#define RDDCMD_IDMARK            2
-#define RDDCMD_DATA              3
-#define RDDCMD_TRACK_READ        4
-#define RDDCMD_END_TRACK         5
-#define RDDCMD_END_DISK          6
+#define RDDCMD_BEGIN_DISK     0x00
+#define RDDCMD_BEGIN_TRACK    0x01
+#define RDDCMD_IDMARK         0x02
+#define RDDCMD_DATA           0x03
+#define RDDCMD_TRACK_READ     0x04
+#define RDDCMD_END_TRACK      0x05
+#define RDDCMD_END_DISK       0x06
+#define RDDCMD_RESERVED07H    0x07
+#define RDDCMD_RESERVED08H    0x08
+#define RDDCMD_RESERVED09H    0x09
+#define RDDCMD_RESERVED0AH    0x0A
+#define RDDCMD_RESERVED0BH    0x0B
+#define RDDCMD_RESERVED0CH    0x0C
+#define RDDCMD_RESERVED0DH    0x0D
+#define RDDCMD_RESERVED0EH    0x0E
+#define RDDCMD_RESERVED0FH    0x0F
 #define RDDCMD_UNSTABLE_BYTES 0x10
 
 #define RDD_PADDED_SIZE(n) (((n)+15)&0xFFFFFFF0)

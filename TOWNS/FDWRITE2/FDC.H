@@ -93,6 +93,11 @@ struct FDC_IOConfig
 
 void FDC_TakeOverINT46H(void);
 struct FDC_IOConfig FDC_GetIOConfig(unsigned int drive,unsigned int mode);
+
+/*! Set H or Side bit of the controlByte of cfgPtr.
+*/
+void FDC_SetSide(struct FDC_IOConfig *cfgPtr,int H);
+
 int FDC_GetNumberOfCylinders(unsigned int mode);
 void FDC_SelectDrive(struct FDC_IOConfig cfg);
 void FDC_WriteDriveControl(struct FDC_IOConfig cfg,unsigned char IRQEN);

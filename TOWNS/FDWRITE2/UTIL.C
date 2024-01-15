@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
 #include "UTIL.H"
 #include "DEF.H"
 
@@ -60,17 +61,22 @@ unsigned int IdentifyFileType(const char fileName[])
 		ext[i]=toupper(ext[i]);
 	}
 
-	if(0==strcmp(ext[i],".D77"))
+	if(0==strcmp(ext,".D77"))
 	{
 		return FILETYPE_D77;
 	}
-	else if(0==strcmp(ext[i],".RDD"))
+	else if(0==strcmp(ext,".RDD"))
 	{
 		char id[16];
 		FILE *fp=fopen(fileName,"rb");
 		if(NULL!=fp && 16==fread(id,1,16,fp) && 0==strcmp(id,RDD_SIGNATURE))
 		{
+			fclose(fp);
 			return FILETYPE_RDD;
+		}
+		if(NULL!=fp)
+		{
+			fclose(fp);
 		}
 	}
 	else
