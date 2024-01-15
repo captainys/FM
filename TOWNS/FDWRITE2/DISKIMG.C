@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "DISKIMG.H"
 #include "UTIL.H"
 
@@ -97,7 +98,157 @@ void Track_Destroy(TRACK *track)
 	Track_Init(track);
 }
 
+int Track_MakeFormatData(unsigned char data[],unsigned long maxLen,const TRACK *track,unsigned char crunchGapLevel)
+{
+	int err=ERROR_NONE;
+	unsigned int ptr=0;
 
+	int i,sec;
+	unsigned int len_preGap=32;
+	unsigned int len_sync=12;
+	unsigned int len_gap2=0x16;
+	unsigned int len_gap3=0x36;
+
+	if(0==crunchGapLevel)
+	{
+		// No change.
+	}
+	if(1==crunchGapLevel)
+	{
+		len_preGap=24;
+		len_sync=10;
+		len_gap2=0x10;
+		len_gap3=0x30;
+	}
+	else
+	{
+		len_preGap=20;
+		len_sync=9;
+		len_gap2=0x0C;
+		len_gap3=0x26;
+	}
+
+	const unsigned char FORMATBYTE_SYNC=0;
+	const unsigned char FORMATBYTE_MISSING_CLOCK=0xF5;
+	const unsigned char FORMATBYTE_ADDR_MARK=0xFE;
+	const unsigned char FORMATBYTE_DATA_MARK=0xFB;
+	const unsigned char FORMATBYTE_DELETED_DATA_MARK=0xF8;
+	const unsigned char FORMATBYTE_CRC=0xF7;
+	const unsigned char FORMATBYTE_GAP=0x4E;
+	const unsigned char FORMATBYTE_FILLER=0xE5;
+
+	for(i=0; i<len_preGap && ptr<maxLen; ++i)
+	{
+		data[ptr++]=FORMATBYTE_GAP;
+	}
+	for(sec=0; sec<track->numAddrMarks && ptr<maxLen; ++sec)
+	{
+		for(i=0; i<len_sync && ptr<maxLen; ++i)
+		{
+			data[ptr++]=FORMATBYTE_SYNC;
+		}
+
+		// Make ID Mark
+		if(maxLen<ptr+8)
+		{
+			err=ERROR_FORMAT_DATA_OVERFLOW;
+			break;
+		}
+		data[ptr++]=FORMATBYTE_MISSING_CLOCK;
+		data[ptr++]=FORMATBYTE_MISSING_CLOCK;
+		data[ptr++]=FORMATBYTE_MISSING_CLOCK;
+		data[ptr++]=FORMATBYTE_ADDR_MARK;
+		data[ptr++]=track->addrMarks[sec].CHRN[0];
+		data[ptr++]=track->addrMarks[sec].CHRN[1];
+		data[ptr++]=track->addrMarks[sec].CHRN[2];
+		data[ptr++]=track->addrMarks[sec].CHRN[3];
+		data[ptr++]=FORMATBYTE_CRC;
+
+		for(i=0; i<len_gap2 && ptr<maxLen; ++i)
+		{
+			data[ptr++]=FORMATBYTE_GAP;
+		}
+
+		if(0==(track->addrMarks[sec].flags&FLAG_RECORD_NOT_FOUND))
+		{
+			// Make Data Mark
+			if(maxLen<ptr+4)
+			{
+				err=ERROR_FORMAT_DATA_OVERFLOW;
+				break;
+			}
+			data[ptr++]=FORMATBYTE_MISSING_CLOCK;
+			data[ptr++]=FORMATBYTE_MISSING_CLOCK;
+			data[ptr++]=FORMATBYTE_MISSING_CLOCK;
+			data[ptr++]=FORMATBYTE_DATA_MARK;
+
+			unsigned int size=(128<<(track->addrMarks[sec].CHRN[3]&3));
+			for(i=0; i<size && ptr<maxLen; ++i)
+			{
+				data[ptr++]=FORMATBYTE_FILLER;
+			}
+
+			if(ptr<maxLen)
+			{
+				data[ptr++]=FORMATBYTE_CRC;
+			}
+
+			for(i=0; i<len_gap3 && ptr<maxLen; ++i)
+			{
+				data[ptr++]=FORMATBYTE_GAP;
+			}
+		}
+	}
+
+	while(ptr<maxLen)
+	{
+		data[ptr++]=FORMATBYTE_GAP;
+	}
+
+	return err;
+}
+
+int VerifyDiskWritable(const DISKPROP *prop)
+{
+	switch(prop->mediaType)
+	{
+	case D77_MEDIATYPE_2D :
+		return ERROR_2D_NOT_SUPPORTED;
+	case D77_MEDIATYPE_1D :
+	case D77_MEDIATYPE_1DD:
+		return ERROR_1D_1DD_NOT_SUPPORTED;
+	}
+	return ERROR_NONE;
+}
+
+int IdentifyDiskSizeInKB(const DISKPROP *prop,const TRACK *track)
+{
+	switch(prop->mediaType)
+	{
+	case D77_MEDIATYPE_2HD:
+		{
+			int num512byteSectors=0;
+			int i;
+			for(i=0; i<track->numSectors; ++i)
+			{
+				if(512==track->sectors[i].numBytes)
+				{
+					++num512byteSectors;
+				}
+			}
+			if(16<num512byteSectors)
+			{
+				return 1440;
+			}
+		}
+		return 1232;
+	case D77_MEDIATYPE_2D:
+		return 320;
+	case D77_MEDIATYPE_2DD:
+		return 640;
+	}
+	return 0;
+}
 
 static void D77Reader_Init(D77READER *reader)
 {
@@ -143,6 +294,17 @@ int D77Reader_Begin(D77READER *reader,const char fn[])
 		return ERROR_TOO_SHORT;
 	}
 
+	int i;
+	for(i=0; i<D77_HEADER_LENGTH; ++i)
+	{
+		printf("%02x ",reader->header_basic[i]);
+		if(i%16==15)
+		{
+			printf("\n");
+		}
+	}
+
+
 	reader->prop.writeProtected=reader->header_basic[D77_HEADER_OFFSET_WRITEPROT];
 	reader->prop.mediaType=reader->header_basic[D77_HEADER_OFFSET_MEDIATYPE];
 	reader->diskSize=DWordToUnsignedInt(reader->header_basic+D77_HEADER_OFFSET_DISKSIZE);
@@ -151,8 +313,8 @@ int D77Reader_Begin(D77READER *reader,const char fn[])
 		// According to the D77 format, I need to find the first non-zero offset
 		// to know how many tracks in this 
 		unsigned int track=0;
-		long long int headerEndPtr=DAMN_BIG_NUMBER;
-		for(long long int i=D77_HEADER_LENGTH; i<reader->diskSize && i<headerEndPtr && track<MAX_NUM_TRACKS; i+=4)
+		long int headerEndPtr=DAMN_BIG_NUMBER;
+		for(long int i=D77_HEADER_LENGTH; i<reader->diskSize && i<headerEndPtr && track<MAX_NUM_TRACKS; i+=4)
 		{
 			unsigned long offset;
 			unsigned char dw[4];
@@ -242,7 +404,7 @@ int D77Reader_ReadTrack(TRACK *track,D77READER *reader,unsigned int trackPos)
 	{
 		unsigned char CHRN[4];
 		unsigned char *sectorPtr=trackData+sectorOffset;
-		long long int sectorNByte=WordToUnsignedShort(sectorPtr+0x0e);
+		long int sectorNBytes=WordToUnsignedShort(sectorPtr+0x0e);
 		if(trackSize<=sectorOffset+0x10)
 		{
 			return ERROR_BROKEN_DATA;
@@ -279,7 +441,7 @@ int D77Reader_ReadTrack(TRACK *track,D77READER *reader,unsigned int trackPos)
 			++numSectors;
 		}
 
-		sectorOffset+=0x10+WordToUnsignedShort(sectorPtr+0x0e);
+		sectorOffset+=0x10+sectorNBytes;
 	}
 
 
@@ -293,7 +455,6 @@ int D77Reader_ReadTrack(TRACK *track,D77READER *reader,unsigned int trackPos)
 		unsigned int numBytes=0;
 		unsigned char CHRN[4];
 		unsigned char *sectorPtr=trackData+sectorOffset;
-		long long int sectorNByte=WordToUnsignedShort(sectorPtr+0x0e);
 		if(trackSize<=sectorOffset+0x10)
 		{
 			return ERROR_BROKEN_DATA;
@@ -315,6 +476,7 @@ int D77Reader_ReadTrack(TRACK *track,D77READER *reader,unsigned int trackPos)
 
 		if(D77_SECTOR_STATUS_RECORD_NOT_FOUND==sectorPtr[8])
 		{
+			// Flag address-mark so that formatter won't make a data mark for this address mark.
 			track->addrMarks[addrMarkIdx].flags|=FLAG_RECORD_NOT_FOUND;
 		}
 		else

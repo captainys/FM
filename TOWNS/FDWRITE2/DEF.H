@@ -15,12 +15,32 @@ enum
 	ERROR_TRACK_OUT_OF_RANGE,
 	ERROR_OUT_OF_MEMORY,
 	ERROR_BROKEN_DATA,
+	ERROR_1D_1DD_NOT_SUPPORTED,
+	ERROR_2D_NOT_SUPPORTED,
+	ERROR_2HD_1440KB_NOT_SUPPORTED,
+	ERROR_FORMAT_DATA_OVERFLOW,
 };
 
 
 #define DAMN_BIG_NUMBER 0x7fffffff
 
-#define _MAX_PATH 260
+#ifndef _MAX_PATH
+	#define _MAX_PATH 260
+#endif
 
+
+
+//                                        		.386p 
+//                                        		ASSUME CS:CODE 
+//00000000                                CODE		SEGMENT 
+//00000000  FA                            		CLI 
+//00000001  FB                            		STI 
+//00000002                                CODE		ENDS 
+//                                        		END 
+#define __CLI _inline(0xFA)
+#define __STI _inline(0xFB)
+
+#define SMALLER(a,b) ((a)<(b) ? (a) : (b))
+#define GREATER(a,b) ((a)>(b) ? (a) : (b))
 
 #endif

@@ -3,8 +3,10 @@
 #include <ctype.h>
 #include "DISKIMG.H"
 #include "DEF.H"
+#include "DMABUF.H"
 
-
+static struct bufferInfo DMABuf;
+static unsigned char formatData[FORMAT_LEN_MAX];
 
 void PrintHelp(void)
 {
@@ -45,6 +47,15 @@ void PrintError(int err)
 		break;
 	case ERROR_BROKEN_DATA:
 		fprintf(stderr,"Error: Broken data.\n");
+		break;
+	case ERROR_1D_1DD_NOT_SUPPORTED:
+		fprintf(stderr,"Error: 1D/1DD not supported.\n");
+		break;
+	case ERROR_2D_NOT_SUPPORTED:
+		fprintf(stderr,"Error: 2D not supported.\n");
+		break;
+	case ERROR_2HD_1440KB_NOT_SUPPORTED:
+		fprintf(stderr,"Error: 144KB not supported.\n");
 		break;
 	}
 }
@@ -89,13 +100,20 @@ int RecognizeCommandParameterInfo(struct CommandParameterInfo *cpi,int ac,char *
 	return ERROR_NONE;
 }
 
-int ProcessD77(struct CommandParameterInfo *cpi)
+int WriteBackD77(struct CommandParameterInfo *cpi)
 {
 	int err;
 	int trackPos;
 	D77READER *reader=D77Reader_Create();
 
 	err=D77Reader_Begin(reader,cpi->imageFileName);
+	if(ERROR_NONE!=err)
+	{
+		D77Reader_Destroy(reader);
+		return err;
+	}
+
+	err=VerifyDiskWritable(&reader->prop);
 	if(ERROR_NONE!=err)
 	{
 		D77Reader_Destroy(reader);
@@ -109,13 +127,15 @@ int ProcessD77(struct CommandParameterInfo *cpi)
 		D77Reader_ReadTrack(&trk,reader,trackPos);
 
 		printf("C%02d H%02d\n",trk.C,trk.H);
-
 		for(i=0; i<trk.numAddrMarks; ++i)
 		{
 			printf("%02x%02x%02x%02x ",trk.addrMarks[i].CHRN[0],trk.addrMarks[i].CHRN[1],trk.addrMarks[i].CHRN[2],trk.addrMarks[i].CHRN[3]);
+			if(7==i%8 || i+1==trk.numAddrMarks)
+			{
+				printf("\n");
+			}
 		}
 
-		printf("\n");
 
 		Track_Destroy(&trk);
 	}
@@ -137,7 +157,9 @@ int main(int ac,char *av[])
 		return 1;
 	}
 
-	err=ProcessD77(&cpi);
+	DMABuf=MakeDataBuffer();
+
+	err=WriteBackD77(&cpi);
 	if(ERROR_NONE!=err)
 	{
 		PrintError(err);

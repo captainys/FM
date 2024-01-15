@@ -44,6 +44,29 @@ typedef struct Track
 void Track_Init(TRACK *track);
 int Track_Prepare(TRACK *track,int C,int H,int numAddrMarks,int numSectors);
 void Track_Destroy(TRACK *track);
+/*! crunchGapLevel
+    0
+	unsigned int len_preGap=32;
+	unsigned int len_sync=12;
+	unsigned int len_gap2=0x16;
+	unsigned int len_gap3=0x36;
+	1
+	unsigned int len_preGap=24;
+	unsigned int len_sync=10;
+	unsigned int len_gap2=0x10;
+	unsigned int len_gap3=0x30;
+	2
+	unsigned int len_preGap=20;
+	unsigned int len_sync=9;
+	unsigned int len_gap2=0x0C;
+	unsigned int len_gap3=0x26;
+*/
+int Track_MakeFormatData(unsigned char data[],unsigned long maxLen,const TRACK *track,unsigned char crunchGapLevel);
+
+#define FORMAT_LEN_2DD          6198
+#define FORMAT_LEN_2HD_1232KB  10416
+#define FORMAT_LEN_2HD_1440KB  12934
+#define FORMAT_LEN_MAX         16384
 
 typedef struct DiskProp
 {
@@ -58,6 +81,13 @@ typedef struct Disk
 	TRACK tracks[MAX_NUM_TRACKS];
 } DISK;
 
+int VerifyDiskWritable(const DISKPROP *prop);
+
+/*! Returns 0, 320, 640, 1232 or 1440.
+    Does not distinguish 640KB and 720KB.
+    Returns 0 if the media type is 1D or 1DD or unknown.
+*/
+int Identify2HDDiskSize(const DISKPROP *prop,const TRACK *track);
 
 #define D77_HEADER_LENGTH 0x20
 
