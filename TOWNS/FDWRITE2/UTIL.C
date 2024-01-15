@@ -1,7 +1,5 @@
 #include "UTIL.H"
 
-
-
 unsigned long DWordToUnsignedInt(const unsigned char data[])
 {
 	return *(unsigned long *)data;

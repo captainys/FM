@@ -1,6 +1,7 @@
 ////////////////////////////////////////////////////////////////////////
 // DMA Buffer
 
+#include <stdio.h>
 #include <string.h>
 #include "DMABUF.H"
 #include "DEF.H"
@@ -112,7 +113,7 @@ struct bufferInfo MakeDataBuffer(void)
 	return info;
 }
 
-extern void WriteToDMABuf(const struct bufferInfo *buf,unsigned long len,const unsigned char data[])
+void WriteToDMABuf(const struct bufferInfo *buf,unsigned long len,const unsigned char data[])
 {
 	unsigned int page=0,ptr=0;
 	while(page<buf->numberOfPages && ptr<len)
@@ -124,7 +125,7 @@ extern void WriteToDMABuf(const struct bufferInfo *buf,unsigned long len,const u
 	}
 }
 
-extern void ReadFromDMABuf(unsigned char data[],const struct bufferInfo *buf,unsigned long len)
+void ReadFromDMABuf(unsigned char data[],const struct bufferInfo *buf,unsigned long len)
 {
 	unsigned int page=0,ptr=0;
 	while(page<buf->numberOfPages && ptr<len)

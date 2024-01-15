@@ -1,12 +1,23 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <dos.h>
+#include <signal.h>
 #include "DISKIMG.H"
 #include "DEF.H"
 #include "DMABUF.H"
+#include "FDC.H"
+#include "PIC.H"
+#include "TIMER.H"
+
+
 
 static struct bufferInfo DMABuf;
 static unsigned char formatData[FORMAT_LEN_MAX];
+static _Handler default_INT46H_Handler;
+static struct PICMask default_PICMask;
+
 
 void PrintHelp(void)
 {
@@ -58,6 +69,41 @@ void PrintError(int err)
 		fprintf(stderr,"Error: 144KB not supported.\n");
 		break;
 	}
+}
+
+void CleanUp(void)
+{
+	int i;
+	_setpvect(INT_FDC,default_INT46H_Handler);
+//	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
+//	
+//	controlByte&=~CTL_MOTOR;
+//	speedByte&=~SPD_INUSE;
+//	SelectDrive();
+//	WriteDriveControl(0);
+//	
+	PIC_SetMask(default_PICMask);
+//	
+//	Color(7);
+//	PrintSysCharWord("        ",1,7);
+//	PrintSysCharWord("        ",9,7);
+//	PrintSysCharWord("        ",17,7);
+//	PrintSysCharWord("        ",25,7);
+	for(i=0; i<8; ++i)
+	{
+//		unsigned char r=(i&2 ? 255 : 0);
+//		unsigned char g=(i&4 ? 255 : 0);
+//		unsigned char b=(i&1 ? 255 : 0);
+//		Palette(i,r,g,b);
+	}
+}
+
+void CtrlC(int err)
+{
+	// Color(7);
+	CleanUp();
+	printf("Intercepted Ctrl+C\n");
+	exit(1);
 }
 
 struct CommandParameterInfo
@@ -158,6 +204,10 @@ int main(int ac,char *av[])
 	}
 
 	DMABuf=MakeDataBuffer();
+
+	default_INT46H_Handler=_getpvect(INT_FDC);
+	default_PICMask=PIC_GetMask();
+	signal(SIGINT,CtrlC);
 
 	err=WriteBackD77(&cpi);
 	if(ERROR_NONE!=err)

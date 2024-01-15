@@ -5,5 +5,4 @@
 unsigned long DWordToUnsignedInt(const unsigned char data[]);
 unsigned short WordToUnsignedShort(const unsigned char data[]);
 
-
 #endif

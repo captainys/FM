@@ -1,0 +1,84 @@
+#ifndef FDC_H_IS_INCLUDED
+#define FDC_H_IS_INCLUDED
+
+#define IO_FDC_STATUS			0x200
+#define FDCSTA_BUSY				0x01
+#define FDCSTA_INDEX			0x02
+
+#define IOERR_CRC 8
+#define IOERR_RECORD_NOT_FOUND 0x10
+#define IOERR_DELETED_DATA     0x20
+#define IOERR_LOST_DATA			0x04
+
+#define IO_PIC0_IRR				0x00
+#define IO_PIC0_ISR				0x00
+#define IO_PIC0_OCW2			0x00	// bit 3 & 4 zero
+#define IO_PIC0_OCW3			0x00	// bit 3=1, bit4=0
+#define IRR_FDC					0x40
+
+#define IO_FDC_COMMAND			0x200
+#define FDCCMD_RESTORE_HEAD_UNLOAD  0x00
+#define FDCCMD_RESTORE			0x08
+#define FDCCMD_SEEK				0x18
+#define FDCCMD_READADDR			0xC0
+#define FDCCMD_READTRACK		0xE0
+#define FDCCMD_READSECTOR		0x80
+#define FDCCMD_FORCEINTERRUPT	0xD0
+
+#define IO_FDC_CYLINDER			0x202
+#define IO_FDC_SECTOR			0x204
+#define IO_FDC_DATA				0x206
+
+#define IO_FDC_DRIVE_STATUS		0x0208
+#define DRIVE_STA_FREADY		0x02
+
+#define IO_FDC_DRIVE_CONTROL	0x0208
+#define IO_FDC_DRIVE_SELECT		0x020C
+
+#define IO_1US_WAIT				0x06C
+
+#define IO_DMA_INITIALIZE		0x0A0
+#define IO_DMA_CHANNEL			0x0A1
+#define IO_DMA_COUNT_LOW		0x0A2
+#define IO_DMA_COUNT_HIGH		0x0A3
+#define IO_DMA_ADDR_LOW			0x0A4
+#define IO_DMA_ADDR_MID_LOW		0x0A5
+#define IO_DMA_ADDR_MID_HIGH	0x0A6
+#define IO_DMA_ADDR_HIGH		0x0A7
+#define IO_DMA_DEVICE_CTRL_LOW	0x0A8
+#define IO_DMA_DEVICE_CTRL_HIGH	0x0A9
+#define IO_DMA_MODE_CONTROL		0x0AA
+#define IO_DMA_STATUS			0x0AB
+#define IO_DMA_REQUEST			0x0AE
+#define IO_DMA_MASK				0x0AF
+
+#define IO_FUNCTION_ID			0x24
+
+#define DRIVE_MOTOR_WAIT_TIME	2000000
+#define READADDR_TIMEOUT		1000000
+#define READADDR_TRACK_TIMEOUT  3000000
+#define READTRACK_TIMEOUT		3000000
+#define READSECTOR_TIMEOUT		3000000
+#define AFTER_SCSI_WAIT          100000	// 100ms
+
+enum
+{
+	MODE_2D,       // 320K
+	MODE_2DD,      // 640/720K
+	MODE_2HD_1232K,// 1232K
+	MODE_2HD_1440K,// 1440K
+};
+
+#define CTL_CLKSEL 0x20
+#define CTL_MOTOR  0x10
+#define CTL_SIDE   0x04
+#define CTL_MFM    0x02
+#define CTL_IRQEN  0x01
+
+#define SPD_MODE_B 0x80
+#define SPD_360RPM 0x40
+#define SPD_INUSE  0x10
+
+#define INT_FDC 0x46
+
+#endif
