@@ -264,6 +264,16 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 	return ERROR_NONE;
 }
 
+int WriteBackRDD(struct CommandParameterInfo *cpi)
+{
+	return ERROR_NONE;
+}
+
+int WriteBackBIN(struct CommandParameterInfo *cpi)
+{
+	return ERROR_UNSUPPORTED_FILE_TYPE;
+}
+
 int main(int ac,char *av[])
 {
 	int err=ERROR_NONE;
@@ -283,9 +293,22 @@ int main(int ac,char *av[])
 	default_PICMask=PIC_GetMask();
 	signal(SIGINT,CtrlC);
 
-	printf("Start\n");
+	switch(IdentifyFileType(cpi.imageFileName))
+	{
+	case FILETYPE_D77:
+		err=WriteBackD77(&cpi);
+		break;
+	case FILETYPE_RDD:
+		err=WriteBackRDD(&cpi);
+		break;
+	case FILETYPE_BIN:
+		err=WriteBackBIN(&cpi);
+		break;
+	default:
+		err=ERROR_UNSUPPORTED_FILE_TYPE;
+		return 1;
+	}
 
-	err=WriteBackD77(&cpi);
 	if(ERROR_NONE!=err)
 	{
 		PrintError(err);
