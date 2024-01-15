@@ -1,6 +1,8 @@
 #ifndef FDC_H_IS_INCLUDED
 #define FDC_H_IS_INCLUDED
 
+#include "DMABUF.H"
+
 #define IO_FDC_STATUS			0x200
 #define FDCSTA_BUSY				0x01
 #define FDCSTA_INDEX			0x02
@@ -22,6 +24,7 @@
 #define FDCCMD_SEEK				0x18
 #define FDCCMD_READADDR			0xC0
 #define FDCCMD_READTRACK		0xE0
+#define FDCCMD_WRITETRACK		0xF0
 #define FDCCMD_READSECTOR		0x80
 #define FDCCMD_FORCEINTERRUPT	0xD0
 
@@ -58,6 +61,7 @@
 #define READADDR_TIMEOUT		1000000
 #define READADDR_TRACK_TIMEOUT  3000000
 #define READTRACK_TIMEOUT		3000000
+#define WRITETRACK_TIMEOUT		3000000
 #define READSECTOR_TIMEOUT		3000000
 #define AFTER_SCSI_WAIT          100000	// 100ms
 
@@ -80,5 +84,28 @@ enum
 #define SPD_INUSE  0x10
 
 #define INT_FDC 0x46
+
+struct FDC_IOConfig
+{
+	unsigned char drvSel,controlByte,speedByte,seekStep;
+};
+
+void FDC_TakeOverINT46H(void);
+struct FDC_IOConfig FDC_GetIOConfig(unsigned int drive,unsigned int mode);
+int FDC_GetNumberOfCylinders(unsigned int mode);
+void FDC_SelectDrive(struct FDC_IOConfig cfg);
+void FDC_WriteDriveControl(struct FDC_IOConfig cfg,unsigned char IRQEN);
+unsigned char FDC_ReadDriveStatusIO(void);
+int FDC_CheckDriveReady(struct FDC_IOConfig cfg);
+unsigned int  FDC_WaitReady(void);
+void FDC_Command(unsigned char cmd);
+void FDC_WaitIndexHole(void);
+unsigned char FDC_Restore(struct FDC_IOConfig cfg);
+unsigned char FDC_Seek(struct FDC_IOConfig cfg,unsigned char C);
+unsigned char FDC_ReadAddress(struct FDC_IOConfig cfg,struct bufferInfo DMABuf,unsigned int  *accumTime);
+unsigned char FDC_ReadSectorReal(struct FDC_IOConfig cfg,struct bufferInfo DMABuf,unsigned int  *accumTime,unsigned char C,unsigned char H,unsigned char R,unsigned char N);
+unsigned char FDC_ReadSector(struct FDC_IOConfig cfg,struct bufferInfo DMABuf,unsigned int  *accumTime,unsigned char C,unsigned char H,unsigned char R,unsigned char N);
+unsigned char FDC_ReadTrack(struct FDC_IOConfig cfg,struct bufferInfo DMABuf,unsigned short *readSize);
+unsigned char FDC_WriteTrack(unsigned long *writeSize,struct FDC_IOConfig cfg,struct bufferInfo DMABuf,unsigned int len,unsigned char data[]);
 
 #endif

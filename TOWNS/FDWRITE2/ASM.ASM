@@ -5,7 +5,8 @@
 						PUBLIC	GetCS
 						PUBLIC	GetINT46Handler
 						PUBLIC	SetINT46Handler
-						PUBLIC	SetUpDMA
+						PUBLIC	SetUpDMAIn
+						PUBLIC	SetUpDMAOut
 						PUBLIC	Tsugaru_Debug
 
 CODE					SEGMENT
@@ -89,12 +90,12 @@ SetINT46Handler			ENDP
 
 
 
-;void SetUpDMA(unsigned int physAddr,unsigned int count);
+;void SetUpDMAIn(unsigned int physAddr,unsigned int count);
 ;[ESP]		EFLAGS
 ;[ESP+4]	EIP
 ;[ESP+8]	physAddr
 ;[ESP+12]	count
-SetUpDMA				PROC
+SetUpDMAIn				PROC
 
 
 ; A1  Channel
@@ -126,7 +127,48 @@ SetUpDMA				PROC
 
 						RET
 
-SetUpDMA				ENDP
+SetUpDMAIn				ENDP
+
+
+
+;void SetUpDMAOut(unsigned int physAddr,unsigned int count);
+;[ESP]		EFLAGS
+;[ESP+4]	EIP
+;[ESP+8]	physAddr
+;[ESP+12]	count
+SetUpDMAOut				PROC
+
+
+; A1  Channel
+; A2  Count
+; AA  Mode/Control
+
+						PUSHFD
+						CLI
+						XOR  	AL,AL
+						OUT  	0A1H,AL	; CHANNEL
+
+						MOV		EAX,[ESP+8]
+						OUT		0A4H,AX
+						SHR		EAX,16
+						OUT		0A6H,AL
+						MOV		AL,AH
+						OUT		0A7H,AL
+
+						IN		AL,0AFH
+						AND		AL,0FEH
+						OUT		0AFH,AL
+
+						MOV		AX,[ESP+12]
+						OUT		0A2H,AX
+
+						MOV		AL,48H
+						OUT		0AAH,AL
+						POPFD
+
+						RET
+
+SetUpDMAOut				ENDP
 
 
 

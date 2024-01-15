@@ -60,8 +60,10 @@ void Track_Destroy(TRACK *track);
 	unsigned int len_sync=9;
 	unsigned int len_gap2=0x0C;
 	unsigned int len_gap3=0x26;
+
+	returns error code.
 */
-int Track_MakeFormatData(unsigned char data[],unsigned long maxLen,const TRACK *track,unsigned char crunchGapLevel);
+int Track_MakeFormatData(unsigned int *len,unsigned char data[],unsigned long maxLen,const TRACK *track,unsigned char crunchGapLevel);
 
 #define FORMAT_LEN_2DD          6198
 #define FORMAT_LEN_2HD_1232KB  10416
@@ -87,7 +89,7 @@ int VerifyDiskWritable(const DISKPROP *prop);
     Does not distinguish 640KB and 720KB.
     Returns 0 if the media type is 1D or 1DD or unknown.
 */
-int Identify2HDDiskSize(const DISKPROP *prop,const TRACK *track);
+int IdentifyDiskSizeInKB(const DISKPROP *prop,const TRACK *track);
 
 #define D77_HEADER_LENGTH 0x20
 

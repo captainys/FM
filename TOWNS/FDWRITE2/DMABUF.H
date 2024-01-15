@@ -17,7 +17,7 @@ struct bufferInfo
 };
 
 extern struct bufferInfo MakeDataBuffer(void);
-extern void WriteToDMABuf(const struct bufferInfo *buf,unsigned long len,const unsigned char data[]);
-extern void ReadFromDMABuf(unsigned char data[],const struct bufferInfo *buf,unsigned long len);
+extern void WriteToDMABuf(const struct bufferInfo buf,unsigned long len,const unsigned char data[]);
+extern void ReadFromDMABuf(unsigned char data[],const struct bufferInfo buf,unsigned long len);
 
 #endif

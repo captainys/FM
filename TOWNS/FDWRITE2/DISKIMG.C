@@ -98,7 +98,7 @@ void Track_Destroy(TRACK *track)
 	Track_Init(track);
 }
 
-int Track_MakeFormatData(unsigned char data[],unsigned long maxLen,const TRACK *track,unsigned char crunchGapLevel)
+int Track_MakeFormatData(unsigned int *len,unsigned char data[],unsigned long maxLen,const TRACK *track,unsigned char crunchGapLevel)
 {
 	int err=ERROR_NONE;
 	unsigned int ptr=0;
@@ -200,6 +200,8 @@ int Track_MakeFormatData(unsigned char data[],unsigned long maxLen,const TRACK *
 		}
 	}
 
+	*len=ptr;
+
 	while(ptr<maxLen)
 	{
 		data[ptr++]=FORMATBYTE_GAP;
@@ -294,15 +296,15 @@ int D77Reader_Begin(D77READER *reader,const char fn[])
 		return ERROR_TOO_SHORT;
 	}
 
-	int i;
-	for(i=0; i<D77_HEADER_LENGTH; ++i)
-	{
-		printf("%02x ",reader->header_basic[i]);
-		if(i%16==15)
-		{
-			printf("\n");
-		}
-	}
+	//int i;
+	//for(i=0; i<D77_HEADER_LENGTH; ++i)
+	//{
+	//	printf("%02x ",reader->header_basic[i]);
+	//	if(i%16==15)
+	//	{
+	//		printf("\n");
+	//	}
+	//}
 
 
 	reader->prop.writeProtected=reader->header_basic[D77_HEADER_OFFSET_WRITEPROT];
@@ -349,6 +351,7 @@ int D77Reader_Begin(D77READER *reader,const char fn[])
 
 int D77Reader_ReadTrack(TRACK *track,D77READER *reader,unsigned int trackPos)
 {
+	int i;
 	unsigned int C=trackPos/2;
 	unsigned int H=trackPos&1;
 
@@ -378,15 +381,19 @@ int D77Reader_ReadTrack(TRACK *track,D77READER *reader,unsigned int trackPos)
 		return ERROR_NONE;
 	}
 
-	if(trackPos+1<reader->prop.numTracks)
+	for(i=trackPos+1; i<reader->prop.numTracks; ++i)
 	{
-		trackEnd=reader->trackPtr[trackPos+1];
+		trackEnd=reader->trackPtr[i];
+		if(0!=trackEnd) // Next track is unformatted
+		{
+			break;
+		}
 	}
-	else
+	if(0==trackEnd)
 	{
 		trackEnd=reader->diskSize;
 	}
-	trackSize=trackEnd-trackBegin;
+	trackSize=(trackBegin<trackEnd ? trackEnd-trackBegin : 0);
 
 	fseek(reader->fp,trackBegin,SEEK_SET);
 	trackData=(unsigned char *)malloc(trackSize);
