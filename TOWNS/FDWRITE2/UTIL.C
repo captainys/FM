@@ -32,7 +32,7 @@ void ExtractExtension(char ext[5],const char fileName[])
 	ext[4]=0;
 	for(i=0; i<4 && 0!=fileName[lastDot+i]; ++i)
 	{
-		ext[i]=fileName[lstDot+i];
+		ext[i]=fileName[lastDot+i];
 	}
 }
 
@@ -68,7 +68,7 @@ unsigned int IdentifyFileType(const char fileName[])
 	{
 		char id[16];
 		FILE *fp=fopen(fileName,"rb");
-		if(NULL!=fp && 16==fread(id,1,16,fp) && 0==strcmp(id,"REALDISKDUMP"))
+		if(NULL!=fp && 16==fread(id,1,16,fp) && 0==strcmp(id,RDD_SIGNATURE))
 		{
 			return FILETYPE_RDD;
 		}

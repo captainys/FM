@@ -11,6 +11,10 @@
 #define FLAG_DELETED_DATA      2
 #define FLAG_RECORD_NOT_FOUND  4
 
+#define MB8877_IOERR_CRC 8
+#define MB8877_IOERR_RECORD_NOT_FOUND 0x10
+#define MB8877_IOERR_DELETED_DATA     0x20
+#define MB8877_IOERR_LOST_DATA			0x04
 
 
 typedef struct AddrMark
@@ -127,5 +131,33 @@ int D77Reader_ReadTrack(TRACK *track,D77READER *reader,unsigned int trackPos);
 void D77Reader_DestroyTrack(TRACK *track);
 int D77Reader_End(D77READER *reader);
 void D77Reader_Destroy(D77READER *);
+
+
+#define RDDCMD_BEGIN_DISK        0
+#define RDDCMD_BEGIN_TRACK       1
+#define RDDCMD_IDMARK            2
+#define RDDCMD_DATA              3
+#define RDDCMD_TRACK_READ        4
+#define RDDCMD_END_TRACK         5
+#define RDDCMD_END_DISK          6
+#define RDDCMD_UNSTABLE_BYTES 0x10
+
+#define RDD_PADDED_SIZE(n) (((n)+15)&0xFFFFFFF0)
+
+typedef struct RDDReader
+{
+	FILE *fp;
+	DISKPROP prop;
+	unsigned char RDDVer;
+	char diskName[34];
+	unsigned char captureDevice;
+} RDDREADER;
+
+RDDREADER *RDDReader_Create(void);
+int RDDReader_Begin(RDDREADER *reader,const char fn[]);
+int RDDReader_ReadTrack(TRACK *track,RDDREADER *reader);
+void RDDReader_DestroyTrack(TRACK *track);
+int RDDReader_End(RDDREADER *reader);
+void RDDReader_Destroy(RDDREADER *);
 
 #endif

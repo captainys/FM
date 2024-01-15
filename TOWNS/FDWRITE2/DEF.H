@@ -27,6 +27,8 @@ enum
 	ERROR_2HD_1440KB_NOT_SUPPORTED,
 	ERROR_FORMAT_DATA_OVERFLOW,
 	ERROR_UNSUPPORTED_FILE_TYPE,
+
+	END_OF_FILE
 };
 
 
@@ -36,6 +38,7 @@ enum
 	#define _MAX_PATH 260
 #endif
 
+#define RDD_SIGNATURE "REALDISKDUMP"
 
 
 //                                        		.386p 

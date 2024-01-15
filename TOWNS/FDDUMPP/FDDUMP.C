@@ -100,6 +100,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //        However, at the time of the change, no .RDD file with 10H tag existed.
 //        It shouldn't affect anything.
 
+// New Tags: Always +0Eh is the size in bytes excluding the 16-bytes tag.  
+//           Size taken in the file will be padded to 16*N bytes.
 
 // Next Track
 

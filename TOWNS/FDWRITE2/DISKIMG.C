@@ -542,3 +542,227 @@ void D77Reader_Destroy(D77READER *reader)
 	}
 	free(reader);
 }
+
+
+
+
+
+RDDREADER *RDDReader_Create(void)
+{
+	RDDREADER *reader=(RDDREADER *)malloc(sizeof(RDDREADER));
+	if(NULL!=reader)
+	{
+		reader->fp=NULL;
+		reader->prop.writeProtected=0;
+		reader->prop.mediaType=0;
+		reader->prop.numTracks=0;
+	}
+	return reader;
+}
+int RDDReader_Begin(RDDREADER *reader,const char fn[])
+{
+	int err=ERROR_NONE;
+	reader->fp=fopen(fn,"rb");
+	if(NULL!=reader->fp)
+	{
+		unsigned char buf[48];
+		if(16!=fread(buf,1,16,reader->fp))
+		{
+			err=ERROR_TOO_SHORT;
+			goto CLOSE_AND_RETURN;
+		}
+		if(0!=strcmp((char *)buf,RDD_SIGNATURE))
+		{
+			err=ERROR_BROKEN_DATA;
+			goto CLOSE_AND_RETURN;
+		}
+
+		if(48!=fread(buf,1,16,reader->fp))
+		{
+			err=ERROR_TOO_SHORT;
+			goto CLOSE_AND_RETURN;
+		}
+		if(RDDCMD_BEGIN_DISK!=buf[0])
+		{
+			err=ERROR_BROKEN_DATA;
+			goto CLOSE_AND_RETURN;
+		}
+
+		reader->RDDVer=buf[1];
+		reader->prop.mediaType=buf[2];
+		reader->prop.writeProtected=buf[3]&1;
+		reader->prop.numTracks=0; // Unknown at the beginning.
+		reader->captureDevice=buf[4];
+		strncpy(reader->diskName,(char *)buf+16,32);
+		reader->diskName[32]=0;
+		reader->diskName[33]=0;
+	}
+	return err;
+
+CLOSE_AND_RETURN:
+	fclose(reader->fp);
+	reader->fp=NULL;
+	return err;
+}
+int RDDReader_ReadTrack(TRACK *track,RDDREADER *reader)
+{
+	int err=0;
+	size_t fpos=ftell(reader->fp);
+	unsigned char buf[16],C,H;
+	unsigned int numAddrMarks=0,numSectors=0,addrMark,sector;
+
+	if(16!=fread(buf,1,16,reader->fp))
+	{
+		return ERROR_TOO_SHORT;
+	}
+	if(RDDCMD_END_DISK==buf[0])
+	{
+		return END_OF_FILE;
+	}
+	if(RDDCMD_BEGIN_TRACK!=buf[0])
+	{
+		return ERROR_BROKEN_DATA;
+	}
+	C=buf[1];
+	H=buf[2];
+
+	while(1)
+	{
+		size_t s;
+		if(16!=fread(buf,1,16,reader->fp))
+		{
+			return ERROR_TOO_SHORT;
+		}
+		switch(buf[0])
+		{
+		case RDDCMD_END_DISK:
+			// End of Disk without End of Track
+			return ERROR_BROKEN_DATA;
+		case RDDCMD_IDMARK:
+			++numAddrMarks;
+			break;
+		case RDDCMD_DATA:
+			++numSectors;
+			s=WordToUnsignedShort(buf+0x0E);
+			s=RDD_PADDED_SIZE(s);
+			fseek(reader->fp,ftell(reader->fp)+s,SEEK_SET);
+			break;
+		case RDDCMD_TRACK_READ:
+		case RDDCMD_UNSTABLE_BYTES:
+		default:
+			s=WordToUnsignedShort(buf+0x0E);
+			s=RDD_PADDED_SIZE(s);
+			fseek(reader->fp,ftell(reader->fp)+s,SEEK_SET);
+			break;
+		}
+		if(RDDCMD_END_TRACK==buf[0])
+		{
+			break;
+		}
+	}
+
+	fseek(reader->fp,fpos,SEEK_SET);
+
+	Track_Init(track);
+	err=Track_Prepare(track,C,H,numAddrMarks,numSectors);
+
+	addrMark=0;
+	sector=0;
+	while(1)
+	{
+		size_t s;
+		if(16!=fread(buf,1,16,reader->fp))
+		{
+			return ERROR_TOO_SHORT;
+		}
+		switch(buf[0])
+		{
+		case RDDCMD_END_DISK:
+			// End of Disk without End of Track
+			return ERROR_BROKEN_DATA;
+		case RDDCMD_IDMARK:
+			track->addrMarks[addrMark].CHRN[0]=buf[1];
+			track->addrMarks[addrMark].CHRN[1]=buf[2];
+			track->addrMarks[addrMark].CHRN[2]=buf[3];
+			track->addrMarks[addrMark].CHRN[3]=buf[4];
+			track->addrMarks[addrMark].flags=0;
+			if(MB8877_IOERR_CRC&buf[7])
+			{
+				track->addrMarks[addrMark].flags|=FLAG_CRC_ERROR;
+			}
+
+			++addrMark;
+			break;
+		case RDDCMD_DATA:
+			track->density=buf[6]&1;
+
+			s=WordToUnsignedShort(buf+0x0E);
+			s=RDD_PADDED_SIZE(s);
+
+			Sector_Alloc(&track->sectors[sector],s);
+			fread(track->sectors[sector].data,1,s,reader->fp);
+
+			if(MB8877_IOERR_CRC&buf[7])
+			{
+				track->sectors[sector].flags|=FLAG_CRC_ERROR;
+			}
+			if(MB8877_IOERR_RECORD_NOT_FOUND&buf[7])
+			{
+				track->sectors[sector].flags|=FLAG_RECORD_NOT_FOUND;
+			}
+
+			++sector;
+			break;
+		case RDDCMD_TRACK_READ:
+		case RDDCMD_UNSTABLE_BYTES:
+		default:
+			s=WordToUnsignedShort(buf+0x0E);
+			s=RDD_PADDED_SIZE(s);
+			fseek(reader->fp,ftell(reader->fp)+s,SEEK_SET);
+			break;
+		}
+		if(RDDCMD_END_TRACK==buf[0])
+		{
+			break;
+		}
+	}
+
+	for(addrMark=0; addrMark<track->numAddrMarks; ++addrMark)
+	{
+		unsigned char recordNotFound=FLAG_RECORD_NOT_FOUND; // Tentative
+		for(sector=0; sector<track->numSectors; ++sector)
+		{
+			if(track->sectors[sector].CHRN[0]==track->addrMarks[addrMark].CHRN[0] &&
+			   track->sectors[sector].CHRN[2]==track->addrMarks[addrMark].CHRN[2])
+			{
+				recordNotFound=(track->sectors[sector].flags&FLAG_RECORD_NOT_FOUND);
+				break;
+			}
+		}
+		track->addrMarks[addrMark].flags|=recordNotFound;
+	}
+
+	return err;
+}
+void RDDReader_DestroyTrack(TRACK *track)
+{
+	Track_Destroy(track);
+}
+int RDDReader_End(RDDREADER *reader)
+{
+	if(NULL!=reader->fp)
+	{
+		fclose(reader->fp);
+		reader->fp=NULL;
+	}
+	return ERROR_NONE;
+}
+void RDDReader_Destroy(RDDREADER *reader)
+{
+	if(NULL!=reader->fp)
+	{
+		fclose(reader->fp);
+		reader->fp=NULL;
+	}
+	free(reader);
+}
