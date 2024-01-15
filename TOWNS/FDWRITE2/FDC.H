@@ -98,6 +98,8 @@ struct FDC_IOConfig FDC_GetIOConfig(unsigned int drive,unsigned int mode);
 */
 void FDC_SetSide(struct FDC_IOConfig *cfgPtr,int H);
 
+int FDC_Support1440KB(void);
+
 int FDC_GetNumberOfCylinders(unsigned int mode);
 void FDC_SelectDrive(struct FDC_IOConfig cfg);
 void FDC_WriteDriveControl(struct FDC_IOConfig cfg,unsigned char IRQEN);

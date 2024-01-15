@@ -11,7 +11,10 @@
 #include "PIC.H"
 #include "TIMER.H"
 #include "UTIL.H"
+#include "CONSOLE.H"
 
+
+#define VERSION 20240115
 
 
 static struct bufferInfo DMABuf;
@@ -69,33 +72,39 @@ void PrintError(int err)
 	case ERROR_2HD_1440KB_NOT_SUPPORTED:
 		fprintf(stderr,"Error: 144KB not supported.\n");
 		break;
+	case ERROR_DISK_IMAGE_IS_ON_FD:
+		fprintf(stderr,"Error: Disk Image cannot be on a floppy-disk.\n");
+		break;
 	}
 }
 
 void CleanUp(void)
 {
 	int i;
+	struct FDC_IOConfig cfg;
+
 	_setpvect(INT_FDC,default_INT46H_Handler);
-//	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
-//	
-//	controlByte&=~CTL_MOTOR;
-//	speedByte&=~SPD_INUSE;
-//	SelectDrive();
-//	WriteDriveControl(0);
-//	
+	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
+	
+	cfg=FDC_GetIOConfig(0,MODE_2HD_1232K);
+	cfg.controlByte&=~CTL_MOTOR;
+	cfg.speedByte&=~SPD_INUSE;
+	FDC_SelectDrive(cfg);
+	FDC_WriteDriveControl(cfg,0);
+
 	PIC_SetMask(default_PICMask);
-//	
-//	Color(7);
-//	PrintSysCharWord("        ",1,7);
-//	PrintSysCharWord("        ",9,7);
-//	PrintSysCharWord("        ",17,7);
-//	PrintSysCharWord("        ",25,7);
+	
+	Color(7);
+	PrintSysCharWord("        ",1,7);
+	PrintSysCharWord("        ",9,7);
+	PrintSysCharWord("        ",17,7);
+	PrintSysCharWord("        ",25,7);
 	for(i=0; i<8; ++i)
 	{
-//		unsigned char r=(i&2 ? 255 : 0);
-//		unsigned char g=(i&4 ? 255 : 0);
-//		unsigned char b=(i&1 ? 255 : 0);
-//		Palette(i,r,g,b);
+		unsigned char r=(i&2 ? 255 : 0);
+		unsigned char g=(i&4 ? 255 : 0);
+		unsigned char b=(i&1 ? 255 : 0);
+		Palette(i,r,g,b);
 	}
 }
 
@@ -202,6 +211,11 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 			{
 				mode=MODE_2HD_1440K;
 				formatLen=FORMAT_LEN_2HD_1440KB;
+				if(0==FDC_Support1440KB())
+				{
+					err=ERROR_2HD_1440KB_NOT_SUPPORTED;
+					break;
+				}
 			}
 			else
 			{
@@ -313,6 +327,11 @@ int WriteBackRDD(struct CommandParameterInfo *cpi)
 			{
 				mode=MODE_2HD_1440K;
 				formatLen=FORMAT_LEN_2HD_1440KB;
+				if(0==FDC_Support1440KB())
+				{
+					err=ERROR_2HD_1440KB_NOT_SUPPORTED;
+					break;
+				}
 			}
 			else
 			{
@@ -368,11 +387,115 @@ int WriteBackRDD(struct CommandParameterInfo *cpi)
 
 int WriteBackBIN(struct CommandParameterInfo *cpi)
 {
-	return ERROR_UNSUPPORTED_FILE_TYPE;
+	int err=0,trackPos=0;
+	struct FDC_IOConfig fdcConfig;
+	static unsigned char formatData[FORMAT_LEN_MAX];
+
+	BINREADER *reader=BINReader_Create();
+
+	err=BINReader_Begin(reader,cpi->imageFileName);
+	if(ERROR_NONE!=err)
+	{
+		BINReader_Destroy(reader);
+		return err;
+	}
+
+	err=VerifyDiskWritable(&reader->prop);
+	if(ERROR_NONE!=err)
+	{
+		BINReader_Destroy(reader);
+		return err;
+	}
+
+	unsigned int mode=MODE_2HD_1232K,formatLen=FORMAT_LEN_2HD_1232KB;
+	switch(reader->fileSize)
+	{
+	case FILESIZE_2DD_640KB:
+		mode=MODE_2DD;
+		formatLen=FORMAT_LEN_2DD;
+		break;
+	case FILESIZE_2DD_720KB:
+		mode=MODE_2DD;
+		formatLen=FORMAT_LEN_2DD;
+		break;
+	case FILESIZE_2HD_1440KB:
+		mode=MODE_2HD_1440K;
+		formatLen=FORMAT_LEN_2HD_1440KB;
+		if(0==FDC_Support1440KB())
+		{
+			return ERROR_2HD_1440KB_NOT_SUPPORTED;
+		}
+		break;
+	case FILESIZE_2HD_1232KB:
+		mode=MODE_2HD_1232K;
+		formatLen=FORMAT_LEN_2HD_1232KB;
+		break;
+	}
+
+	fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
+	FDC_Restore(fdcConfig);
+	for(trackPos=0; trackPos<reader->prop.numTracks; ++trackPos)
+	{
+		unsigned long bytesWritten;
+		TRACK trk;
+		err=BINReader_ReadTrack(&trk,reader);
+		if(ERROR_NONE!=err)
+		{
+			break;
+		}
+
+		fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
+		FDC_SetSide(&fdcConfig,trk.H);
+
+		Track_Print(&trk);
+
+		{
+			int crunchLevel;
+			for(crunchLevel=0; crunchLevel<3; ++crunchLevel)
+			{
+				unsigned int len;
+				Track_MakeFormatData(&len,formatData,FORMAT_LEN_MAX,&trk,crunchLevel);
+				if(len<=formatLen)
+				{
+					break;
+				}
+				printf("Crunch %d\n",crunchLevel);
+			}
+		}
+
+		FDC_Seek(fdcConfig,trk.C);
+		FDC_WriteTrack(&bytesWritten,fdcConfig,DMABuf,formatLen,formatData);
+
+		{
+			int sec;
+			for(sec=0; sec<trk.numSectors; ++sec)
+			{
+				FDC_WriteSector(fdcConfig,DMABuf,
+						trk.sectors[sec].CHRN[0],
+						trk.sectors[sec].CHRN[1],
+						trk.sectors[sec].CHRN[2],
+						trk.sectors[sec].CHRN[3],
+						trk.sectors[sec].numBytes,
+						trk.sectors[sec].data,
+						0!=(trk.sectors[sec].flags&FLAG_DELETED_DATA),
+						0!=(trk.sectors[sec].flags&FLAG_CRC_ERROR));
+			}
+		}
+
+		Track_Destroy(&trk);
+	}
+
+	BINReader_Destroy(reader);
+
+	return ERROR_NONE;
 }
 
 int main(int ac,char *av[])
 {
+	printf("FDWRITE2.EXP - RDD/D77/BIN Floppy-Disk Write-Back Utility\n");
+	printf("  Version %d\n",VERSION);
+	printf("  by CaptainYS http://www.ysflight.com\n");
+
 	int err=ERROR_NONE;
 
 	struct CommandParameterInfo cpi;

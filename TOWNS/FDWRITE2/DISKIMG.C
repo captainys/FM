@@ -819,3 +819,120 @@ void RDDReader_Destroy(RDDREADER *reader)
 	}
 	free(reader);
 }
+
+
+
+
+BINREADER *BINReader_Create(void)
+{
+	BINREADER *reader=(BINREADER *)malloc(sizeof(BINREADER));
+	reader->fp=NULL;
+	reader->fileSize=0;
+	reader->trackPos=0;
+	return reader;
+}
+
+int BINReader_Begin(BINREADER *reader,const char fn[])
+{
+	reader->fp=fopen(fn,"rb");
+	if(NULL!=reader->fp)
+	{
+		fseek(reader->fp,0,SEEK_END);
+		reader->fileSize=ftell(reader->fp);
+		fseek(reader->fp,0,SEEK_SET);
+		reader->trackPos=0;
+		switch(reader->fileSize)
+		{
+		case FILESIZE_2DD_640KB:
+			reader->prop.mediaType=D77_MEDIATYPE_2DD;
+			reader->prop.writeProtected=0;
+			reader->prop.numTracks=160;
+			reader->numSectorTrack=8;
+			reader->N=2;
+			break;
+		case FILESIZE_2DD_720KB:
+			reader->prop.mediaType=D77_MEDIATYPE_2DD;
+			reader->prop.writeProtected=0;
+			reader->prop.numTracks=160;
+			reader->numSectorTrack=9;
+			reader->N=2;
+			break;
+		case FILESIZE_2HD_1440KB:
+			reader->prop.mediaType=D77_MEDIATYPE_2HD;
+			reader->prop.writeProtected=0;
+			reader->prop.numTracks=160;
+			reader->numSectorTrack=18;
+			reader->N=2;
+			break;
+		case FILESIZE_2HD_1232KB:
+			reader->prop.mediaType=D77_MEDIATYPE_2HD;
+			reader->prop.writeProtected=0;
+			reader->prop.numTracks=154;
+			reader->numSectorTrack=8;
+			reader->N=3;
+			break;
+		default:
+			fclose(reader->fp);
+			reader->fp=NULL;
+			return ERROR_UNSUPPORTED_FILE_TYPE;
+		}
+	}
+	return ERROR_NONE;
+}
+
+int BINReader_ReadTrack(TRACK *track,BINREADER *reader)
+{
+	int err=ERROR_NONE;
+	unsigned char C=reader->trackPos/2,H=reader->trackPos&1;
+	unsigned int sectorLen=(128<<reader->N);
+	int i;
+
+	Track_Init(track);
+	err=Track_Prepare(track,C,H,reader->numSectorTrack,reader->numSectorTrack);
+
+	for(i=0; i<reader->numSectorTrack; ++i)
+	{
+		AddrMark_Init(&track->addrMarks[i]);
+		track->addrMarks[i].CHRN[0]=C;
+		track->addrMarks[i].CHRN[1]=H;
+		track->addrMarks[i].CHRN[2]=i+1;
+		track->addrMarks[i].CHRN[3]=reader->N;
+
+		Sector_Init(&track->sectors[i]);
+		Sector_Alloc(&track->sectors[i],sectorLen);
+		track->sectors[i].CHRN[0]=C;
+		track->sectors[i].CHRN[1]=H;
+		track->sectors[i].CHRN[2]=i+1;
+		track->sectors[i].CHRN[3]=reader->N;
+
+		fread(track->sectors[i].data,1,sectorLen,reader->fp);
+	}
+
+	reader->trackPos++;
+	return err;
+}
+
+void BINReader_DestroyTrack(TRACK *track)
+{
+	Track_Destroy(track);
+}
+
+int BINReader_End(BINREADER *reader)
+{
+	if(NULL!=reader->fp)
+	{
+		fclose(reader->fp);
+		reader->fp=NULL;
+	}
+	return ERROR_NONE;
+}
+
+void BINReader_Destroy(BINREADER *reader)
+{
+	if(NULL!=reader->fp)
+	{
+		fclose(reader->fp);
+		reader->fp=NULL;
+	}
+	free(reader);
+}

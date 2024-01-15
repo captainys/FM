@@ -146,6 +146,14 @@ void FDC_SetSide(struct FDC_IOConfig *cfgPtr,int H)
 	}
 }
 
+int FDC_Support1440KB(void)
+{
+	unsigned char byteData=_inp(IO_FDC_DRIVE_STATUS);
+	byteData>>=2;
+	byteData&=7;
+	return 3==byteData;
+}
+
 int FDC_GetNumberOfCylinders(unsigned int mode)
 {
 	switch(mode)

@@ -32,7 +32,7 @@ typedef struct Sector
 } SECTOR;
 
 void Sector_Init(SECTOR *sector);
-void Sector_Alloc(SECTOR *sector,unsigned int len);
+void Sector_Alloc(SECTOR *sector,unsigned int lenInBytes);
 void Sector_Destroy(SECTOR *sector);
 
 typedef struct Track
@@ -170,5 +170,28 @@ int RDDReader_ReadTrack(TRACK *track,RDDREADER *reader);
 void RDDReader_DestroyTrack(TRACK *track);
 int RDDReader_End(RDDREADER *reader);
 void RDDReader_Destroy(RDDREADER *);
+
+
+#define FILESIZE_2DD_640KB (640*1024)
+#define FILESIZE_2DD_720KB (720*1024)
+#define FILESIZE_2HD_1440KB (1440*1024)
+#define FILESIZE_2HD_1232KB (1232*1024)
+
+typedef struct BINReader
+{
+	FILE *fp;
+	DISKPROP prop;
+	unsigned int fileSize;
+	unsigned int trackPos;
+	unsigned int numSectorTrack;
+	unsigned int N;
+} BINREADER;
+
+BINREADER *BINReader_Create(void);
+int BINReader_Begin(BINREADER *reader,const char fn[]);
+int BINReader_ReadTrack(TRACK *track,BINREADER *reader);
+void BINReader_DestroyTrack(TRACK *track);
+int BINReader_End(BINREADER *reader);
+void BINReader_Destroy(BINREADER *);
 
 #endif
