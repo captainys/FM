@@ -98,6 +98,10 @@ struct FDC_IOConfig FDC_GetIOConfig(unsigned int drive,unsigned int mode);
 */
 void FDC_SetSide(struct FDC_IOConfig *cfgPtr,int H);
 
+/*! Non-zero MFM sets double-density mode.
+*/
+void FDC_SetMFM(struct FDC_IOConfig *cfgPtr,int MFM);
+
 int FDC_Support1440KB(void);
 
 int FDC_GetNumberOfCylinders(unsigned int mode);

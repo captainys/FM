@@ -11,6 +11,9 @@
 #define FLAG_DELETED_DATA      2
 #define FLAG_RECORD_NOT_FOUND  4
 
+#define DENSITY_MFM            0
+#define DENSITY_FM             1
+
 #define MB8877_IOERR_CRC 8
 #define MB8877_IOERR_RECORD_NOT_FOUND 0x10
 #define MB8877_IOERR_DELETED_DATA     0x20

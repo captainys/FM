@@ -75,6 +75,9 @@ void PrintError(int err)
 	case ERROR_DISK_IMAGE_IS_ON_FD:
 		fprintf(stderr,"Error: Disk Image cannot be on a floppy-disk.\n");
 		break;
+	case ERROR_DRIVE_NOT_READY:
+		fprintf(stderr,"Error: Drive not ready.\n");
+		break;
 	}
 }
 
@@ -87,6 +90,7 @@ void CleanUp(void)
 	FDC_Command(FDCCMD_RESTORE_HEAD_UNLOAD);
 	
 	cfg=FDC_GetIOConfig(0,MODE_2HD_1232K);
+	FDC_SetMFM(&cfg,1);
 	cfg.controlByte&=~CTL_MOTOR;
 	cfg.speedByte&=~SPD_INUSE;
 	FDC_SelectDrive(cfg);
@@ -167,8 +171,55 @@ void MakeFormatData(unsigned char formatData[],size_t max_len,size_t formatLen,T
 		{
 			break;
 		}
-		printf("Overbyte.  Crunch %d\n",crunchLevel);
+		printf("Overbyte (%d/%d).  Crunch %d\n",len,formatLen,crunchLevel);
 	}
+
+	if(3==crunchLevel) // Could not fit all sectors
+	{
+		// If 1024-byte sector x8 and smaller sectors, try shrinking smaller sectors.
+		int i;
+		int num1024byte=0,numSmall=0;
+		for(i=0; i<track->numAddrMarks; ++i)
+		{
+			if(3==track->addrMarks[i].CHRN[3])
+			{
+				++num1024byte;
+			}
+			else
+			{
+				++numSmall;
+			}
+		}
+		if(8==num1024byte)
+		{
+			for(i=0; i<track->numAddrMarks; ++i)
+			{
+				if(3!=track->addrMarks[i].CHRN[3])
+				{
+					track->addrMarks[i].CHRN[3]=0; // Make it a 128-byte sector.
+				}
+			}
+			for(i=0; i<track->numSectors; ++i)
+			{
+				if(3!=track->sectors[i].CHRN[3])
+				{
+					track->sectors[i].CHRN[3]=0; // Make it a 128-byte sector.
+				}
+			}
+
+			for(crunchLevel=0; crunchLevel<3; ++crunchLevel)
+			{
+				Track_MakeFormatData(&len,formatData,max_len,track,crunchLevel);
+				if(len<=formatLen)
+				{
+					printf("Fits (%d/%d)\n",len,formatLen);
+					break;
+				}
+				printf("Still Overbyte (%d/%d).  Crunch %d\n",len,formatLen,crunchLevel);
+			}
+		}
+	}
+
 }
 
 void WriteSectors(struct FDC_IOConfig fdcConfig,struct bufferInfo DMABuf,TRACK *track)
@@ -220,18 +271,30 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 	case D77_MEDIATYPE_2HD:
 		mode=MODE_2HD_1232K;
 		formatLen=FORMAT_LEN_2HD_1232KB;
+		printf("2HD Disk\n");
 		break;
 	case D77_MEDIATYPE_2D:
 		mode=MODE_2D;
 		formatLen=FORMAT_LEN_2DD;
+		printf("2D Disk\n");
 		break;
 	case D77_MEDIATYPE_2DD:
 		mode=MODE_2DD;
 		formatLen=FORMAT_LEN_2DD;
+		printf("2DD Disk\n");
 		break;
 	}
 
 	fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
+
+	if(0==FDC_CheckDriveReady(fdcConfig))
+	{
+		Color(2);
+		printf("Drive Not Ready.\n");
+		Color(7);
+		return ERROR_DRIVE_NOT_READY;
+	}
+
 	FDC_Restore(fdcConfig);
 	for(trackPos=0; trackPos<reader->prop.numTracks; ++trackPos)
 	{
@@ -260,6 +323,7 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 		}
 		fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
 		FDC_SetSide(&fdcConfig,trk.H);
+		FDC_SetMFM(&fdcConfig,(trk.density==DENSITY_MFM));
 
 		Track_Print(&trk);
 
@@ -281,6 +345,7 @@ int WriteBackD77(struct CommandParameterInfo *cpi)
 int WriteBackRDD(struct CommandParameterInfo *cpi)
 {
 	int err;
+	unsigned char FDCStatus;
 	struct FDC_IOConfig fdcConfig;
 	static unsigned char formatData[FORMAT_LEN_MAX];
 
@@ -306,19 +371,32 @@ int WriteBackRDD(struct CommandParameterInfo *cpi)
 	case D77_MEDIATYPE_2HD:
 		mode=MODE_2HD_1232K;
 		formatLen=FORMAT_LEN_2HD_1232KB;
+		printf("2HD Disk\n");
 		break;
 	case D77_MEDIATYPE_2D:
 		mode=MODE_2D;
 		formatLen=FORMAT_LEN_2DD;
+		printf("2D Disk\n");
 		break;
 	case D77_MEDIATYPE_2DD:
 		mode=MODE_2DD;
 		formatLen=FORMAT_LEN_2DD;
+		printf("2DD Disk\n");
 		break;
 	}
 
 	fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
+
+	if(0==FDC_CheckDriveReady(fdcConfig))
+	{
+		Color(2);
+		printf("Drive Not Ready.\n");
+		Color(7);
+		return ERROR_DRIVE_NOT_READY;
+	}
+
 	FDC_Restore(fdcConfig);
+
 	while(1)
 	{
 		unsigned long bytesWritten;
@@ -350,13 +428,19 @@ int WriteBackRDD(struct CommandParameterInfo *cpi)
 		}
 		fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
 		FDC_SetSide(&fdcConfig,trk.H);
+		FDC_SetMFM(&fdcConfig,(trk.density==DENSITY_MFM));
 
 		Track_Print(&trk);
 
 		MakeFormatData(formatData,FORMAT_LEN_MAX,formatLen,&trk);
 
-		FDC_Seek(fdcConfig,trk.C);
-		FDC_WriteTrack(&bytesWritten,fdcConfig,DMABuf,formatLen,formatData);
+		FDCStatus=FDC_Seek(fdcConfig,trk.C);
+
+		// printf("Seek Returned %02x\n",FDCStatus);
+
+		FDCStatus=FDC_WriteTrack(&bytesWritten,fdcConfig,DMABuf,formatLen,formatData);
+
+		// printf("Format Returned %02x  %d bytes written.\n",FDCStatus,bytesWritten);
 
 		WriteSectors(fdcConfig,DMABuf,&trk);
 
@@ -416,6 +500,15 @@ int WriteBackBIN(struct CommandParameterInfo *cpi)
 	}
 
 	fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
+
+	if(0==FDC_CheckDriveReady(fdcConfig))
+	{
+		Color(2);
+		printf("Drive Not Ready.\n");
+		Color(7);
+		return ERROR_DRIVE_NOT_READY;
+	}
+
 	FDC_Restore(fdcConfig);
 	for(trackPos=0; trackPos<reader->prop.numTracks; ++trackPos)
 	{
@@ -429,6 +522,7 @@ int WriteBackBIN(struct CommandParameterInfo *cpi)
 
 		fdcConfig=FDC_GetIOConfig(cpi->target_drive-'A',mode);
 		FDC_SetSide(&fdcConfig,trk.H);
+		FDC_SetMFM(&fdcConfig,1);
 
 		Track_Print(&trk);
 
@@ -472,6 +566,21 @@ int main(int ac,char *av[])
 	default_PICMask=PIC_GetMask();
 	signal(SIGINT,CtrlC);
 
+
+	{
+		// Based on my memo in FDDUMP.C
+
+		// I don't know what timer does bad for FDC, but at the beginning of Read Sector BIOS Call,
+		// it was cancelling two timers.  So, I just disable timers and see.
+
+		// Confirmed!  Unless I mask timer interrupt, FDC gets irresponsive, probably because Disk BIOS was using
+		// timer for checking disk change, it did something to I/O, and messed up with FDC.
+
+		struct PICMask picmask=PIC_GetMask();
+		picmask.m[0]|=1;
+		PIC_SetMask(picmask);
+	}
+
 	switch(IdentifyFileType(cpi.imageFileName))
 	{
 	case FILETYPE_D77:
@@ -485,8 +594,10 @@ int main(int ac,char *av[])
 		break;
 	default:
 		err=ERROR_UNSUPPORTED_FILE_TYPE;
-		return 1;
+		goto ERREND;
 	}
+
+	CleanUp();
 
 	if(ERROR_NONE!=err)
 	{
@@ -495,4 +606,8 @@ int main(int ac,char *av[])
 	}
 
 	return 0;
+
+ERREND:
+	CleanUp();
+	return 1;
 }

@@ -104,32 +104,38 @@ int Track_MakeFormatData(unsigned int *len,unsigned char data[],unsigned long ma
 	unsigned int ptr=0;
 
 	int i,sec;
-	unsigned int len_preGap=32;
+	unsigned int len_preGap=64;
 	unsigned int len_sync=12;
+	unsigned int len_gap1=50;
 	unsigned int len_gap2=0x16;
 	unsigned int len_gap3=0x36;
+	unsigned int len_gap4=0x20;
 
 	if(0==crunchGapLevel)
 	{
 		// No change.
 	}
-	if(1==crunchGapLevel)
+	else if(1==crunchGapLevel)
 	{
-		len_preGap=24;
+		len_preGap=48;
 		len_sync=10;
+		len_gap1=42;
 		len_gap2=0x10;
 		len_gap3=0x30;
 	}
 	else
 	{
-		len_preGap=20;
+		len_preGap=32;
 		len_sync=9;
+		len_gap1=36;
 		len_gap2=0x0C;
 		len_gap3=0x26;
 	}
 
 	const unsigned char FORMATBYTE_SYNC=0;
 	const unsigned char FORMATBYTE_MISSING_CLOCK=0xF5;
+	const unsigned char FORMATBYTE_MISSING_CLOCK_C2=0xF6;
+	const unsigned char FORMATBYTE_INDEX_MARK=0xFC;
 	const unsigned char FORMATBYTE_ADDR_MARK=0xFE;
 	const unsigned char FORMATBYTE_DATA_MARK=0xFB;
 	const unsigned char FORMATBYTE_DELETED_DATA_MARK=0xF8;
@@ -141,6 +147,19 @@ int Track_MakeFormatData(unsigned int *len,unsigned char data[],unsigned long ma
 	{
 		data[ptr++]=FORMATBYTE_GAP;
 	}
+	if(maxLen<ptr+4)
+	{
+		return ERROR_FORMAT_DATA_OVERFLOW;
+	}
+	data[ptr++]=FORMATBYTE_MISSING_CLOCK_C2;
+	data[ptr++]=FORMATBYTE_MISSING_CLOCK_C2;
+	data[ptr++]=FORMATBYTE_MISSING_CLOCK_C2;
+	data[ptr++]=FORMATBYTE_INDEX_MARK;
+	for(i=0; i<len_gap1 && ptr<maxLen; ++i)
+	{
+		data[ptr++]=FORMATBYTE_GAP;
+	}
+
 	for(sec=0; sec<track->numAddrMarks && ptr<maxLen; ++sec)
 	{
 		for(i=0; i<len_sync && ptr<maxLen; ++i)
@@ -198,6 +217,11 @@ int Track_MakeFormatData(unsigned int *len,unsigned char data[],unsigned long ma
 				data[ptr++]=FORMATBYTE_GAP;
 			}
 		}
+	}
+
+	for(i=0; i<len_gap4 && ptr<maxLen; ++i)
+	{
+		data[ptr++]=FORMATBYTE_GAP;
 	}
 
 	*len=ptr;
@@ -499,7 +523,7 @@ int D77Reader_ReadTrack(TRACK *track,D77READER *reader,unsigned int trackPos)
 		track->addrMarks[addrMarkIdx].CHRN[2]=sectorPtr[2];
 		track->addrMarks[addrMarkIdx].CHRN[3]=sectorPtr[3];
 
-		track->density=sectorPtr[6];
+		track->density=(0==sectorPtr[6] ? DENSITY_MFM : DENSITY_FM);  // 0x40->FM
 
 		numBytes=WordToUnsignedShort(sectorPtr+0x0e);
 
@@ -729,7 +753,7 @@ int RDDReader_ReadTrack(TRACK *track,RDDREADER *reader)
 			++addrMark;
 			break;
 		case RDDCMD_DATA:
-			track->density=buf[6]&1;
+			track->density=((0==buf[6]&1) ? DENSITY_MFM : DENSITY_FM);
 
 			s=WordToUnsignedShort(buf+0x0E);
 			s=RDD_PADDED_SIZE(s);

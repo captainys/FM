@@ -145,8 +145,18 @@ SetUpDMAOut				PROC
 
 						PUSHFD
 						CLI
-						XOR  	AL,AL
+						XOR  	AX,AX
 						OUT  	0A1H,AL	; CHANNEL
+
+						MOV		AX,0020H
+						OUT		0A8H,AX
+
+						MOV		AL,48H
+						OUT		0AAH,AL
+
+						IN		AL,0AFH
+						OR		AL,01H   ; Mask FDC DMACh
+						OUT		0AFH,AL
 
 						MOV		EAX,[ESP+8]
 						OUT		0A4H,AX
@@ -155,15 +165,13 @@ SetUpDMAOut				PROC
 						MOV		AL,AH
 						OUT		0A7H,AL
 
-						IN		AL,0AFH
-						AND		AL,0FEH
-						OUT		0AFH,AL
-
 						MOV		AX,[ESP+12]
 						OUT		0A2H,AX
 
-						MOV		AL,48H
-						OUT		0AAH,AL
+						IN		AL,0AFH
+						AND		AL,0FEH
+						OUT		0AFH,AL   ; Enable FDC DMACh
+
 						POPFD
 
 						RET

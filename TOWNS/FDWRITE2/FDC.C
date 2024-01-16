@@ -146,6 +146,18 @@ void FDC_SetSide(struct FDC_IOConfig *cfgPtr,int H)
 	}
 }
 
+void FDC_SetMFM(struct FDC_IOConfig *cfgPtr,int MFM)
+{
+	if(0==MFM)
+	{
+		cfgPtr->controlByte&=(~CTL_MFM);
+	}
+	else
+	{
+		cfgPtr->controlByte|=CTL_MFM;
+	}
+}
+
 int FDC_Support1440KB(void)
 {
 	unsigned char byteData=_inp(IO_FDC_DRIVE_STATUS);
