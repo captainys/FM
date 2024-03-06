@@ -5,7 +5,9 @@
 
 
 						; Fit it within 32KB
-DEFAULT_LOADER_LBA		EQU		1 	; OFFSET 1024   Apparently 1024 bytes per sector
+BYTES_PER_SECTOR		EQU		1024	;   Apparently 1024 bytes per sector
+DEFAULT_FAKE_FBIOS		EQU		1	; OFFSET 1024
+DEFAULT_LOADER_LBA		EQU		2 	; OFFSET 2048
 DEFAULT_YSSCSICD_LBA	EQU		26	; OFFSET 26624
 
 
@@ -26,9 +28,19 @@ MAIN					PROC
 						; ****ing MASM kindly inserts NOP after JMP and messes up the offsets.  Good job, Microsoft.
 						DB		0EBH,(REALMAIN-@f)  ; JMP		REALMAIN
 @@:
-						DB		"FM TOWNS RESCUE BOOT LOADER BY CAPTAINYS"	; 40 chars
-						DB		54 dup (0)									; 40+54=0x5E (Why 0x5E?  I don't know Fujitsu's IPL leaves this many bytes.)
 
+						DB		"FM TOWNS RESCUE IPL"
+
+						ORG		0020H
+
+						DD		1,1
+
+						DB		"BY CAPTIANYS"
+
+						ORG		005EH
+
+
+						; 0x5E (Why 0x5E?  I don't know why Fujitsu's IPL leaves this many bytes -> Looks like it is supposed to be BIOS PARAM BLOCK.
 LOADER_LBA				DD		DEFAULT_LOADER_LBA
 YSSCSICD_LBA			DD		DEFAULT_YSSCSICD_LBA
 
@@ -234,6 +246,11 @@ PRINT_TALL				ENDP
 
 MESSAGE					DB	"IC MEMORY CARD BOOT",0
 ERROR_MESSAGE			DB	"SOMETHING WENT WRONG.",0
+
+
+
+						ORG		DEFAULT_FAKE_FBIOS*BYTES_PER_SECTOR
+						DB		"FBIOS"
 
 CODE					ENDS
 
