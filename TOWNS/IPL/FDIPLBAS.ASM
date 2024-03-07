@@ -10,7 +10,15 @@ MAIN					PROC
 						DB		0EBH,(REALMAIN-@f)  ; JMP		REALMAIN
 @@:
 
-						DB			55H dup (0)
+						DB		"FM TOWNS RESCUE IPL"
+
+						ORG		0020H
+
+						DD		1,1
+
+						DB		"BY CAPTIANYS"
+
+						ORG		005EH
 
 REALMAIN:
 						CLI
