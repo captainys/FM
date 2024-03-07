@@ -1,3 +1,7 @@
+; 386SX Support
+; Credit to jckarter (https://cohost.org/jckarter/tagged/fm%20towns)
+; Thank you for your great help!
+
 DO_386SX_THINGS			PROC
 						PUSHFD
 						PUSHAD
@@ -16,14 +20,14 @@ DO_386SX_THINGS			PROC
 						JAE		DO_386SX_THINGS_RET
 
 						PUSH	EAX
-						CALL	TSUGARU_DEBUG_BREAK
+						; CALL	TSUGARU_DEBUG_BREAK
 						CALL	LOAD_IOSYS_FROM_ROM
 						POP		EAX
 
 						CALL	PATCH_ROM_IOSYS
 
 
-						CALL	TSUGARU_DEBUG_BREAK
+						; CALL	TSUGARU_DEBUG_BREAK
 
 
 DO_386SX_THINGS_RET:
@@ -145,15 +149,28 @@ LOAD_IOSYS_FROM_ROM		ENDP
 
 ; EAX FBIOS version
 PATCH_ROM_IOSYS			PROC
-						MOV		BX,0A3AH
+						MOV		BX,0050H
 						MOV		DS,BX
-						CMP		DWORD PTR DS:[01DBH],3A59229AH
+						MOV		AX,DS:[0]
+						MOV		DS,AX	; Then, DS:0000 is the FBIOS entry address.
+
+						CMP		BYTE PTR DS:[0],0E9H ; JMP rel16
+						JNE		ROM_IOSYS_NOT_UX
+						MOV		BX,DS:[1]
+						ADD		BX,3  ; DS:BX is the jump destination
+
+						; It should look like this
+						; 0A3A:000001DA FA                        CLI
+						; 0A3A:000001DB 9A22593A0A                CALLF   0A3A:5922
+
+						CMP		WORD PTR DS:[BX],09AFAh ; CLI / CALLF cs:eip
+						JNE		ROM_IOSYS_NOT_UX
+						CMP		DS:[BX+4],AX
 						JNE		ROM_IOSYS_NOT_UX
 
-						MOV		DWORD PTR DS:[01DBH],90909090H  ; NOP FBIOS version check
-						MOV		BYTE PTR DS:[01DFH],90H ; NOP
+						MOV		DWORD PTR [BX+1],90909090H  ; NOP FBIOS version check
+						MOV		BYTE PTR [BX+5],90H ; NOP
 						JMP		PATCHED_ROM_IOSYS
-
 ROM_IOSYS_NOT_UX:
 
 PATCHED_ROM_IOSYS:
