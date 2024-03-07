@@ -130,8 +130,6 @@ SECONDARY_LOADER_LOADED:
 						DW		0000H
 						DW		BOOTLOADER_SEGMENT
 
-
-
 CD_ERROR:
 						TEXTLOCATION	01H,02H
 						MOV		SI,OFFSET ERROR_MESSAGE
@@ -156,6 +154,30 @@ DEVICEID				DB	0
 TRACK_SIDE				DW	0
 SECTOR					DB	0
 BUFFADDR				DW	0
+
+
+						; 80386SX SYSTEM ROM will read Sector 1 for the partition table.
+						; Then checks magic number first six bytes.
+						; Then finds a boot partition and reads first sector of the boot partition.
+						; If "IPL4", reads sector written at [0020].  If it is not FBIOS, the SYSROM will boot into the CD IPL.  If not force ROM IO.SYS.
+
+						ORG		0800H  ; Sector 1
+
+						DB		95H,78H,8EH,6DH,92H,0CAH,03H,00H,00H,00H,0FEH,0FFH,01H,00H,00H,02H
+						DB		0010H dup (0FFH)
+
+						DB		0FFH	; Boot Partition
+						DB		1
+						DD		2		; Start Sector
+						DD		10		; Number of sectors (fake)
+						DB		6 dup(0)
+						DB		"MS-DOS          "
+						DB		"RESCUE          "
+
+
+						ORG		1000H  ; Sector 2
+						DB		"IPL4"
+
 
 CODE					ENDS
 
