@@ -11,6 +11,8 @@
 
 #include "icmimage.h"
 
+#define TsugaruDebugBreak _outp(0x2386,2);
+
 #define CMOS_BACKUP_ADDR 0xDFFC
 unsigned char *C0000000H=NULL;
 
