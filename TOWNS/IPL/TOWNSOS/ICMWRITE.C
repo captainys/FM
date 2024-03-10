@@ -17,7 +17,7 @@
 unsigned char *C0000000H=NULL;
 
 extern void SETUP_PAGE_TABLE(unsigned char *pageBuf);
-extern unsigned char *MALLOC_PHYS_ADDR(void);
+extern unsigned char *MALLOC_PHYS_ADDR(unsigned int physAddr);
 extern void TRANSFER_TO_ICM(unsigned int size,const unsigned char from[],unsigned char to[]); // size needs to be 4*N
 extern void CLEAR_ICM(unsigned int size,unsigned char cmosptr[]);
 
@@ -389,6 +389,19 @@ void PrintVerificationError(void)
 #define ICM_DEVICE_TYPE 0x50
 // If accessed from device ID 0x4A, it seems to work as 1024 bytes per sector?
 
+unsigned int ICM_PhysAddr(void)
+{
+	unsigned char AL=_inp(0x30);
+	if(3==(AL&7))
+	{
+		return 0xD00000; // 386SX
+	}
+	else
+	{
+		return 0xC0000000;
+	}
+}
+
 void ClearICMCMOSBackUp(void)
 {
 	CLEAR_ICM(65536-CMOS_BACKUP_ADDR,C0000000H+CMOS_BACKUP_ADDR);
@@ -458,7 +471,7 @@ int main(int ac,char *av[])
 {
 	// _outp(0x2386,2); //Tsugaru debugger break.
 
-	C0000000H=MALLOC_PHYS_ADDR();
+	C0000000H=MALLOC_PHYS_ADDR(ICM_PhysAddr());
 
 	// This method worked on Tsugaru, but didn't work on actual MX.
 	// unsigned char *pageBuf=malloc(32768+4095); // Need space that puts 8 pages.  32768+4095 should be good enough.

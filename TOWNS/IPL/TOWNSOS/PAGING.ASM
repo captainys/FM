@@ -190,8 +190,12 @@ CLEAR_ICM				ENDP
 
 
 
+;	[EBP]		EBP
+;	[EBP+4]		Return EIP
+;	[EBP+8]		Physical Address
 MALLOC_PHYS_ADDR		PROC
-
+						PUSH	EBP
+						MOV		EBP,ESP
 
 						PUSH	EBX
 						PUSH	EDX
@@ -200,7 +204,7 @@ MALLOC_PHYS_ADDR		PROC
 						PUSH	ES
 
 						MOV		AX,DS
-						MOV		EBX,0C0000000H
+						MOV		EBX,[EBP+8]
 						MOV		ECX,32	; 32 pages * 4KB = 128KB	; At this time I only need 64K, but for the future.
 						MOV		AX,250AH
 						INT		21H
@@ -211,6 +215,9 @@ MALLOC_PHYS_ADDR		PROC
 						POP		ESI
 						POP		EDX
 						POP		EBX
+
+						MOV		ESP,EBP
+						POP		EBP
 						RET
 
 
