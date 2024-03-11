@@ -339,13 +339,12 @@ void PrintResult(int BIOSErr)
 	}
 	else if(0==(BIOSErr&1))
 	{
-		PrintString(100,240,"正常に終了しました。");
+		PrintString(100,240,"書き込みに成功しました。");
 		PrintString(100,256,"リターンキー、パッドボタン、またはマウスボタンで");
-		PrintString(100,272,"メニューに戻ります。");
+		PrintString(100,272,"プログラムを終了します。");
 
 		PrintString(100,304,"Written to IC Memory Card successfully..");
-		PrintString(100,320,"Return Key, Pad Button, or Mouse Button to return");
-		PrintString(100,336,"to MENU.");
+		PrintString(100,320,"Return Key, Pad Button, or Mouse Button to exit.");
 	}
 	else
 	{
@@ -385,9 +384,18 @@ void PrintVerificationError(void)
 	WaitForKeyMouseOrPadButton();
 }
 
+// TICM.SYS uses device ID 0x50, in which case the sector size is 512 bytes.
 #define ICM_SECTOR_SIZE 512
 #define ICM_DEVICE_TYPE 0x50
-// If accessed from device ID 0x4A, it seems to work as 1024 bytes per sector?
+// However, it is not available in Towns OS V2.1 L51.  WTF?
+
+// If accessed from device ID 0x4A, it seems to work as 1024 bytes per sector?  -> Confirmed.  0x4A uses 1024 bytes per sector.
+#define ICM_SECTOR_SIZE_4A 1024
+#define ICM_DEVICE_TYPE_4A 0x4A
+
+// OK.  From Towns OS V2.1 L51, neither 0x50 nor 0x4A works.  WTF.
+
+#define ICM_SECTOR_SIZE_LARGER ((ICM_SECTOR_SIZE)<(ICM_SECTOR_SIZE_4A) ? (ICM_SECTOR_SIZE_4A) : (ICM_SECTOR_SIZE))
 
 unsigned int ICM_PhysAddr(void)
 {
@@ -440,21 +448,33 @@ int WriteICM(void)
 	return 0;
 }
 
-int VerifyICM(void)
+int VerifyICM(unsigned int devId,unsigned int sectorSize)
 {
 	int sector=0;
-	unsigned char readBuf[ICM_SECTOR_SIZE];
-	for(unsigned int base=0; base<ICMIMAGE_size; base+=ICM_SECTOR_SIZE)
+	unsigned char readBuf[ICM_SECTOR_SIZE_LARGER];
+	for(unsigned int base=0; base<ICMIMAGE_size; base+=sectorSize)
 	{
 		int blocknum; // Probably BX returned by Disk BIOS.
-		int err=DKB_read2(ICM_DEVICE_TYPE,sector,1,(char *)readBuf,&blocknum);
+		int err=DKB_read2(devId,sector,1,(char *)readBuf,&blocknum);
+		if(2==err)
+		{
+			/* Ideally I want to make sure the Disk BIOS can read the contents written to
+			   the IC Memory Card.  However, Towns OS V2.1 L51 doesn't seem to accept the
+			   BIOS disk read command with undocumented device IDs for IC Memory Card,
+			   0x4A and 0x50.
+
+			   All I can do is to directly compare memory bytes.
+			*/
+			goto DIRECT_COMPARISON;
+		}
+
 		if(0!=err)
 		{
 			return err;
 		}
 
 		unsigned int i;
-		for(i=0; i<ICM_SECTOR_SIZE && base+i<ICMIMAGE_size; ++i)
+		for(i=0; i<sectorSize && base+i<ICMIMAGE_size; ++i)
 		{
 			if(readBuf[i]!=ICMIMAGE[base+i])
 			{
@@ -465,6 +485,13 @@ int VerifyICM(void)
 		++sector;
 	}
 	return 0;
+
+DIRECT_COMPARISON:
+	if(0==memcmp(C0000000H,ICMIMAGE,ICMIMAGE_size))
+	{
+		return 0;
+	}
+	return -1;
 }
 
 int main(int ac,char *av[])
@@ -540,7 +567,8 @@ int main(int ac,char *av[])
 			int err=WriteICM();
 			if(0==err)
 			{
-				if(0==VerifyICM())
+				if(0==VerifyICM(ICM_DEVICE_TYPE,ICM_SECTOR_SIZE) &&
+				   0==VerifyICM(ICM_DEVICE_TYPE_4A,ICM_SECTOR_SIZE_4A))
 				{
 					PrintResult(err);
 					break;
