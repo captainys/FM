@@ -91,6 +91,7 @@ SCSI_COMMAND			PROC
 						MOV		BYTE PTR CS:[SCSI_PHASE_FLAG],0
 
 						CALL	SCSI_WAIT_READY	; AL,DX Destroyed
+						JB		SCSI_ERROR_80 ; Timed out
 
 						CALL	SCSI_DMA_INITIALIZE
 
@@ -198,7 +199,7 @@ SCSI_COMMAND			ENDP
 SCSI_WAIT_READY			PROC
 						PUSH	CX
 						CLC
-						MOV		CX,3000
+						MOV		CX,30000
 @@:
 						MOV		DX,IO_SCSI_STATUS
 						IN		AL,DX
@@ -245,7 +246,7 @@ SCSI_SELECT				ENDP
 
 SCSI_WAIT_BUSY			PROC
 						CLC
-						MOV		CX,3000
+						MOV		CX,30000
 @@:						MOV		DX,IO_SCSI_STATUS
 						IN		AL,DX
 						AND		AL,8
