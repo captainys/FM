@@ -496,6 +496,16 @@ RS232CMENU_SEND_ROMS	PROC
 					MOV		BYTE PTR CS:[RS232C_DUMP_ROM_LEFT],4
 
 					; I need to make ROM_LEFT as 8 if Marty.  How can I identify Marty?
+					; -> Looks like I did reverse engineerint of TBIOS by myself.  I'm writing too many lines of code....
+
+					; With this, it should be able to dump Marty ROMs IF RS232C can be added to Marty.  Probably not.
+
+					IN		AL,0031H
+					AND		AL,040H   ; Non-zero if Marty
+					JE		SHORT @f
+
+					MOV		BYTE PTR CS:[RS232C_DUMP_ROM_LEFT],8
+
 @@:
 
 					CALL	RS232CMENU_SEND_ROM_FILL_NEXT
