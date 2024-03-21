@@ -26,7 +26,7 @@ int main(void)
 
 	printf("\n");
 
-	for(i=0; i<41; ++i)
+	for(i=0; i<72; ++i)
 	{
 		printf("%f %lf\n",float_data[i],double_data[i]);
 	}

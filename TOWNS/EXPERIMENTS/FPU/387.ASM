@@ -12,6 +12,8 @@
 ;   FINCSTP
 ;   FLDCW
 ;   FLDENV
+;   FRESTORE
+;   FSAVE
 
 PUSH_RESULT		MACRO
 				FWAIT
@@ -41,6 +43,9 @@ ZERO_DIVISION	MACRO
 				FDIVP	ST(1),ST
 				ENDM
 
+FPOP			MACRO
+				FSTP	ST(0)
+				ENDM
 
 
 DATA			SEGMENT
@@ -258,7 +263,7 @@ RUN387			PROC
 				FILD	DS:[INT_HUNDRED]
 				FADD	ST(1),ST
 				FWAIT
-				FSTP	ST(0)
+				FPOP
 
 				PUSH_RESULT
 
@@ -597,8 +602,159 @@ RUN387			PROC
 
 
 				; *** FPATAN ***
+				FILD_imm16	0	;Y
+				FILD_imm16	100	;X
+				FPATAN
+				PUSH_RESULT
+
+				FILD_imm16	100	;Y
+				FILD_imm16	100	;X
+				FPATAN
+				PUSH_RESULT
+
+				FILD_imm16	100	;Y
+				FILD_imm16	0	;X
+				FPATAN
+				PUSH_RESULT
+
+				FILD_imm16	100	;Y
+				FILD_imm16	-100	;X
+				FPATAN
+				PUSH_RESULT
+
+				FILD_imm16	0	;Y
+				FILD_imm16	-100	;X
+				FPATAN
+				PUSH_RESULT
+
+				FILD_imm16	-100	;Y
+				FILD_imm16	-100	;X
+				FPATAN
+				PUSH_RESULT
+
+				FILD_imm16	-100	;Y
+				FILD_imm16	0	;X
+				FPATAN
+				PUSH_RESULT
+
+				FILD_imm16	-100	;Y
+				FILD_imm16	100	;X
+				FPATAN
+				PUSH_RESULT
+
+
+
 				; *** FPREM ***
+				FLD		DWORD PTR DS:[FLOAT_HALF]
+				FLDPI
+				FPREM
+				PUSH_RESULT
+				FPOP
+
+
+
 				; *** FPREM1 ***
+				FLD		DWORD PTR DS:[FLOAT_HALF]
+				FLDPI
+				FPREM1
+				PUSH_RESULT
+				FPOP
+
+
+
+				; *** FPTAN ***
+				FLDPI
+				FILD_imm16 -3
+				FDIVP	ST(1),ST
+				FPTAN
+				FWAIT
+				FPOP
+				PUSH_RESULT
+
+				FLDPI
+				FILD_imm16 -4
+				FDIVP	ST(1),ST
+				FPTAN
+				FWAIT
+				FPOP
+				PUSH_RESULT
+
+				FLDZ
+				FPTAN
+				FWAIT
+				FPOP
+				PUSH_RESULT
+
+				FLDPI
+				FILD_imm16 4
+				FDIVP	ST(1),ST
+				FPTAN
+				FWAIT
+				FPOP
+				PUSH_RESULT
+
+				FLDPI
+				FILD_imm16 3
+				FDIVP	ST(1),ST
+				FPTAN
+				FWAIT
+				FPOP
+				PUSH_RESULT
+
+
+
+				; *** FRNDINT ***
+				; Rounding Control bits:
+				; CW&0C00H
+				;   00:Nearest or Even
+				;   01:Round down
+				;   10:Round up
+				;   11:Truncate toward zero
+				FSTCW	SS:[EBP-16]
+				MOV		CX,0
+FRNDINT_LOOP:
+				MOV		AX,SS:[EBP-16]
+				AND		AX,0F3FFH
+				OR		AX,CX
+				MOV		SS:[EBP-16],AX
+				FLDCW	SS:[EBP-16]
+
+				FILD_imm16	199
+				FILD_imm16	100
+				FDIVP	ST(1),ST
+				FRNDINT
+				PUSH_RESULT
+
+				FILD_imm16	-199
+				FILD_imm16	100
+				FDIVP	ST(1),ST
+				FRNDINT
+				PUSH_RESULT
+
+				FILD_imm16	201
+				FILD_imm16	100
+				FDIVP	ST(1),ST
+				FRNDINT
+				PUSH_RESULT
+
+				FILD_imm16	-201
+				FILD_imm16	100
+				FDIVP	ST(1),ST
+				FRNDINT
+				PUSH_RESULT
+
+				ADD		CX,0400H
+				CMP		CX,1000H
+				JNE		FRNDINT_LOOP
+
+				MOV		AX,SS:[EBP-16]
+				AND		AX,0F3FFH   ; Reset to Nearest
+				MOV		SS:[EBP-16],AX
+				FLDCW	SS:[EBP-16]
+
+
+
+				; *** FSCALE ***
 
 
 
