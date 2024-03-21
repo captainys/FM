@@ -1,0 +1,243 @@
+				.386p
+				.387
+
+				PUBLIC	RUN387
+
+				ASSUME	CS:CODE,DS:DATA
+
+DATA			SEGMENT
+
+FLOAT_TWO		DD		0
+DOUBLE_TWO		DQ		0
+TBYTE_TWO		DT		0
+
+FLOAT_FOUR		DD		0
+DOUBLE_FOUR		DQ		0
+TBYTE_FOUR		DT		0
+
+FLOAT_HALF		DD		0
+DOUBLE_HALF		DQ		0
+TBYTE_HALF		DT		0
+
+FLOAT_QUARTER	DD		0
+DOUBLE_QUARTER	DQ		0
+TBYTE_QUARTER	DT		0
+
+FLOAT_TENTH		DD		0
+DOUBLE_TENTH	DQ		0
+TBYTE_TENTH		DT		0
+
+
+INT_ZERO		DD		0
+SHORT_ZERO		DW		0
+
+INT_ONE			DD		1
+SHORT_ONE		DW		1
+
+INT_TWO			DD		2
+SHORT_TWO		DW		2
+
+INT_THREE		DD		3
+SHORT_THREE		DW		3
+
+INT_FOUR		DD		4
+SHORT_FOUR		DW		4
+
+DATA			ENDS
+
+
+CODE			SEGMENT
+
+; RUN387(int *int_data,float *float_data,double *double_data);
+RUN387			PROC
+				PUSH	EBP
+				MOV		EBP,ESP
+
+				PUSHAD
+
+				MOV		EBX,[EBP+8]	; EBX=int_data
+				MOV		ESI,[EBP+12]	; ESI=float_data
+				MOV		EDI,[EBP+16]	; EDI=double_data
+				MOV		EDX,[EBP+20]	; EDX=data_80bit
+
+				FNINIT  ;  Control Word<-037FH, Status Word clear, Stack Empty
+
+				FNOP
+				FSETPM
+				FNENI
+				FNDISI
+
+				FLD1
+				FLDL2T
+				FLDPI
+				FLDLG2
+				FLDLN2
+				FLDZ
+
+				FST		QWORD PTR DS:[EDI]
+				FSTP	DWORD PTR DS:[ESI]
+				ADD		EDI,8
+				ADD		ESI,4
+
+				FST		DWORD PTR DS:[ESI]
+				FSTP	QWORD PTR DS:[EDI]
+				ADD		EDI,8
+				ADD		ESI,4
+
+				FST		QWORD PTR DS:[EDI]
+				FSTP	DWORD PTR DS:[ESI]
+				ADD		EDI,8
+				ADD		ESI,4
+
+				FST		DWORD PTR DS:[ESI]
+				FSTP	QWORD PTR DS:[EDI]
+				ADD		EDI,8
+				ADD		ESI,4
+				ADD		EDX,10
+
+				FST		QWORD PTR DS:[EDI]
+				FSTP	DWORD PTR DS:[ESI]
+				ADD		EDI,8
+				ADD		ESI,4
+
+				FST		DWORD PTR DS:[ESI]
+				FSTP	QWORD PTR DS:[EDI]
+				ADD		EDI,8
+				ADD		ESI,4
+
+
+				FLD1
+				FLDL2T
+				FLDPI
+				FLDLG2
+				FLDLN2
+				FLDZ
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDX,10
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDX,10
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDX,10
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDX,10
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDX,10
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDX,10
+
+				FWAIT
+
+				; Make Twos
+
+				FLD1
+				FLD1
+				FADDP	ST(1),ST
+				FWAIT
+
+				FST		DS:[FLOAT_TWO]
+				FST		DS:[DOUBLE_TWO]
+				FSTP	DS:[TBYTE_TWO]
+
+				; Make Fours
+
+				FLD		DS:[FLOAT_TWO]
+				FADD	DS:[FLOAT_TWO]
+				FWAIT
+				FSTP	DS:[FLOAT_FOUR]
+
+				FLD		DS:[DOUBLE_TWO]
+				FADD	DS:[DOUBLE_TWO]
+				FWAIT
+				FSTP	DS:[DOUBLE_FOUR]
+
+				FLD		DS:[TBYTE_TWO]
+				FLD		DS:[TBYTE_TWO]
+				FADDP	ST(1),ST
+				FWAIT
+				FSTP	DS:[TBYTE_FOUR]
+
+				; Store Twos and Fours
+
+				FLD		DS:[TBYTE_FOUR]
+				FLD		DS:[TBYTE_TWO]
+
+				FST		QWORD PTR DS:[EDI]
+				FST		DWORD PTR DS:[ESI]
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDI,8
+				ADD		ESI,4
+				ADD		EDX,10
+
+				FST		QWORD PTR DS:[EDI]
+				FST		DWORD PTR DS:[ESI]
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDI,8
+				ADD		ESI,4
+				ADD		EDX,10
+
+				FILD	DS:[INT_ZERO]
+				FIADD	DS:[INT_ONE]
+				FIADD	DS:[INT_TWO]
+				FIADD	DS:[INT_THREE]
+				FIADD	DS:[INT_FOUR]
+
+				FST		QWORD PTR DS:[EDI]
+				FST		DWORD PTR DS:[ESI]
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDI,8
+				ADD		ESI,4
+				ADD		EDX,10
+
+				FILD	DS:[SHORT_ZERO]
+				FIADD	DS:[SHORT_ONE]
+				FIADD	DS:[SHORT_TWO]
+				FIADD	DS:[SHORT_THREE]
+				FIADD	DS:[SHORT_FOUR]
+
+				FST		QWORD PTR DS:[EDI]
+				FST		DWORD PTR DS:[ESI]
+				FSTP	TBYTE PTR DS:[EDX]
+				ADD		EDI,8
+				ADD		ESI,4
+				ADD		EDX,10
+
+				; FDIV/FDIVP,FIDIV
+
+				FLD1
+				FILD	DS:[INT_TWO]
+				FDIVP	ST(1),ST
+				FST		DS:[FLOAT_HALF]
+				FST		DS:[DOUBLE_HALF]
+				FSTP	DS:[TBYTE_HALF]
+
+				FILD	DS:[INT_FOUR]
+				FLD1
+				FDIV	ST,ST(1)
+				FST		DS:[FLOAT_QUARTER]
+				FST		DS:[DOUBLE_QUARTER]
+				FSTP	DS:[TBYTE_QUARTER]
+
+				; Still ST(0) is 4
+				FIADD	DS:[INT_THREE]
+				FIADD	DS:[INT_THREE]	; Make it 10
+				FLD1
+				FXCH	ST(1)	; ST(0) is 10, ST(1) is 1
+				FDIV	ST(1),ST	; ST(0) is 10, ST(1) is 0.1
+				FXCH	ST(1)
+				FST		DS:[FLOAT_TENTH]
+				FST		DS:[DOUBLE_TENTH]
+				FSTP	DS:[TBYTE_TENTH]
+
+				FSTP	ST(0)	; Essentially FPOP
+
+
+				POPAD
+				MOV		ESP,EBP
+				POP		EBP
+
+				RET
+
+RUN387			ENDP
+
+CODE			ENDS
+				END
