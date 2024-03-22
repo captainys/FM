@@ -2,6 +2,7 @@
 				.387
 
 				PUBLIC	RUN387
+				PUBLIC	TBYTE_TO_QWORD
 
 				ASSUME	CS:CODE,DS:DATA
 
@@ -10,10 +11,13 @@
 ;   FFREE
 ;   FICOM
 ;   FINCSTP
-;   FLDCW
-;   FLDENV
+;   FSTCW (Test not crash only)
+;   FLDCW (Test not crash only)
+;   FSTENV (Test not crash only)
+;   FLDENV (Test not crash only)
 ;   FRESTORE
 ;   FSAVE
+;   FXTRACT
 
 PUSH_RESULT		MACRO
 				FWAIT
@@ -103,7 +107,7 @@ CODE			SEGMENT
 RUN387			PROC
 				PUSH	EBP
 				MOV		EBP,ESP
-				SUB		ESP,16
+				SUB		ESP,32
 
 				PUSHAD
 
@@ -119,6 +123,22 @@ RUN387			PROC
 				FNENI
 				FNDISI
 
+
+				; At least should not crash
+				FSTCW	SS:[EBP-16]
+				FLDCW	SS:[EBP-16]
+				FSTSW	SS:[EBP-16]
+				FSTSW	AX
+				FSTENV	SS:[EBP-32]
+				FLDENV	SS:[EBP-32]
+
+				FILD_imm32 1
+				FTST
+				FPOP
+
+
+
+				; *** FLD1,FLDL2T,FLDPI,FLDLG2,FLDLN2,FLDZ *** (6 output)
 				FLD1
 				FLDL2T
 				FLDPI
@@ -145,7 +165,6 @@ RUN387			PROC
 				FSTP	QWORD PTR DS:[EDI]
 				ADD		EDI,8
 				ADD		ESI,4
-				ADD		EDX,10
 
 				FST		QWORD PTR DS:[EDI]
 				FSTP	DWORD PTR DS:[ESI]
@@ -181,22 +200,23 @@ RUN387			PROC
 
 
 
-				; *** F2XM1 ***
-
-				FLD		DS:[DOUBLE_HALF]
+				; *** F2XM1 *** (1 output)
+				FLD1
+				FILD_imm16	2
+				FDIVP	ST(1),ST
 				F2XM1
 				PUSH_RESULT
 
 
 
-				; *** FABS ***
+				; *** FABS *** (1 output)
 				FILD_imm32 -65536
 				FABS
 				PUSH_RESULT
 
 
 
-				; *** FADD/FADDP/FIADD
+				; *** FADD/FADDP/FIADD (5 output)
 
 				; Make Twos
 
@@ -269,7 +289,7 @@ RUN387			PROC
 
 
 
-				; *** FBLD ***
+				; *** FBLD *** (1 output)
 				FBLD	DS:[BCD_SAMPLE]
 				PUSH_RESULT
 
@@ -282,7 +302,7 @@ RUN387			PROC
 
 
 
-				; *** FCHS ***
+				; *** FCHS *** (2 output)
 				FILD_imm16 100
 				FCHS
 				PUSH_RESULT
@@ -355,37 +375,29 @@ RUN387			PROC
 
 
 
-				; *** FCOS ***
-				FLDPI
+				; *** FCOS *** (12 output)
+				MOV		ECX,0
+FCOS_LOOP:
+				PUSH	ECX
+				FILD	DWORD PTR SS:[ESP]
+				POP		ECX
 				FILD_imm16	6
 				FDIVP	ST(1),ST
+				FWAIT
+				FLDPI
+				FMULP	ST(1),ST
 				FWAIT
 				FCOS
 				FWAIT
 				PUSH_RESULT	; Output is 0.866025 (cos(PI/6))
 
-				FLDPI
-				FILD_imm16	3
-				FDIVP	ST(1),ST
-				FWAIT
-				FCOS
-				FWAIT
-				PUSH_RESULT
-
-				FLDPI
-				FILD_imm16	4
-				FDIVP	ST(1),ST
-				FWAIT
-				FILD_imm16	3
-				FMULP	ST(1),ST
-				FWAIT
-				FCOS
-				FWAIT
-				PUSH_RESULT	; Output is -0.707107  (cos(3PI/4))
+				INC		ECX
+				CMP		ECX,12
+				JL		FCOS_LOOP
 
 
 
-				; *** FDIV/FDIVP,FIDIV ***
+				; *** FDIV/FDIVP,FIDIV *** (7 output)
 
 				FLD1
 				FILD	DS:[INT_TWO]
@@ -471,7 +483,7 @@ RUN387			PROC
 
 
 
-				; *** FDIVR/FDIVPR/FIDIVR
+				; *** FDIVR/FDIVPR/FIDIVR (7 output)
 				FILD_imm16	256
 				FSTP	DWORD PTR SS:[EBP-16]
 				FILD_imm16	10
@@ -530,7 +542,7 @@ RUN387			PROC
 
 
 
-				; *** FLD ***
+				; *** FLD *** (1 output)
 				FILD_imm16 16
 				FSTP	QWORD PTR SS:[EBP-16]
 				FLD		QWORD PTR SS:[EBP-16]
@@ -541,7 +553,7 @@ RUN387			PROC
 
 
 
-				; *** FMUL/FMULP/FIMUL ***
+				; *** FMUL/FMULP/FIMUL *** (7 output)
 				FILD_imm16	-4096
 				FILD_imm16	16
 				FSTP	DWORD PTR SS:[EBP-16]
@@ -601,7 +613,7 @@ RUN387			PROC
 
 
 
-				; *** FPATAN ***
+				; *** FPATAN *** (8 output)
 				FILD_imm16	0	;Y
 				FILD_imm16	100	;X
 				FPATAN
@@ -644,7 +656,7 @@ RUN387			PROC
 
 
 
-				; *** FPREM ***
+				; *** FPREM *** (1 output)
 				FLD		DWORD PTR DS:[FLOAT_HALF]
 				FLDPI
 				FPREM
@@ -653,7 +665,7 @@ RUN387			PROC
 
 
 
-				; *** FPREM1 ***
+				; *** FPREM1 *** (1 output)
 				FLD		DWORD PTR DS:[FLOAT_HALF]
 				FLDPI
 				FPREM1
@@ -662,7 +674,7 @@ RUN387			PROC
 
 
 
-				; *** FPTAN ***
+				; *** FPTAN *** (5 output)
 				FLDPI
 				FILD_imm16 -3
 				FDIVP	ST(1),ST
@@ -703,7 +715,7 @@ RUN387			PROC
 
 
 
-				; *** FRNDINT ***
+				; *** FRNDINT *** (16 output)
 				; Rounding Control bits:
 				; CW&0C00H
 				;   00:Nearest or Even
@@ -754,7 +766,195 @@ FRNDINT_LOOP:
 
 
 
-				; *** FSCALE ***
+				; *** FSCALE *** (2 output)
+				FILD_imm16 12
+				FLD1
+				FSCALE
+				PUSH_RESULT
+
+				FILD_imm16 8
+				FLD1
+				FSCALE
+				PUSH_RESULT
+
+
+
+				; *** FSIN *** (12 output)
+				MOV		ECX,0
+FSIN_LOOP:
+				PUSH	ECX
+				FILD	DWORD PTR SS:[ESP]
+				POP		ECX
+				FILD_imm16	6
+				FDIVP	ST(1),ST
+				FWAIT
+				FLDPI
+				FMULP	ST(1),ST
+				FWAIT
+				FSIN
+				FWAIT
+				PUSH_RESULT	; Output is 0.866025 (SIN(PI/6))
+
+				INC		ECX
+				CMP		ECX,12
+				JL		FSIN_LOOP
+
+
+
+				; *** FSINCOS *** (24 output)
+				MOV		ECX,0
+FSINCOS_LOOP:
+				PUSH	ECX
+				FILD	DWORD PTR SS:[ESP]
+				POP		ECX
+				FILD_imm16	6
+				FDIVP	ST(1),ST
+				FWAIT
+				FLDPI
+				FMULP	ST(1),ST
+				FWAIT
+				FSINCOS
+				FWAIT
+				PUSH_RESULT
+				PUSH_RESULT
+
+				INC		ECX
+				CMP		ECX,12
+				JL		FSINCOS_LOOP
+
+
+
+				; *** FSQRT *** (11 output)
+				MOV		ECX,0
+FSQRT_LOOP:
+				PUSH	ECX
+				FILD	DWORD PTR SS:[ESP]
+				POP		ECX
+				FILD_imm16 10
+				FDIVP	ST(1),ST
+				FWAIT
+				FMUL	ST,ST(0)
+				FWAIT
+				FSQRT
+				FWAIT
+				PUSH_RESULT
+
+				ADD		ECX,2
+				CMP		ECX,20
+				JLE		FSQRT_LOOP
+
+
+
+				; *** FSUB/FSUBP/FISUB *** (7 output)
+				FILD_imm16	10
+				FSUB	DWORD PTR DS:[FLOAT_QUARTER]
+				PUSH_RESULT
+
+				FILD_imm16	5
+				FSUB	QWORD PTR DS:[DOUBLE_HALF]
+				PUSH_RESULT
+
+				FILD_imm16	100
+				FILD_imm16	200
+				FSUB	ST,ST(1)
+				PUSH_RESULT
+
+				FILD_imm16	50
+				FSUB	ST(1),ST
+				FPOP
+				PUSH_RESULT
+
+				FILD_imm32  500000
+				FILD_imm32  400000
+				FSUBP	ST(1),ST
+				PUSH_RESULT
+				FPOP
+
+				PUSH	DWORD PTR 1234
+				FLD		DS:[DOUBLE_TENTH]
+				FISUB	DWORD PTR SS:[ESP]
+				PUSH_RESULT
+
+				FLD		DS:[DOUBLE_TENTH]
+				FISUB	WORD PTR SS:[ESP]
+				PUSH_RESULT
+
+				FPOP
+				ADD		ESP,4
+
+
+
+				; *** FSUBR/FSUBPR/FISUBR *** (7 output)
+				FILD_imm16	10
+				FSUBR	DWORD PTR DS:[FLOAT_QUARTER]
+				PUSH_RESULT
+
+				FILD_imm16	5
+				FSUBR	QWORD PTR DS:[DOUBLE_HALF]
+				PUSH_RESULT
+
+				FILD_imm16	100
+				FILD_imm16	200
+				FSUBR	ST,ST(1)
+				PUSH_RESULT
+
+				FILD_imm16	50
+				FSUBR	ST(1),ST
+				FPOP
+				PUSH_RESULT
+
+				FILD_imm32  500000
+				FILD_imm32  400000
+				FSUBRP	ST(1),ST
+				PUSH_RESULT
+				FPOP
+
+				PUSH	DWORD PTR 1234
+				FLD		DS:[DOUBLE_TENTH]
+				FISUBR	DWORD PTR SS:[ESP]
+				PUSH_RESULT
+
+				FLD		DS:[DOUBLE_TENTH]
+				FISUBR	WORD PTR SS:[ESP]
+				PUSH_RESULT
+
+				FPOP
+				ADD		ESP,4
+
+
+
+				; *** FUCOM/FUCOMP/FUCOMPP ***
+				FILD_imm32 1000000
+				FILD_imm32 1000000
+				FILD_imm32 1000000
+				FUCOM	ST(2)
+
+				FUCOMP	ST(2)
+
+				FUCOMPP
+
+
+
+				; *** FXAM ***
+				FILD_imm32	100000000
+				FXAM
+				FPOP
+
+
+
+				; *** FYL2X *** (1 output)
+				FILD_imm32	100000
+				FILD_imm16	256
+				FYL2X
+				PUSH_RESULT
+
+
+
+				; *** FYL2XP1 *** (1 output)
+				FILD_imm32	100000
+				FLD		DS:[DOUBLE_TENTH]
+				FYL2XP1
+				PUSH_RESULT
 
 
 
@@ -765,6 +965,17 @@ FRNDINT_LOOP:
 				RET
 
 RUN387			ENDP
+
+
+; extern TBYTE_TO_QWORD(double *qword_ptr,const unsigned char *tbyte_ptr);
+TBYTE_TO_QWORD	PROC
+				MOV		EAX,SS:[ESP+8]
+				FLD		TBYTE PTR DS:[EAX]
+				MOV		EAX,SS:[ESP+4]
+				FSTP	QWORD PTR DS:[EAX]
+				RET
+TBYTE_TO_QWORD	ENDP
+
 
 CODE			ENDS
 				END
