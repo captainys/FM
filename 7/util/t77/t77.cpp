@@ -990,3 +990,42 @@ T77Decoder::RawDecodingInfo T77Decoder::RawReadByte(RawDecodingInfo info) const
 	}
 	return info;
 }
+
+T77Decoder::RawDecodingInfo T77Decoder::RawReadByteNoSync(RawDecodingInfo info) const
+{
+	while(true!=info.endOfFile)
+	{
+		auto ptrSave=info.ptr;
+
+		int bit[11];
+		for(int i=0; i<11; ++i)
+		{
+			bit[i]=GetBit(info.ptr);
+		}
+
+		if(0==bit[0] && 0!=bit[9] && 0!=bit[10])
+		{
+			++info.byteCtr;
+			info.byteData=
+				 bit[1]+
+				(bit[2]<<1)+
+				(bit[3]<<2)+
+				(bit[4]<<3)+
+				(bit[5]<<4)+
+				(bit[6]<<5)+
+				(bit[7]<<6)+
+				(bit[8]<<7);
+			return info;
+		}
+		else
+		{
+			info.ptr=ptrSave+1;
+			if((long long)t77.size()<info.ptr+2)
+			{
+				info.endOfFile=true;
+			}
+		}
+	}
+	info.byteData=0xff;
+	return info;
+}

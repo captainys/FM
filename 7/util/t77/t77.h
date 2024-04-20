@@ -118,6 +118,7 @@ public:
 	};
 	RawDecodingInfo BeginRawDecoding(void) const;
 	RawDecodingInfo RawReadByte(RawDecodingInfo info) const;
+	RawDecodingInfo RawReadByteNoSync(RawDecodingInfo info) const;
 
 
 	static long long int GetHeaderBlockPointer(const std::vector <unsigned char> &dump);

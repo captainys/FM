@@ -556,13 +556,16 @@ void FM7CassetteTape::Remake(
 
 		if(true!=processed)
 		{
+			int c=0;
 			auto info=t77Dec.BeginRawDecoding();
 			info.ptr=ptrStop[fileIdx];
-			while(info.ptr<ptrStop[fileIdx+1] && true!=info.endOfFile)
+			while(true!=info.endOfFile)
 			{
-				info=t77Dec.RawReadByte(info);
+				info=t77Dec.RawReadByteNoSync(info);
 				byteString.push_back(info.byteData);
+				++c;
 			}
+			printf("%d raw bytes.\n",c);
 		}
 
 		dir.push_back(file);
