@@ -409,7 +409,7 @@ public:
 
 		if(ptr+4<=bin.size() &&
 		   bin[ptr  ]==0xAD &&
-		   bin[ptr+1]==0x9F &&
+		   (bin[ptr+1]&0x9F)==0x9F &&
 		   bin[ptr+2]==0xFB &&
 		   bin[ptr+3]==0xFA)
 		{
@@ -422,7 +422,7 @@ public:
 		}
 		else if(ptr+4<=bin.size() &&
 		   bin[ptr  ]==0x6E &&
-		   bin[ptr+1]==0x9F &&
+		   (bin[ptr+1]&0x9F)==0x9F &&
 		   bin[ptr+2]==0xFB &&
 		   bin[ptr+3]==0xFA)
 		{

@@ -339,7 +339,7 @@ void AlterSectorData(
 			dat[i+1]=(hookInstAddr>>8)&0xff;
 			dat[i+2]= hookInstAddr&0xff;
 		}
-		if(i+3<dat.size() && dat[i+1]==0x9F && dat[i+2]==0xFB && dat[i+3]==0xFA)
+		if(i+3<dat.size() && (dat[i+1]&0x9F)==0x9F && dat[i+2]==0xFB && dat[i+3]==0xFA)
 		{
 			if(dat[i]==0xAD) // JSR [$FBFA]
 			{
