@@ -786,10 +786,10 @@ int main(int ac,char *av[])
 			FILE *fp=fopen(fc80.cpi.saveT77FName.c_str(),"ab");
 			if(nullptr==fp)
 			{
-				fclose(fp);
 				printf("Cannot open a T77 for save.\n");
 				return 1;
 			}
+			fclose(fp);
 			printf("Creating a new T77 for saving.\n");
 			fc80.saveTape.CleanUp();
 			fc80.saveTape.StartT77Header();
