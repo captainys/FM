@@ -41,10 +41,10 @@ unsigned int GetDwordLE(const unsigned char *ptr)
 
 void PutDwordLE(unsigned char *ptr,unsigned int data)
 {
-	ptr[0]=(data);
-	ptr[1]=(data>>8);
-	ptr[2]=(data>>16);
-	ptr[3]=(data>>24);
+	ptr[0]=(data)&255;
+	ptr[1]=(data>>8)&255;
+	ptr[2]=(data>>16)&255;
+	ptr[3]=(data>>24)&255;
 }
 
 unsigned int GetDwordBE(const unsigned char *ptr)
@@ -239,20 +239,35 @@ int main(int ac,char *av[])
 		return 0;
 	}
 
+	printf("IO.SYS LBA=%d Size=%d\n",verifyLBA,verifyLEN);
+
+	printf("Have IPL\n");
 
 	size_t dstIOSYSLBA,dstIOSYSLEN;
-	if(OK!=FindIOSYS(&dstIOSYSLBA,&dstIOSYSLEN,av[2]))
+	if(OK==FindIOSYS(&dstIOSYSLBA,&dstIOSYSLEN,av[2]))
 	{
-		FILE *fp=fopen(av[2],"wb+");
+		FILE *fp=fopen(av[2],"r+b");
 		if(NULL!=fp)
 		{
 			size_t numSec=(dstIOSYSLEN+SECTOR_LEN-1)/SECTOR_LEN;
 			PutDwordLE(IPL+0x20,dstIOSYSLBA);
 			PutDwordLE(IPL+0x24,numSec);
 
-			fwrite(fp,1,SECTOR_LEN,IPL);
+			fseek(fp,0,SEEK_SET);
+			fwrite(IPL,1,SECTOR_LEN,fp);
+			fclose(fp);
 			printf("Transplantation done.\n");
 		}
+		else
+		{
+			printf("Cannot open destination file.\n");
+			return 1;
+		}
+	}
+	else
+	{
+		printf("Cannot find IO.SYS in the destination disc.\n");
+		return 1;
 	}
 
 	return 0;
