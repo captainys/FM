@@ -119,8 +119,8 @@ DEVICE_ID_SET:
 						; CMOS_BACKED_UP flag is outside of the Loader.
 						; Needs to be copied separately.
 						PUSH	FS
+						CALL	GET_LOADER_TOP_EDX
 						MOV		AL,4	; Bit2=FS
-						MOV		EDX,ICM_LOADER_TOP
 						CALL	GET_UNREALMODE_SEG
 						MOV		AL,FS:[CMOS_BACKED_UP]
 						MOV		CS:[CMOS_BACKED_UP],AL
@@ -139,7 +139,14 @@ MAIN					ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+GET_LOADER_TOP_EDX:
+						MOV		EDX,ICM_LOADER_TOP
+						CALL	CMP_CPU_386SX
+						JNE		@f
+						MOV		EDX,ICM_LOADER_TOP_386SX
+@@:						RET
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DEMOSPLASH_MESSAGE		PROC
 						MOV		AX,280AH

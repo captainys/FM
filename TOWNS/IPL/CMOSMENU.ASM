@@ -365,8 +365,8 @@ ICM_WRITE_SETTING_AL	PROC
 						;			bit2:FS
 						;			bit3:GS
 						;   EDX    Physical Address
+						CALL	GET_LOADER_TOP_EDX
 						MOV		AL,4	; Bit2=FS
-						MOV		EDX,ICM_LOADER_TOP
 						CALL	GET_UNREALMODE_SEG
 
 						MOV		BX,DI
@@ -441,8 +441,8 @@ DO_BACKUP_CMOS			PROC
 						;			bit2:FS
 						;			bit3:GS
 						;   EDX    Physical Address
+						CALL	GET_CMOS_BACKUP_ADDR_EDX
 						MOV		AL,2	; Bit1=ES
-						MOV		EDX,ICM_CMOS_BACKUP_PHYSADDR
 						CALL	GET_UNREALMODE_SEG
 
 
@@ -486,8 +486,8 @@ DO_RESTORE_CMOS			PROC
 						;			bit2:FS
 						;			bit3:GS
 						;   EDX    Physical Address
+						CALL	GET_CMOS_BACKUP_ADDR_EDX
 						MOV		AL,1	; Bit0=DS
-						MOV		EDX,ICM_CMOS_BACKUP_PHYSADDR
 						CALL	GET_UNREALMODE_SEG
 
 						CALL	MAP_CMOS_D8000
@@ -738,6 +738,15 @@ BOOTDEVMENU_UPDATE_MENU_SELECT:
 						OUT		DX,AL
 
 						RET
+
+
+
+GET_CMOS_BACKUP_ADDR_EDX:
+						MOV		EDX,ICM_CMOS_BACKUP_PHYSADDR
+						CALL	CMP_CPU_386SX
+						JNE		@f
+						MOV		EDX,ICM_CMOS_BACKUP_386SX_PHYSADDR
+@@:						RET
 
 
 
