@@ -14,6 +14,21 @@ To make a patched executable in FM TOWNS (can be done in AUTOEXEC.BAT)
 
 
 
+More Detailed Instruction:
+
+(1) Using Towns OS V1.1, format a 1232KB (2HD) floppy disk with [Copy CD Player System] option checked.
+(2) Copy PATCH.EXP in this directory to the floppy disk.
+(3) Copy YSSCSICD.SYS (find it from https://github.com/captainys/FM/tree/master/TOWNS/YSSCSICD/sys) to the floppy disk.
+(4) Add the following line in CONFIG.SYS of the floppy disk.
+DEVICE=YSSCSICD.SYS
+(5) Replace AUTOEXEC.BAT with the following.
+IF EXIST RPATCH.EXE GOTO run
+RUN386 PATCH.EXP Q:\R.EXE \RPATCH.EXE
+:RUN
+RPATCH.EXE
+(6) Insert RAIDEN CD-ROM in the SCSI CD drive, and the floppy disk in A drive, (Do not write protect for the first time.) and power on FM TOWNS.  Once RAIDEN boots, you can write-protect the floppy disk.
+
+
 Reverse Engineering:
 
 Oh my god!  R.EXE has its own CD-ROM BIOS in the executable!  Why did they waste it!?  Raiden's own CD-ROM BIOS takes exactly the same command set as FM TOWNS original CD-ROM BIOS.  What I had to do was to replace Raiden's own BIOS call to INT 93H (FM TOWNS's original CD-ROM BIOS).  It doesn't seem to working as a copy protection.  Did VING's programmers just want to explore more about FM TOWNS CD-ROM I/O then?
@@ -24,23 +39,23 @@ The patched R.EXe needs to run from Towns OS V1.1.  Unpatched version runs from 
 
 
 
-���d�`�� for FM TOWNS SCSI CD-ROM�N���p�p�b�`
+雷電伝説 for FM TOWNS SCSI CD-ROM起動用パッチ
 
-�g����:
+使い方:
 
-patch.c���R���p�C��&���s���ė��d�`����R.EXE�Ƀp�b�`�𓖂Ă�BTowns OS V1.1�pSCSI CD-ROM�N���t���b�s�[�f�B�X�N���C�����āATowns MENU�̑���Ƀp�b�`�𓖂Ă����s�t�@�C�������s����悤�ɏ���������B
+patch.cをコンパイル&実行して雷電伝説のR.EXEにパッチを当てる。Towns OS V1.1用SCSI CD-ROM起動フロッピーディスクを修正して、Towns MENUの代わりにパッチを当てた実行ファイルを実行するように書き換える。
 
-���邢�́APATCH.EXP�����̂悤�Ɏ��s���邱�Ƃ�FM TOWNS��Ńp�b�`�𓖂Ă邱�Ƃ��\�B
+あるいは、PATCH.EXPを次のように実行することでFM TOWNS上でパッチを当てることも可能。
 
 run386 PATCH.EXP Q:\R.EXE A:\RPATCH.EXE
 
-AUTOEXEC.BAT�̒��Ŏ��s���邱�ƂŃt���b�s�[�f�B�X�N����N�������^�C�~���O�Ńp�b�`�𓖂Ă邱�Ƃ��\�B
+AUTOEXEC.BATの中で実行することでフロッピーディスクから起動したタイミングでパッチを当てることも可能。
 
 
 
-���:
+解析:
 
-�Ȃ��! ���d�`�����s�t�@�C��R.EXE�͒��ɓƎ���CD-ROM BIOS�������Ă����B�Ȃ�ł���Ȃ��̂��킴�킴�������̂�!?R.EXE�Ǝ�CD-ROM BIOS��FM TOWNS�W��CD-ROM BIOS�Ɠ����R�}���h���󂯕t����̂ŁA�P�ɌĂяo����INT 93H�Ƀ��_�C���N�g���邾���ŗǂ������B�R�s�[�v���e�N�V�����Ƃ��Ă̈Ӗ�������悤�ɂ��v���Ȃ����AVING�̃v���O���}�[�͒P��FM TOWNS��CD-ROM I/O���������Ă݂��������������낤��?
+なんと! 雷電伝説実行ファイルR.EXEは中に独自のCD-ROM BIOSを持っていた。なんでそんなものをわざわざ書いたのか!?R.EXE独自CD-ROM BIOSはFM TOWNS標準CD-ROM BIOSと同じコマンドを受け付けるので、単に呼び出しをINT 93Hにリダイレクトするだけで良かった。コピープロテクションとしての意味があるようにも思えないし、VINGのプログラマーは単にFM TOWNSのCD-ROM I/Oをいじってみたかっただけだろうか?
 
-�Ȃ��A�p�b�`�𓖂Ă�R.EXE��Towns OS V1.1����N������K�v������B�p�b�`�𓖂ĂĂ��Ȃ��o�[�W�������ƃh���C�o�������C���X�g�[�����Ă��Ȃ�Towns OS V2.1����̎��s���\���������ǁA�p�b�`�𓖂Ă��o�[�W�����̓t�@�C���̓ǂݍ��݂ŉ�����j�󂵂Ă��܂��͗l(�N���b�V�����Ă���ӏ������肵���񂾂��ǁA���ʂ�fread�݂���������)�B�����_�ł�Towns OS V2.1����̋N���͂ł��Ȃ��B�Ƃ������A�ǂ���Towns OS�̃h���C�o�������Ă���ƃN���b�V�����邩�炪��΂���V2.1����N���ł���悤�ɂ���Ӗ��͂��܂薳���B
+なお、パッチを当てたR.EXEはTowns OS V1.1から起動する必要がある。パッチを当てていないバージョンだとドライバを何もインストールしていないTowns OS V2.1からの実行も可能だったけど、パッチを当てたバージョンはファイルの読み込みで何かを破壊してしまう模様(クラッシュしている箇所も特定したんだけど、普通のfreadみたいだった)。現時点ではTowns OS V2.1からの起動はできない。というか、どうせTowns OSのドライバが入っているとクラッシュするからがんばってV2.1から起動できるようにする意味はあまり無い。
 
