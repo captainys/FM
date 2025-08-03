@@ -76,6 +76,10 @@ SCSI_COMMAND			PROC
 						PUSHF
 
 
+						CALL	CMP_MACHINE_ID_MARTY
+						JE		SCSI_ERROR_80
+
+
 						; Pentium model may be too fast for SCSI controller when multiple commands
 						; are shot in a short time.  Add 10ms delay.
 						PUSH	CX
@@ -197,6 +201,12 @@ SCSI_COMMAND			ENDP
 
 
 SCSI_WAIT_READY			PROC
+						CALL	CMP_MACHINE_ID_MARTY
+						JNE		@f
+						STC
+						RET
+
+@@:
 						PUSH	CX
 						CLC
 						MOV		CX,30000
@@ -362,6 +372,16 @@ SCSI_UTIL_REALADDR_TO_LINEAR	PROC
 						ADD		EDX,EAX
 						RET
 SCSI_UTIL_REALADDR_TO_LINEAR	ENDP
+
+
+
+CMP_MACHINE_ID_MARTY:
+						PUSH	AX
+						IN		AL,031H
+						CMP		AL,04AH
+						POP		AX
+						RET
+
 
 
 

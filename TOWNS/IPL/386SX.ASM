@@ -2,15 +2,25 @@
 ; Credit to jckarter (https://cohost.org/jckarter/tagged/fm%20towns)
 ; Thank you for your great help!
 
+CMP_CPU_386SX			PROC
+						PUSH	AX
+						IN		AL,IO_MACHINE_ID_LOW
+						AND		AL,7
+						CMP		AL,CPUID_386SX
+						POP		AX
+						RET
+
+CMP_CPU_386SX			ENDP
+
+
+
 DO_386SX_THINGS			PROC
 						PUSHFD
 						PUSHAD
 						PUSH	DS
 						PUSH	ES
 
-						IN		AL,IO_MACHINE_ID_LOW
-						AND		AL,7
-						CMP		AL,CPUID_386SX
+						CALL	CMP_CPU_386SX
 						JNE		DO_386SX_THINGS_RET
 
 						; Is 386SX TOWNS.

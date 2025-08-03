@@ -2,7 +2,7 @@
 
 						PAGE	99,160
 
-VERSION_STRING			EQU		"VERSION 20240318"
+VERSION_STRING			EQU		"VERSION 20241204"
 
 						.386p
 CODE					SEGMENT	USE16
@@ -119,8 +119,8 @@ DEVICE_ID_SET:
 						; CMOS_BACKED_UP flag is outside of the Loader.
 						; Needs to be copied separately.
 						PUSH	FS
+						CALL	GET_LOADER_TOP_EDX
 						MOV		AL,4	; Bit2=FS
-						MOV		EDX,ICM_LOADER_TOP
 						CALL	GET_UNREALMODE_SEG
 						MOV		AL,FS:[CMOS_BACKED_UP]
 						MOV		CS:[CMOS_BACKED_UP],AL
@@ -139,7 +139,14 @@ MAIN					ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+GET_LOADER_TOP_EDX:
+						MOV		EDX,ICM_LOADER_TOP
+						CALL	CMP_CPU_386SX
+						JNE		@f
+						MOV		EDX,ICM_LOADER_TOP_386SX
+@@:						RET
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 DEMOSPLASH_MESSAGE		PROC
 						MOV		AX,280AH
@@ -155,8 +162,8 @@ DEMOSPLASH_MESSAGE_MOVABLE		PROC
 DEMOSPLASH_MESSAGE_MOVABLE		ENDP
 
 
-MSG_DEMOSPLASH			DB		"PLEASE JOIN US AT DEMOSPLASH 2024",0
-						DB		"AND 2025, 2026, ...",0
+MSG_DEMOSPLASH			DB		"PLEASE JOIN US AT DEMOSPLASH 2025",0
+						DB		"AND 2026, 2027, ...",0
 						DB		"https://demosplash.org",0
 						DB		0FFH,0FFH
 
