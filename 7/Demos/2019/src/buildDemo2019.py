@@ -2,6 +2,8 @@
 
 import subprocess
 
+D77filename="../FM77AVDEMO_2019_YS_V3.D77"
+
 def Assemble(fnInD77,asmFn):
 	srecFn=fnInD77+".srec"
 	allcmd=["asm6809.exe","-v"]+asmFn+["-S","-o",srecFn]
@@ -155,7 +157,7 @@ print("DM2019M.srec needs to be written as DM2019M in 2D F-BASIC format disk")
 
 subprocess.Popen([
 	"d77fileutil",
-	"Demo2019.d77",
+	D77filename,
 	"-new",
 	"-srecwrite","DM2019-0.srec","DM2019-0",
 	"-srecwrite","DM2019-1.srec","DM2019-1",
@@ -163,9 +165,9 @@ subprocess.Popen([
 ]).wait()
 
 subprocess.Popen([
-	"d77write","Demo2019.d77","0","0","1","DM2019I.srec"
+	"d77write",D77filename,"0","0","1","DM2019I.srec"
 ]).wait();
 
 subprocess.Popen([
-	"d77write","Demo2019.d77","0","0","9","DM2019L.srec"
+	"d77write",D77filename,"0","0","9","DM2019L.srec"
 ]).wait();
