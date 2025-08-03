@@ -1,0 +1,199 @@
+						ORG		$1800
+
+
+
+DEMO2019_MAIN
+						PSHS	A,B,X,Y,U,CC,DP
+						ORCC	#$40 	; Only mask FIRQ.  Keep IRQ running for BGM.
+
+						LDA		#2
+						STA		IO_SUBSYS_MONITOR_TYPE
+
+						LBSR	SET_4096COLOR_MODE
+						LBSR	SET_PALETTE_8_8_64
+
+
+						LBSR	MMR_INIT
+						LBSR	INSTALL_WIREFRAME_SUBCPU
+
+						LBSR	CALL_SUBCPU_C000
+
+
+						; Clear screen
+
+						LBSR	HALT_SUBCPU
+						LBSR	MMR_ENABLE_ACCESS_SUBCPU_RAM
+
+						LDY		#LINEDATA_BUF
+						LDA		#LINE_CMD_SELECT_BANK1
+						STA		,Y+
+						LDA		#LINE_CMD_CLS
+						STA		,Y+
+						LDA		#LINE_CMD_SELECT_BANK0
+						STA		,Y+
+						LDA		#LINE_CMD_CLS
+						STA		,Y+
+						LDA		#LINE_CMD_2D_END_OF_CMDSET
+						STA		,Y+
+
+
+						LBSR	MMR_DISABLE
+						LBSR	RELEASE_SUBCPU
+
+
+
+						LBSR		SET_DEFAULT_PALETTE
+						LBSR		INTRO_FM77AV
+						LBSR		SUBCPU_ALL_CLS_AND_FLUSH
+						LBSR		SET_PALETTE_8_8_64
+
+
+
+						LBSR	START_BGM
+						ANDCC	#$EF		; Explicitly activate IRQ
+
+						STA		IO_URARAM
+
+
+						; Beginning of the journey.
+						LBSR	DEMO2019_PROLOG_SEQUENCE
+						LBSR	SUBCPU_ALL_CLS_AND_FLUSH
+
+						LBSR	SOLAR_SYSTEM
+						LBSR	SUBCPU_ALL_CLS_AND_FLUSH
+
+						LBSR	FLYBY_PLUTO_TO_JUPITER
+						LBSR	SUBCPU_ALL_CLS_AND_FLUSH
+
+	 					LBSR	FLYING_THROUGH_ASTEROID
+						LBSR	SUBCPU_ALL_CLS_AND_FLUSH
+
+						LBSR	FLYBY_MARS
+						LBSR	SUBCPU_ALL_CLS_AND_FLUSH
+
+						LBSR	APPROACH_EARTH
+						LBSR	SUBCPU_ALL_CLS_AND_FLUSH
+
+						LBSR	SATELLITE
+						LBSR	SUBCPU_ALL_CLS_AND_FLUSH
+
+						LBSR	AFTERBURNER
+						LBSR	SUBCPU_ALL_CLS_AND_FLUSH
+
+
+						LBSR	LANDING
+						LBSR	ENDTITLE
+
+
+						;	LBSR	SIN16_ROT16_TEST
+
+						;LBSR	DEMO2019_SPIN_PERS	; Single-model test
+
+						;LBSR	DEMO2019_SPIN_ORTHO	; Single-model test
+
+						;LBSR	DEMO2019_INTRO		; Four-models
+						;LBSR	DEMO2019_FOUR_DUCKY	; Four-models
+
+						;LBSR	DEMO2019_2D_TRANS
+						;LBSR	DEMO2019_SPIN_SQUARE
+
+
+WAIT_BREAK_KEY			LDA		$FD04
+						BITA	#2
+						BNE		WAIT_BREAK_KEY
+
+
+						LDA		IO_URARAM
+
+						LBSR	END_BGM
+						BSR		STOP_WIREFRAME_SUBCPU
+
+						PULS	A,B,X,Y,U,CC,DP,PC
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+INSTALL_WIREFRAME_SUBCPU
+						PSHS	CC
+						ORCC	#$50
+
+
+						LBSR	HALT_SUBCPU
+						LBSR	MMR_ENABLE_ACCESS_SUBCPU_RAM
+
+
+						LEAX	WIREFRAME_SUBCPU_BEGIN,PCR
+						LDU		#$C000
+						LDY		#WIREFRAME_SUBCPU_END-WIREFRAME_SUBCPU_BEGIN
+INSTALL_WIREFRAME_SUBCPU_COPY_LOOP
+						LDA		,X+
+						STA		,U+
+						LEAY	-1,Y
+						BNE		INSTALL_WIREFRAME_SUBCPU_COPY_LOOP
+
+						; Prevent Sub-CPU from executing a random command >>
+						CLR		$FC82
+						LDA		#$80
+						ORA		$FC80
+						STA		$FC80
+						; Prevent Sub-CPU from executing a random command <<
+
+						LBSR	MMR_DISABLE
+						LBSR	RELEASE_SUBCPU
+
+						PULS	CC,PC
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+STOP_WIREFRAME_SUBCPU
+						PSHS	CC
+						ORCC	#$50
+
+						LBSR	HALT_SUBCPU
+						LBSR	MMR_ENABLE_ACCESS_SUBCPU_RAM
+
+
+						LDA		#LINE_CMD_END
+						STA		LINEDATA_BUF
+
+
+						LBSR	MMR_DISABLE
+						LBSR	RELEASE_SUBCPU
+
+
+						LDD		#0
+STOP_WIREFRAME_SUBCPU_WAIT
+						SUBD	#1
+						BNE		STOP_WIREFRAME_SUBCPU_WAIT
+
+
+						LBSR	HALT_SUBCPU
+						LBSR	MMR_ENABLE_ACCESS_SUBCPU_RAM
+
+						LDU		#$C000
+STOP_WIREFRAME_CLEAR_CONSOLE
+						CLR		,U+
+						CMPU	#$C800
+						BNE		STOP_WIREFRAME_CLEAR_CONSOLE
+
+						LDA		#$80
+						STA		$FC80
+
+						LBSR	MMR_DISABLE
+						LBSR	RELEASE_SUBCPU
+
+
+						PULS	CC,PC
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+

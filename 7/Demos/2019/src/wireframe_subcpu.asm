@@ -1,0 +1,635 @@
+						PSHS	A,B,X,Y,U,CC
+						ORCC	#$50
+
+						LDA		$D021		; SubSYS Cursor Control
+						ANDA	#$FE		; Don't blink cursor
+						STA		$D021
+
+WIREFRAME_SUBCPU_COMMAND_LOOP
+						CLR		LINEDATA_BUF
+
+						LDA		#$80		; ENABLE, PSET
+						STA		IO_SUB_HWDRW_COMMAND
+						LDX		#0
+						STX		IO_SUB_HWDRW_OFFSET
+						LDX		#$FFFF
+						STX		IO_SUB_HWDRW_LINESTYLE
+
+
+WIREFRAME_WAIT_COMMAND	LDA		IO_SUB_READY_BUSY		; Sub-CPU is ready.
+						LDA		LINEDATA_BUF			; $FC80 in MAIN-CPU space
+						BEQ		WIREFRAME_WAIT_COMMAND
+						STA		IO_SUB_READY_BUSY		; Sub-CPU is busy
+
+						BMI		WIREFRAME_SUBCPU_COMMAND_LOOP_END
+
+						LDY		#LINEDATA_BUF
+						BSR		WIREFRAME_SUBCPU_PROCESS_COMMAND
+
+						BRA		WIREFRAME_SUBCPU_COMMAND_LOOP
+
+WIREFRAME_SUBCPU_COMMAND_LOOP_END
+						CLR		IO_SUB_HWDRW_COMMAND	; Disable
+						PULS	A,B,X,Y,U,CC,PC
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_PROCESS_COMMAND
+						BSR		WIREFRAME_SUBCPU_PROCESS_ONE_COMMAND
+						LDA		,Y
+						BMI		WIREFRAME_SUBCPU_PROCESS_COMMAND_END
+						BNE		WIREFRAME_SUBCPU_PROCESS_COMMAND
+WIREFRAME_SUBCPU_PROCESS_COMMAND_END
+						RTS
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_ROTATION	FCB		0
+WIREFRAME_SUBCPU_SCALING	FCB		0
+WIREFRAME_SUBCPU_TRANSX		FDB		0
+WIREFRAME_SUBCPU_TRANSY		FDB		0
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_PROCESS_ONE_COMMAND
+						LDA		,Y+
+						BEQ		WIREFRAME_SUBCPU_PROCESS_COMMAND_END
+						BMI		WIREFRAME_SUBCPU_PROCESS_COMMAND_END
+
+						DECA
+						BEQ		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_NOCLIP
+
+						DECA
+						BEQ		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_CLIP
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP
+
+						DECA
+						; BEQ		WIREFRAME_SUBCPU_PROCESS_3DDRAWLINE_NOCLIP
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_PROCESS_3DDRAWLINE_CLIP
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_SELECT_BANK0
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_SELECT_BANK1
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_CLS
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_PROCESS_HALFCLS
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_PROCESS_SET_OFFSET
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_PROCESS_SET_TRANS
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_PRINT
+
+						DECA
+						LBEQ	WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_16
+
+WIREFRAME_SUBCPU_PROCESS_ONE_COMMAND_END
+						RTS
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_NOCLIP
+						LDB		,Y+
+						BEQ		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_NOCLIP_RTS
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_NOCLIP_LOOP
+						PSHS	B
+
+						BSR		WIREFRAME_HWLINE_WAITREADY
+
+						LDB		,Y+
+						STB		IO_SUB_HWDRW_COLOR
+
+						LDX		,Y++
+						STX		IO_SUB_HWDRW_LINEX0
+						LDX		,Y++
+						STX		IO_SUB_HWDRW_LINEY0
+
+						LDX		,Y++
+						STX		IO_SUB_HWDRW_LINEX1
+						LDX		,Y++
+						STX		IO_SUB_HWDRW_LINEY1
+
+						PULS	B
+						DECB
+						BNE		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_NOCLIP_LOOP
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_NOCLIP_RTS
+						RTS
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_CLIP
+						LEAS	-10,S
+						LDB		,Y+
+						BEQ		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_CLIP_RTS
+						STB		9,S	; Line count
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_CLIP_LOOP
+						LDB		,Y+
+						STB		8,S	; Color
+
+						LDX		6,Y
+						STX		6,S
+						LDX		4,Y
+						STX		4,S
+						LDX		2,Y
+						STX		2,S
+						LDX		 ,Y
+						STX		 ,S
+						LEAY	8,Y
+
+						PSHS	Y
+						LEAY	2,S
+						LBSR	VIEWPORT_CLIP
+						PULS	Y
+						BCS		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_CLIP_NEXTLINE
+
+						BSR		WIREFRAME_SUBCPU_S_TO_HWLINE
+
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_CLIP_NEXTLINE
+						DEC		9,S
+						BNE		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_CLIP_LOOP
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_CLIP_RTS
+						LEAS	10,S
+						RTS
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Guarantee to preserve Y
+WIREFRAME_HWLINE_WAITREADY
+						LDA		IO_SUB_HWDRW_LINESTATE
+						BITA	#$10
+						BEQ		WIREFRAME_HWLINE_WAITREADY
+						RTS
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP
+						LEAS	-11,S
+						LDB		,Y+
+						BEQ		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_EXIT
+						STB		10,S	; number of lines
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_LOOP
+						LEAU	,S
+
+						LDA		#2
+						STA		9,S		; 9,S counter for inside loop
+
+						LDB		,Y+
+						STB		8,S		; 8,S color
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_INSIDE_LOOP
+						LDB		WIREFRAME_SUBCPU_ROTATION,PCR
+						TFR		D,X
+						LDD		,Y++
+						LBSR	ROT8
+						NEGB
+
+						PSHS	B
+						LDB		WIREFRAME_SUBCPU_SCALING,PCR
+						LBSR	SGN_USGN_MUL8
+						TFR		A,B
+						SEX
+
+						ADDD	WIREFRAME_SUBCPU_TRANSX,PCR
+						STD		,U++
+
+						PULS	A
+						LDB		WIREFRAME_SUBCPU_SCALING,PCR
+						LBSR	SGN_USGN_MUL8
+						TFR		A,B
+						SEX
+
+						ADDD	WIREFRAME_SUBCPU_TRANSY,PCR
+						STD		,U++
+
+						DEC		9,S
+						BNE		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_INSIDE_LOOP
+
+						PSHS	Y
+						LEAY	2,S
+						LBSR	VIEWPORT_CLIP
+						PULS	Y
+						BCS		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_NEXTLINE
+
+						BSR	WIREFRAME_SUBCPU_S_TO_HWLINE
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_NEXTLINE
+						DEC		10,S
+						BNE		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_LOOP
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_EXIT
+						LEAS	11,S
+						RTS
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+WIREFRAME_SUBCPU_S_TO_HWLINE
+						BSR		WIREFRAME_HWLINE_WAITREADY
+
+						LDB		10,S
+						STB		IO_SUB_HWDRW_COLOR
+
+						LDX		2,S
+						STX		IO_SUB_HWDRW_LINEX0
+						LDX		4,S
+						STX		IO_SUB_HWDRW_LINEY0
+
+						LDX		6,S
+						STX		IO_SUB_HWDRW_LINEX1
+						LDX		8,S
+						STX		IO_SUB_HWDRW_LINEY1
+
+						RTS
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_SELECT_BANK0
+						LDA		#$04
+						FCB		$8C		; CMPX #$8660
+
+WIREFRAME_SUBCPU_SELECT_BANK1
+						LDA		#$64
+						STA		IO_SUB_VRAM_BANKSELECT
+						RTS
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_PROCESS_3DDRAWLINE_CLIP
+						LEAS	-10,S
+
+						LDB		,Y+
+						BEQ		WIREFRAME_SUBCPU_PROCESS_3DDRAWLINE_CLIP_EXIT
+						STB		9,S	; Number of lines
+
+WIREFRAME_SUBCPU_PROCESS_3DDRAWLINE_CLIP_OUTER_LOOP
+
+						LDB		,Y+
+						STB		8,S	; Color
+
+						LDD		,Y++
+						LDX		2,Y
+						BSR		WIREFRAME_SUBCPU_PROJECT_PERSPECTIVE_DIVISION
+						ADDD	#160
+						STD		,S
+
+						LDD		,Y++
+						LDX		,Y++
+						BSR		WIREFRAME_SUBCPU_PROJECT_PERSPECTIVE_DIVISION
+						ADDD	#100
+						STD		2,S
+
+						LDD		,Y++
+						LDX		2,Y
+						BSR		WIREFRAME_SUBCPU_PROJECT_PERSPECTIVE_DIVISION
+						ADDD	#160
+						STD		4,S
+
+						LDD		,Y++
+						LDX		,Y++
+						BSR		WIREFRAME_SUBCPU_PROJECT_PERSPECTIVE_DIVISION
+						ADDD	#100
+						STD		6,S
+
+
+						PSHS	Y
+						LEAY	2,S
+						LBSR	VIEWPORT_CLIP
+						PULS	Y
+
+
+						BSR	WIREFRAME_SUBCPU_S_TO_HWLINE
+
+						DEC		9,S
+						BNE		WIREFRAME_SUBCPU_PROCESS_3DDRAWLINE_CLIP_OUTER_LOOP
+
+
+WIREFRAME_SUBCPU_PROCESS_3DDRAWLINE_CLIP_EXIT
+						LEAS	10,S
+						RTS
+
+
+
+WIREFRAME_SUBCPU_PROJECT_PERSPECTIVE_DIVISION
+						ASLB
+						ROLA
+						ASLB
+						ROLA
+						ASLB
+						ROLA
+						ASLB
+						ROLA
+						ASLB
+						ROLA
+						ASLB
+						ROLA
+						LBSR	HDIV16
+						RTS
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_CLS
+						PSHS	Y
+
+						LBSR	WIREFRAME_HWLINE_WAITREADY
+
+						CLR		IO_SUB_HWDRW_COLOR
+						CLR		IO_SUB_HWDRW_MASK
+
+
+						LDU		#0
+
+WIREFRAME_SUBCPU_CLS_LOOP
+						PULU 	A,B,X,Y	; Dummy read to use hardware drawing
+						PULU 	A,B,X,Y
+						PULU 	A,B,X,Y
+						PULU 	A,B,X,Y
+						PULU 	A,B,X,Y
+						CMPU	#16380   	; 30 bytes at a time.  30*546=16380
+						BNE		WIREFRAME_SUBCPU_CLS_LOOP
+
+
+						PULS	Y,PC
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_PROCESS_HALFCLS
+						LBSR	WIREFRAME_HWLINE_WAITREADY		; Y is preserved.
+
+						LDD		,Y
+						ADDD	#273*30
+						STD		WIREFRAME_SUBCPU_PROCESS_HALFCLS_ENDADDR+2,PCR
+						LDU		,Y++
+
+						PSHS	Y
+						CLR		IO_SUB_HWDRW_COLOR
+						CLR		IO_SUB_HWDRW_MASK
+
+WIREFRAME_SUBCPU_PROCESS_HALFCLS_LOOP
+						PULU 	A,B,X,Y	; Dummy read to use hardware drawing
+						PULU 	A,B,X,Y ; Reading from $xxxx also erases $xxxx+$4000, $xxxx+$8000
+						PULU 	A,B,X,Y
+						PULU 	A,B,X,Y
+						PULU 	A,B,X,Y
+
+WIREFRAME_SUBCPU_PROCESS_HALFCLS_ENDADDR
+						CMPU	#16380
+						BCS		WIREFRAME_SUBCPU_PROCESS_HALFCLS_LOOP
+
+						PULS	Y,PC
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_PROCESS_SET_OFFSET
+						LBSR	WIREFRAME_HWLINE_WAITREADY		; Y is preserved.
+						LDD		,Y++
+						LSRA									; Need 1-bit shift
+						RORB
+						STD		IO_SUB_HWDRW_OFFSET
+						RTS
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WIREFRAME_SUBCPU_PROCESS_SET_TRANS
+						LDA		,Y+
+						STA		WIREFRAME_SUBCPU_ROTATION,PCR
+						LDA		,Y+
+						STA		WIREFRAME_SUBCPU_SCALING,PCR
+						LDD		,Y++
+						STD		WIREFRAME_SUBCPU_TRANSX,PCR
+						LDD		,Y++
+						STD		WIREFRAME_SUBCPU_TRANSY,PCR
+						RTS
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; Temporary variables
+;							[5,S]	2-bytes		Font pointer
+;							[3,S]	2-bytes		VRAMADDR
+;							[2,S]	1-byte		# Letters left
+;							[1,S]	1-byte		Color
+;							[,S]	1-byte		Color for shifting
+
+WIREFRAME_SUBCPU_PRINT
+						LBSR	WIREFRAME_HWLINE_WAITREADY
+
+						LEAS	-7,S
+
+						CLR		IO_SUB_HWDRW_COMMAND	; Disable
+
+						LDA		,Y+		; Color
+						ANDA	#63
+						STA		1,S
+
+						LDA		,Y+		; # chars
+						STA		2,S
+
+						LDX		,Y++	; VRAM ADDR
+						STX		3,S
+
+						TST		2,S
+						BRA		WIREFRAME_SUBCPU_PRINT_OUTER_LOOP_START
+
+WIREFRAME_SUBCPU_PRINT_OUTER_LOOP
+						LDB		,Y+		; Next character code
+						CLRA
+						LSLB
+						ROLA
+						LSLB
+						ROLA
+						LSLB
+						ROLA
+						ADDD	#SUBSYS_FONT_ROM
+						STD		5,S
+
+						LDU		3,S
+
+						LDA		1,S
+						STA		,S
+
+WIREFRAME_SUBCPU_PRINT_BANK_LOOP
+						LSR		,S
+						BCC		WIREFRAME_SUBCPU_PRINT_NEXTBANK
+
+						LDX		5,S
+						LDB		#8
+WIREFRAME_SUBCPU_BYTE_LOOP
+						LDA		,X+
+						STA		,U
+						LEAU	40,U
+						DECB
+						BNE		WIREFRAME_SUBCPU_BYTE_LOOP
+						LEAU	-320,U
+
+WIREFRAME_SUBCPU_PRINT_NEXTBANK
+						LEAU	$2000,U
+						TST		,S
+						BNE		WIREFRAME_SUBCPU_PRINT_BANK_LOOP
+
+WIREFRAME_SUBCPU_PRINT_NEXTLETTER
+						LDD		3,S
+						ADDD	#1
+						STD		3,S
+						DEC		2,S
+
+WIREFRAME_SUBCPU_PRINT_OUTER_LOOP_START
+						BNE		WIREFRAME_SUBCPU_PRINT_OUTER_LOOP
+
+						LDA		#$80		; ENABLE, PSET
+						STA		IO_SUB_HWDRW_COMMAND
+						LEAS	7,S
+						RTS
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_16
+						LEAS	-10,S
+
+						LDB		,Y+
+						BEQ		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_16_EXIT
+
+						STB		9,S
+						TFR		Y,U
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_16_LOOP
+
+						PULU	B,X,Y
+						STB		8,S
+
+						LDB		WIREFRAME_SUBCPU_ROTATION,PCR
+						LBSR	ROT16
+						STX		,S
+						STY		2,S
+
+						PULU	X,Y
+						LBSR	ROT16
+						STX		4,S
+						STY		6,S
+
+						; In input Y coordinate, positive-Y is up.
+						; Match it by negating Y after rotation.
+						LDD		#0
+						SUBD	2,S
+						STD		2,S
+						LDD		#0
+						SUBD	6,S
+						STD		6,S
+
+
+						LDX		,S
+						LDA		WIREFRAME_SUBCPU_SCALING,PCR
+						LBSR	MUL_SGN16_USGN8
+						ADDD	WIREFRAME_SUBCPU_TRANSX,PCR
+						STD		,S
+
+						LDX		2,S
+						LDA		WIREFRAME_SUBCPU_SCALING,PCR
+						LBSR	MUL_SGN16_USGN8
+						ADDD	WIREFRAME_SUBCPU_TRANSY,PCR
+						STD		2,S
+
+						LDX		4,S
+						LDA		WIREFRAME_SUBCPU_SCALING,PCR
+						LBSR	MUL_SGN16_USGN8
+						ADDD	WIREFRAME_SUBCPU_TRANSX,PCR
+						STD		4,S
+
+						LDX		6,S
+						LDA		WIREFRAME_SUBCPU_SCALING,PCR
+						LBSR	MUL_SGN16_USGN8
+						ADDD	WIREFRAME_SUBCPU_TRANSY,PCR
+						STD		6,S
+
+
+						PSHS	U
+						LEAY	2,S
+						LBSR	VIEWPORT_CLIP
+						PULS	U
+						BCS		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_16_NEXTLINE
+
+						LBSR		WIREFRAME_SUBCPU_S_TO_HWLINE
+
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_16_NEXTLINE
+						DEC		9,S
+						BNE		WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_16_LOOP
+
+
+						TFR		U,Y
+WIREFRAME_SUBCPU_PROCESS_DRAWLINE_TRANS_CLIP_16_EXIT
+						LEAS	10,S
+						RTS
+
+
+

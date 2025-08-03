@@ -1,0 +1,402 @@
+						EXPORT	NEWHORIZONS_3D_DATA
+
+NEWHORIZONS_3D_DATA
+						FCB		56
+						FCB		-50,-20,-49
+						FCB		50,-20,-49
+						FCB		50,-20,-19
+						FCB		-50,-20,-19
+						FCB		-50,13,-49
+						FCB		50,13,-49
+						FCB		50,13,-19
+						FCB		-50,13,-19
+						FCB		9,52,-5
+						FCB		25,25,13
+						FCB		0,52,10
+						FCB		-24,25,14
+						FCB		-9,52,-5
+						FCB		0,25,-28
+						FCB		0,66,0
+						FCB		12,38,48
+						FCB		0,38,49
+						FCB		-12,38,48
+						FCB		-25,38,43
+						FCB		-35,38,35
+						FCB		-43,38,24
+						FCB		-48,38,12
+						FCB		-49,38,0
+						FCB		-48,38,-12
+						FCB		-43,38,-24
+						FCB		-35,38,-35
+						FCB		-24,38,-43
+						FCB		-12,38,-48
+						FCB		0,38,-49
+						FCB		12,38,-48
+						FCB		25,38,-43
+						FCB		35,38,-35
+						FCB		43,38,-24
+						FCB		48,38,-12
+						FCB		49,38,0
+						FCB		48,38,12
+						FCB		43,38,25
+						FCB		35,38,35
+						FCB		25,38,43
+						FCB		0,22,-25
+						FCB		0,17,0
+						FCB		0,22,25
+						FCB		-25,22,0
+						FCB		25,22,0
+						FCB		-18,13,24
+						FCB		-7,3,44
+						FCB		-7,3,102
+						FCB		-18,-20,24
+						FCB		-7,-9,44
+						FCB		-7,-9,102
+						FCB		18,13,24
+						FCB		7,3,44
+						FCB		7,3,102
+						FCB		18,-20,24
+						FCB		7,-9,44
+						FCB		7,-9,102
+						FCB		76
+						; 
+						FCB		$7
+						FCB		0,1
+						FCB		0,-64,0
+						FCB		0,0,-64
+						; 
+						FCB		$7
+						FCB		1,2
+						FCB		0,-64,0
+						FCB		64,0,0
+						; 
+						FCB		$7
+						FCB		3,0
+						FCB		0,-64,0
+						FCB		-64,0,0
+						; 
+						FCB		$7
+						FCB		0,4
+						FCB		0,0,-64
+						FCB		-64,0,0
+						; 
+						FCB		$7
+						FCB		1,5
+						FCB		0,0,-64
+						FCB		64,0,0
+						; 
+						FCB		$7
+						FCB		2,6
+						FCB		64,0,0
+						FCB		52,0,37
+						; 
+						FCB		$7
+						FCB		3,7
+						FCB		-64,0,0
+						FCB		-51,0,37
+						; 
+						FCB		$7
+						FCB		4,5
+						FCB		0,0,-64
+						FCB		0,64,0
+						; 
+						FCB		$7
+						FCB		5,6
+						FCB		64,0,0
+						FCB		0,64,0
+						; 
+						FCB		$7
+						FCB		7,4
+						FCB		-64,0,0
+						FCB		0,64,0
+						; 
+						FCB		$7
+						FCB		8,9
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		9,10
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		10,11
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		11,12
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		12,13
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		13,8
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		12,10
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		10,8
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						; 
+						FCB		$7
+						FCB		12,8
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		12,14
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		14,10
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		8,14
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		15,16
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		16,17
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		17,18
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		18,19
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		19,20
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		20,21
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		21,22
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		22,23
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		23,24
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		24,25
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		25,26
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		26,27
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		27,28
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		28,29
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		29,30
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		30,31
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		31,32
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		32,33
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		33,34
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		34,35
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		35,36
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		36,37
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		37,38
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		38,15
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		28,39
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		39,40
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		40,41
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		41,16
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		40,42
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		42,22
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		40,43
+						FCB		0,0,0
+						FCB		0,0,0
+						FCB		$7
+						FCB		43,34
+						FCB		0,0,0
+						FCB		0,0,0
+						; 
+						FCB		$7
+						FCB		7,44
+						FCB		-51,0,37
+						FCB		0,64,0
+						FCB		$7
+						FCB		44,45
+						FCB		-55,0,31
+						FCB		0,56,29
+						FCB		$7
+						FCB		45,46
+						FCB		-64,0,0
+						FCB		0,64,0
+						; 
+						FCB		$7
+						FCB		3,47
+						FCB		-51,0,37
+						FCB		0,-64,0
+						FCB		$7
+						FCB		47,48
+						FCB		0,-56,29
+						FCB		-55,0,31
+						FCB		$7
+						FCB		48,49
+						FCB		0,-64,0
+						FCB		-64,0,0
+						; 
+						FCB		$7
+						FCB		6,50
+						FCB		52,0,37
+						FCB		0,64,0
+						FCB		$7
+						FCB		50,51
+						FCB		55,0,31
+						FCB		0,56,29
+						FCB		$7
+						FCB		51,52
+						FCB		64,0,0
+						FCB		0,64,0
+						; 
+						FCB		$7
+						FCB		2,53
+						FCB		52,0,37
+						FCB		0,-64,0
+						FCB		$7
+						FCB		53,54
+						FCB		55,0,31
+						FCB		0,-56,29
+						FCB		$7
+						FCB		54,55
+						FCB		64,0,0
+						FCB		0,-64,0
+						; 
+						FCB		$7
+						FCB		52,55
+						FCB		0,0,64
+						FCB		64,0,0
+						; 
+						FCB		$7
+						FCB		55,49
+						FCB		0,0,64
+						FCB		0,-64,0
+						; 
+						FCB		$7
+						FCB		49,46
+						FCB		0,0,64
+						FCB		-64,0,0
+						; 
+						FCB		$7
+						FCB		46,52
+						FCB		0,0,64
+						FCB		0,64,0
+						; 
+						FCB		$7
+						FCB		44,50
+						FCB		0,64,0
+						FCB		0,56,29
+						; 
+						FCB		$7
+						FCB		47,53
+						FCB		0,-64,0
+						FCB		0,-56,29
+						; 
+						FCB		$7
+						FCB		45,48
+						FCB		-55,0,31
+						FCB		-64,0,0
+						FCB		$7
+						FCB		48,54
+						FCB		0,-56,29
+						FCB		0,-64,0
+						; 
+						FCB		$7
+						FCB		54,51
+						FCB		55,0,31
+						FCB		64,0,0
+						FCB		$7
+						FCB		51,45
+						FCB		0,56,29
+						FCB		0,64,0

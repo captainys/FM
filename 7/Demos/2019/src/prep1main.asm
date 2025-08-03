@@ -1,0 +1,12 @@
+						ORG		$1800
+
+
+; Transfer	[BGMDATA:BGMDATA_END] to [$08000:]
+;
+
+
+						LDA		#8
+						LEAY	BGMDATA,PCR
+						LDX		#BGMDATA_END-BGMDATA
+						BSR		MMR_TRANSFER_TO_EXPANDED_RAM
+						RTS
