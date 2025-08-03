@@ -152,3 +152,20 @@ print("DM2019-1.srec needs to be saved as DM2019-1 in 2D F-BASIC format disk")
 print("DM2019I.srec needs to be written to Track 0 Side 0 Sector 1")
 print("DM2019L.srec needs to be written from Track 0 Side 0 Sector 9")
 print("DM2019M.srec needs to be written as DM2019M in 2D F-BASIC format disk")
+
+subprocess.Popen([
+	"d77fileutil",
+	"Demo2019.d77",
+	"-new",
+	"-srecwrite","DM2019-0.srec","DM2019-0",
+	"-srecwrite","DM2019-1.srec","DM2019-1",
+	"-srecwrite","DM2019M.srec","DM2019M",
+]).wait()
+
+subprocess.Popen([
+	"d77write","Demo2019.d77","0","0","1","DM2019I.srec"
+]).wait();
+
+subprocess.Popen([
+	"d77write","Demo2019.d77","0","0","9","DM2019L.srec"
+]).wait();
