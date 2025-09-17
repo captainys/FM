@@ -21,16 +21,50 @@
 size_t nResp=0;
 unsigned char data[MAX_NUM_RESPONSES][4];
 
-int main(void)
+int main(int ac,char *av[])
 {
+	if(ac<2)
+	{
+		printf("Usage: run386 cdopen o/c/l/u\n");
+		printf("  o Open\n");
+		printf("  c Close\n");
+		printf("  l Lock\n");
+		printf("  u Unlock\n");
+		return 1;
+	}
+
 	// Wait CDC Ready
 	while(0==(_inp(IO_CDC_MASTER_STATUS)&1))
 	{
 	}
 
 	// Push params
-	_outp(IO_CDC_PARAM,3);
-	_outp(IO_CDC_PARAM,0);
+	switch(av[1][0])
+	{
+	case 'o':
+	case 'O':
+		_outp(IO_CDC_PARAM,2);
+		_outp(IO_CDC_PARAM,2);
+		break;
+	case 'c':
+	case 'C':
+		_outp(IO_CDC_PARAM,2);
+		_outp(IO_CDC_PARAM,4);
+		break;
+	case 'l':
+	case 'L':
+		_outp(IO_CDC_PARAM,2);
+		_outp(IO_CDC_PARAM,1);
+		break;
+	case 'u':
+	case 'U':
+		_outp(IO_CDC_PARAM,2);
+		_outp(IO_CDC_PARAM,0);
+		break;
+	default:
+		printf("The option must be o, c, l, or u\n");
+		return 1;
+	}
 	_outp(IO_CDC_PARAM,0);
 	_outp(IO_CDC_PARAM,0);
 	_outp(IO_CDC_PARAM,0);
@@ -43,13 +77,13 @@ int main(void)
 	{
 	}
 
-	_outp(IO_CDC_COMMAND,0x1F|CMDFLAG_STATUS_REQUEST);
+	_outp(IO_CDC_COMMAND,0x81|CMDFLAG_STATUS_REQUEST);
 
 	__CLI;
 
 	unsigned int t0,accum=0;
 	t0=inpw(IO_FREERUN_TIMER);
-	while(accum<1000000) // Sample for 1000000us
+	while(accum<5000000) // Sample for 5000000us
 	{
 		unsigned short t,diff;
 		t=inpw(IO_FREERUN_TIMER);
@@ -57,13 +91,23 @@ int main(void)
 		accum+=diff;
 		t0=t;
 
-		if(0!=(_inp(IO_CDC_MASTER_STATUS)&2) && nResp<MAX_NUM_RESPONSES)
+		if(0!=(_inp(IO_CDC_MASTER_STATUS)&2))
 		{
-			data[nResp][0]=_inp(IO_CDC_STATUS);
-			data[nResp][1]=_inp(IO_CDC_STATUS);
-			data[nResp][2]=_inp(IO_CDC_STATUS);
-			data[nResp][3]=_inp(IO_CDC_STATUS);
-			++nResp;
+			if(nResp<MAX_NUM_RESPONSES)
+			{
+				data[nResp][0]=_inp(IO_CDC_STATUS);
+				data[nResp][1]=_inp(IO_CDC_STATUS);
+				data[nResp][2]=_inp(IO_CDC_STATUS);
+				data[nResp][3]=_inp(IO_CDC_STATUS);
+				++nResp;
+			}
+			else
+			{
+				_inp(IO_CDC_STATUS);
+				_inp(IO_CDC_STATUS);
+				_inp(IO_CDC_STATUS);
+				_inp(IO_CDC_STATUS);
+			}
 		}
 	}
 
