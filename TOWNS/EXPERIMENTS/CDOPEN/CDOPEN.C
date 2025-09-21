@@ -30,6 +30,7 @@ int main(int ac,char *av[])
 		printf("  c Close\n");
 		printf("  l Lock\n");
 		printf("  u Unlock\n");
+		printf("  8 Send unknown command A1|02 08 00 00 00 00 00 00\n");
 		return 1;
 	}
 
@@ -61,8 +62,12 @@ int main(int ac,char *av[])
 		_outp(IO_CDC_PARAM,2);
 		_outp(IO_CDC_PARAM,0);
 		break;
+	case '8':
+		_outp(IO_CDC_PARAM,2);
+		_outp(IO_CDC_PARAM,8);
+		break;
 	default:
-		printf("The option must be o, c, l, or u\n");
+		printf("The option must be o, c, l, u, or 8\n");
 		return 1;
 	}
 	_outp(IO_CDC_PARAM,0);

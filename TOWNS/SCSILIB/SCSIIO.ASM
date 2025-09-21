@@ -286,6 +286,10 @@ SCSI_START_COMMAND_SEQUENCE	ENDP
 SCSI_EXEC_DMA			PROC
 						OUT		IO_DMA_MODE_CONTROL,AL
 
+						; In DOS6+EMM386, virtualized I/O ABh needs two readings to clear TC flags.
+						IN		AL,IO_DMA_STATUS
+						IN		AL,IO_DMA_STATUS
+
 SCSI_EXEC_DMA_TRANSFER_LOOP:
 						MOV		EAX,EDI
 						OUT		IO_DMA_ADDR_LOW,AX
@@ -304,8 +308,7 @@ SCSI_EXEC_DMA_TRANSFER_LOOP:
 						OUT		IO_DMA_MASK,AL
 
 @@:
-						MOV		DX,IO_DMA_STATUS
-						IN		AL,DX
+						IN		AL,IO_DMA_STATUS
 						AND		AL,2	; DMAE bit for SCSI (DMA Ch 1) Non-zero means Terminal Count or DMA End
 						JNE		SHORT @f
 
@@ -322,6 +325,9 @@ SCSI_EXEC_DMA_TRANSFER_LOOP:
 						JE		SHORT @b
 
 @@:
+						; Dummy read to clear TC flags of the virtualized I/O ABh.
+						IN		AL,IO_DMA_STATUS
+
 						; Mask DMA
 						IN		AL,IO_DMA_MASK
 						AND		AL,0FH
