@@ -5,6 +5,11 @@ http://www.ysflight.com
 
 
 [Revisions]
+V1.10 2025/09/20
+  Probably runs ok in DOS6+EMM386 environment.  Virtualized I/O 00ABh seems to require two readings to clear
+  TC (Terminal Count) flags, which are supposed to clear just by one reading.  I made it so that it reads
+  I/O 00ABh twice when TC flags need to be cleared.
+
 V0.95 2022/03/29
   Added function 73C0H
     INT 93H
