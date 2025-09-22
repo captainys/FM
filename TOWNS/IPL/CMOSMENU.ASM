@@ -151,6 +151,7 @@ CMOSMENU_ICM_WRITE_PROTECTED:
 
 CMOSMENU_BACKUP:
 						CALL	DO_BACKUP_CMOS
+						CALL	DO_BACKUP_CMOS	; Write twice to support MRAM (hopefully)
 						JC		CMOSMENU_ICM_WRITE_PROTECTED
 
 						MOV		DI,CMOS_BACKED_UP
@@ -380,6 +381,7 @@ ICM_WRITE_SETTING_AL	PROC
 						POP		EAX
 
 						MOV		FS:[DI],EAX
+						MOV		FS:[DI],EAX	; Write twice to support MRAM (hopefully)
 
 						CLC
 

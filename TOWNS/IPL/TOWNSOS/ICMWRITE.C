@@ -413,11 +413,13 @@ unsigned int ICM_PhysAddr(void)
 void ClearICMCMOSBackUp(void)
 {
 	CLEAR_ICM(65536-CMOS_BACKUP_ADDR,C0000000H+CMOS_BACKUP_ADDR);
+	CLEAR_ICM(65536-CMOS_BACKUP_ADDR,C0000000H+CMOS_BACKUP_ADDR); // Write twice to support MRAM (hopefully)
 }
 
 int WriteICM(void)
 {
 	TRANSFER_TO_ICM(ICMIMAGE_size,ICMIMAGE,C0000000H);
+	TRANSFER_TO_ICM(ICMIMAGE_size,ICMIMAGE,C0000000H); // Write twice to support MRAM (hopefully)
 /*
 	// Disk BIOS fails to recognize the Memory Card if everything is 00h.
 	// (Probably checking reg, but FRAM card does not have REG memory for saving cost.)
