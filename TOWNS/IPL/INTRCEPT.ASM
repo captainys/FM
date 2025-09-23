@@ -17,22 +17,6 @@ HDIPL_TO_PATTERN		DB		9AH		; CALLF FFFB:0014
 
 
 
-; Need to patch
-; B000:000000DB 2EFF1E1201                CALLF   WORD PTR CS:[0112H]
-;
-;                                         CALLF   8000:HDIPLINTERCEPT
-
-
-
-HDIPL_FROM_PATTERN2		DB		02Eh,0FFh,01Eh,012h,001h
-HDIPL_TO_PATTERN2		DB		9AH		; CALLF XXXX:YYYY
-						DW		OFFSET HDIPLINTERCEPT
-						DW		08000H
-
-
-
-
-
 ;B000:000000B6 52                        PUSH    DX
 ;B000:000000B7 33D2                      XOR     DX,DX
 ;B000:000000B9 52                        PUSH    DX
@@ -43,6 +27,17 @@ GENERALIPL_TO_PATTERN	DB		0EAH		; JMPF
 						DW		08000H
 
 
+
+; DOS6 IPL
+
+; Need to patch
+; B000:000000DB 2EFF1E1201                CALLF   WORD PTR CS:[0112H]
+;
+;                                         CALLF   8000:HDIPLINTERCEPT
+HDIPL_FROM_PATTERN2		DB		02Eh,0FFh,01Eh,012h,001h
+HDIPL_TO_PATTERN2		DB		9AH		; CALLF XXXX:YYYY
+						DW		OFFSET HDIPLINTERCEPT
+						DW		08000H
 
 
 
@@ -57,7 +52,7 @@ GENERALIPL_FROM_PATTERN2	DB		026h,0FFh,036h,000h,000h
 
 GENERALIPL_TO_PATTERN2		DB		08Bh,00Eh,076h,000h	; MOV CX,[0076H]
 							DB		0EAH		; JMPF
-							DW		OFFSET GENERALIPL_INTERCEPT
+							DW		OFFSET DOS6IPL_INTERCEPT
 							DW		8000h
 							DB		90h,90h	; NOP NOP
 
@@ -114,19 +109,19 @@ SETUP_INTERCEPT_AND_GO	PROC
 						CALL	APPLY_PATCH
 
 
-					;	; IPL by (DOS6+Towns OS)
-					;	MOV		SI,0B000h
-					;	MOV		DS,SI
-					;	PUSH	CS
-					;	POP		ES
+						; IPL by (DOS6+Towns OS)
+						MOV		SI,0B000h
+						MOV		DS,SI
+						PUSH	CS
+						POP		ES
 
-					;	XOR		SI,SI	; B000:0000 is the HD IPL location
-					;	MOV		DX,2048/16 ; Length 2048 bytes maximum divide by 16 to make it pages
-					;	MOV		CX,11	; Pattern Length=11
+						XOR		SI,SI	; B000:0000 is the HD IPL location
+						MOV		DX,2048/16 ; Length 2048 bytes maximum divide by 16 to make it pages
+						MOV		CX,11	; Pattern Length=11
 
-					;	MOV		DI,OFFSET GENERALIPL_FROM_PATTERN2	; ES:DI=Source Pattern
-					;	MOV		BX,OFFSET GENERALIPL_TO_PATTERN2   ; ES:BX=Write Pattern
-					;	CALL	APPLY_PATCH
+						MOV		DI,OFFSET GENERALIPL_FROM_PATTERN2	; ES:DI=Source Pattern
+						MOV		BX,OFFSET GENERALIPL_TO_PATTERN2   ; ES:BX=Write Pattern
+						CALL	APPLY_PATCH
 
 
 
@@ -155,7 +150,15 @@ HDIPLINTERCEPT:
 						CALL	SETUP_INTERCEPT_AND_GO
 						RETF
 
+; Patched DOS6 IPL does:
+;					 	MOV     DX,0050H
+;					 	MOV     ES,DX
+;					 	MOV     CX,[0076H]
+;					 	JMPF    8000:DOS6IPL_INTERCEPT
+DOS6IPL_INTERCEPT:
+						MOV		DX,ES:[0]
 
+; DX must be the segment where FBIOS entry is at offset zero.
 GENERALIPL_INTERCEPT:
 						; This is called after IO.SYS is loaded and no return.
 						PUSHA
