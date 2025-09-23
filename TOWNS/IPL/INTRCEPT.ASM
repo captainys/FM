@@ -28,33 +28,33 @@ GENERALIPL_TO_PATTERN	DB		0EAH		; JMPF
 
 
 
-; DOS6 IPL
+; DOS6 IPL   Commented out for the time being because I haven't figured how to patch DOS6 from IPL.
 
-; Need to patch
-; B000:000000DB 2EFF1E1201                CALLF   WORD PTR CS:[0112H]
-;
-;                                         CALLF   8000:HDIPLINTERCEPT
-HDIPL_FROM_PATTERN2		DB		02Eh,0FFh,01Eh,012h,001h
-HDIPL_TO_PATTERN2		DB		9AH		; CALLF XXXX:YYYY
-						DW		OFFSET HDIPLINTERCEPT
-						DW		08000H
-
-
-
-; B000:000000B1 26FF360000                PUSH    WORD PTR ES:[0000H]
-; B000:000000B6 51                        PUSH    CX
-; B000:000000B7 8B0E7600                  MOV     CX,[0076H]
-; B000:000000BB CB                        RETF
-GENERALIPL_FROM_PATTERN2	DB		026h,0FFh,036h,000h,000h
-							DB		051h
-							DB		08Bh,00Eh,076h,000h
-							DB		0CBh
-
-GENERALIPL_TO_PATTERN2		DB		08Bh,00Eh,076h,000h	; MOV CX,[0076H]
-							DB		0EAH		; JMPF
-							DW		OFFSET DOS6IPL_INTERCEPT
-							DW		8000h
-							DB		90h,90h	; NOP NOP
+;	; Need to patch
+;	; B000:000000DB 2EFF1E1201                CALLF   WORD PTR CS:[0112H]
+;	;
+;	;                                         CALLF   8000:HDIPLINTERCEPT
+;	HDIPL_FROM_PATTERN2		DB		02Eh,0FFh,01Eh,012h,001h
+;	HDIPL_TO_PATTERN2		DB		9AH		; CALLF XXXX:YYYY
+;							DW		OFFSET HDIPLINTERCEPT
+;							DW		08000H
+;	
+;	
+;	
+;	; B000:000000B1 26FF360000                PUSH    WORD PTR ES:[0000H]
+;	; B000:000000B6 51                        PUSH    CX
+;	; B000:000000B7 8B0E7600                  MOV     CX,[0076H]
+;	; B000:000000BB CB                        RETF
+;	GENERALIPL_FROM_PATTERN2	DB		026h,0FFh,036h,000h,000h
+;								DB		051h
+;								DB		08Bh,00Eh,076h,000h
+;								DB		0CBh
+;	
+;	GENERALIPL_TO_PATTERN2		DB		08Bh,00Eh,076h,000h	; MOV CX,[0076H]
+;								DB		0EAH		; JMPF
+;								DW		OFFSET DOS6IPL_INTERCEPT
+;								DW		8000h
+;								DB		90h,90h	; NOP NOP
 
 
 
@@ -79,19 +79,20 @@ SETUP_INTERCEPT_AND_GO	PROC
 						CALL	APPLY_PATCH
 
 
-						; HD IPL Pattern 2 (DOS6+Towns OS)
-						MOV		SI,0B000h
-						MOV		DS,SI
-						PUSH	CS
-						POP		ES
+						; Commented out for the time being because I haven't figured how to patch DOS6 from IPL.
+						;	; HD IPL Pattern 2 (DOS6+Towns OS)
+						;	MOV		SI,0B000h
+						;	MOV		DS,SI
+						;	PUSH	CS
+						;	POP		ES
 
-						XOR		SI,SI	; B000:0000 is the HD IPL location
-						MOV		DX,2048/16 ; Length 2048 bytes maximum, divide by 16 to make it pages
-						MOV		CX,5	; Pattern Length=5
+						;	XOR		SI,SI	; B000:0000 is the HD IPL location
+						;	MOV		DX,2048/16 ; Length 2048 bytes maximum, divide by 16 to make it pages
+						;	MOV		CX,5	; Pattern Length=5
 
-						MOV		DI,OFFSET HDIPL_FROM_PATTERN2	; ES:DI=Source Pattern
-						MOV		BX,OFFSET HDIPL_TO_PATTERN2   ; ES:BX=Write Pattern
-						CALL	APPLY_PATCH
+						;	MOV		DI,OFFSET HDIPL_FROM_PATTERN2	; ES:DI=Source Pattern
+						;	MOV		BX,OFFSET HDIPL_TO_PATTERN2   ; ES:BX=Write Pattern
+						;	CALL	APPLY_PATCH
 
 
 						; Other IPLs
@@ -109,19 +110,20 @@ SETUP_INTERCEPT_AND_GO	PROC
 						CALL	APPLY_PATCH
 
 
-						; IPL by (DOS6+Towns OS)
-						MOV		SI,0B000h
-						MOV		DS,SI
-						PUSH	CS
-						POP		ES
+						; Commented out for the time being because I haven't figured how to patch DOS6 from IPL.
+						;	; IPL by (DOS6+Towns OS)
+						;	MOV		SI,0B000h
+						;	MOV		DS,SI
+						;	PUSH	CS
+						;	POP		ES
 
-						XOR		SI,SI	; B000:0000 is the HD IPL location
-						MOV		DX,2048/16 ; Length 2048 bytes maximum divide by 16 to make it pages
-						MOV		CX,11	; Pattern Length=11
+						;	XOR		SI,SI	; B000:0000 is the HD IPL location
+						;	MOV		DX,2048/16 ; Length 2048 bytes maximum divide by 16 to make it pages
+						;	MOV		CX,11	; Pattern Length=11
 
-						MOV		DI,OFFSET GENERALIPL_FROM_PATTERN2	; ES:DI=Source Pattern
-						MOV		BX,OFFSET GENERALIPL_TO_PATTERN2   ; ES:BX=Write Pattern
-						CALL	APPLY_PATCH
+						;	MOV		DI,OFFSET GENERALIPL_FROM_PATTERN2	; ES:DI=Source Pattern
+						;	MOV		BX,OFFSET GENERALIPL_TO_PATTERN2   ; ES:BX=Write Pattern
+						;	CALL	APPLY_PATCH
 
 
 
