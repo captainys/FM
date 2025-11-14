@@ -225,16 +225,20 @@ V command toggles verbose mode.
 
 F-BASIC 3.0 (Fujitsu) [FM-7,FM77AV40]
 Starts no problem.
-If the program you want to run crashes, you may salvage it by adding the option:
-    -install2 7F25
 
-F-BASIC V3.0 Level 10 (The version comes with FM-77 and later models) requires this option.
-
-This will install the BIOS redirector in the error-message area.  No problem as long as your program won't run into an error.
 From Disk BASIC I confirmed:
     FM-7 DEMO1 [FM-7,FM77AV40]
     FM-7 DEMO2 [FM-7,FM77AV40]
     Emergency [FM-7,FM77AV40]
+
+November 11, 2025:  Disk BASIC 3.0 Level 10 was destoying $FC00 to $FC7F by copying code that is not used.
+The server detects this pattern and NOP it.  Now it can boot without -install2 option.
+
+NOT ANY MORE:  If the program you want to run crashes, you may salvage it by adding the option:
+NOT ANY MORE:      -install2 7F25
+NOT ANY MORE:  F-BASIC V3.0 Level 10 (The version comes with FM-77 and later models) requires this option.
+NOT ANY MORE:  
+NOT ANY MORE:  This will install the BIOS redirector in the error-message area.  No problem as long as your program won't run into an error.
 
 
 

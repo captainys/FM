@@ -45,6 +45,23 @@ const unsigned char BIOS_ERROR_TIME_OVER=			0x0F;
 
 ////////////////////////////////////////////////////////////
 
+template <class T>
+bool ApplyPatch(size_t dataLen,T data[],size_t patchLen,const T from[],const T to[])
+{
+	bool applied=false;
+	for(size_t ptr=0; ptr+patchLen<=dataLen; ++ptr)
+	{
+		if(0==memcmp(data+ptr,from,patchLen))
+		{
+			memcpy(data+ptr,to,patchLen);
+			applied=true;
+		}
+	}
+	return applied;
+}
+
+////////////////////////////////////////////////////////////
+
 class SectorFilterOption
 {
 public:
@@ -298,6 +315,43 @@ void AlterSectorData(
 			}
 		}
 	}
+
+	if(track<=1 && SYSTYPE_F_BASIC_3_0)
+	{
+		// 2025/11/14
+		// Some versions of Disk F-BASIC does not boot from Disk BIOS Redirector does not start.
+		// Newly discovered is that the Disk BASIC was doing a meaningless memory transfer:
+		// 6EA9 3440       PSHS    U
+		// 6EAB C629       LDB     #$29
+		// 6EAD 8E6EB9     LDX     #$6EB9
+		// 6EB0 CEFC00     LDU     #$FC00
+		// 6EB3 BD8597     JSR     $8597
+		// The transfered code is not used.  Therfore, NOPPing 6EB3 does no harm and prevents this meaningless transfer
+		// to save the redirector at FC00.
+
+		const unsigned char from[]=
+		{
+			0x34,0x40,       // PSHS    U
+			0xC6,0x29,       // LDB     #$29
+			0x8E,0x6E,0xB9,  // LDX     #$6EB9
+			0xCE,0xFC,0x00,  // LDU     #$FC00
+			0xBD,0x85,0x97   // JSR     $8597
+		};
+		const unsigned char to[]=
+		{
+			0x34,0x40,       // PSHS    U
+			0xC6,0x29,       // LDB     #$29
+			0x8E,0x6E,0xB9,  // LDX     #$6EB9
+			0xCE,0xFC,0x00,  // LDU     #$FC00
+			0x12,0x12,0x12   // NOP NOP NOP
+		};
+		if(true==ApplyPatch(dat.size(),dat.data(),sizeof(from),from,to))
+		{
+			// Should be C0 H0 R15(0x0F) offset=0xA9
+			printf("Patched F-BASIC to prevent meaningless destruction of $FC00 to $FC7F.\n");
+		}
+	}
+
 
 	if(0==track && SYSTYPE_MDOS7==systemType)
 	{

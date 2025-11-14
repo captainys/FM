@@ -58,6 +58,18 @@ BIOS_DISK_OVERRIDE_BEGIN
 ; Unfortunate situation may be JSR [$FBFA] lies across sectors.
 
 
+; 2025/11/14
+; Some versions of Disk F-BASIC does not boot from Disk BIOS Redirector does not start.
+; Newly discovered is that the Disk BASIC was doing a meaningless memory transfer:
+; 6EA9 3440       PSHS    U
+; 6EAB C629       LDB     #$29
+; 6EAD 8E6EB9     LDX     #$6EB9
+; 6EB0 CEFC00     LDU     #$FC00
+; 6EB3 BD8597     JSR     $8597
+; The transfered code is not used.  Therfore, NOPPing 6EB3 does no harm and prevents this meaningless transfer
+; to save the redirector at FC00.
+
+
 BIOS_ENTRY				EQU		$F17D
 
 

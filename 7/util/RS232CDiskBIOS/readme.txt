@@ -230,6 +230,12 @@ VƒRƒ}ƒ“ƒh‚ÅVerboseƒ‚[ƒh‚ðƒgƒOƒ‹‚Å‚«‚éBVerbose Mode=On‚Å‚ÍŽóMƒoƒCƒg‚ð‘S•”•\Ž¦‚
 
   F-BASIC 3.0 [ŽÀ‹@FM-7,ŽÀ‹@FM77AV40]
     ‹N“®Šm”FB
+
+    2025/11/14 Disk BASIC 3.0 Level 10‚Í‹N“®’†Žg—p‚µ‚È‚¢ƒR[ƒh‚ðFC00`FC7F‚Ì—Ìˆæ‚É
+               “]‘—‚·‚é‚½‚ßAƒŠƒ_ƒCƒŒƒNƒ^‚ð”j‰ó‚µ‚Ä‹N“®‚ÉŽ¸”s‚µ‚Ä‚¢‚½‚±‚Æ‚ª”»–¾‚µ‚½
+               ‚ªA“]‘—‚µ‚Ä‚¢‚éƒR[ƒh‚Í–¢Žg—p‚È‚Ì‚ÅA‚±‚Ì•”•ª‚ðŒŸo‚µ‚ÄNOP‰»‚·‚é‚±‚Æ
+               ‚Å•’Ê‚É‹N“®‚Å‚«‚é‚æ‚¤‚É‚È‚Á‚½B
+
     ‚È‚¨AF-BASIC 3.0‚ÌƒfƒBƒXƒN‚Å‚¤‚Ü‚­“®ì‚µ‚È‚¢‚à‚Ì‚ÍAƒIƒvƒVƒ‡ƒ“‚ÉA
         -install2 7F25
     ‚ð‚Â‚¯‚Ä‚â‚é‚ÆDisk BASIC‚ÌƒGƒ‰[ƒƒbƒZ[ƒW—Ìˆæ‚Éí’“‚·‚é‚Ì‚Å“®ì‚·‚é‚©‚à‚µ‚ê‚È‚¢B
