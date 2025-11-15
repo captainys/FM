@@ -31,7 +31,7 @@ VERIFY_ERROR		LDA		#2
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-MAX_ONE_TIME_TFR	EQU		$6D
+MAX_ONE_TIME_TFR	EQU		($80-(SUBCPU_CMD_DATA_BUFFER-SUBCPU_TFR_CMD))
 
 ; Input D bytes left
 ;       Y Points to SUBCPU_TFR_SRC
@@ -56,7 +56,7 @@ TO_SUB_CPU
 					LEAY	SUBCPU_TFR_SRC,PCR
 
 					STU		(SUBCPU_TFR_DST-SUBCPU_TFR_SRC),Y	; U is free now.
-					LDU		#$D393 ; main $FC93
+					LDU		#($D380+SUBCPU_CMD_DATA_BUFFER-SUBCPU_TFR_CMD)
 					STU		(SUBCPU_TFR_SRC-SUBCPU_TFR_SRC),Y
 
 TO_SUB_CPU_OUTER_LOOP
@@ -67,7 +67,7 @@ TO_SUB_CPU_OUTER_LOOP
 
 					BSR		HALT_SUBCPU
 					BSR		SET_YAMAUCHI_COMMAND
-					LDU		#$FC93
+					LDU		#($FC80+SUBCPU_CMD_DATA_BUFFER-SUBCPU_TFR_CMD)
 					; B is one-time transfer length. (From TAKE_MIN_TFR_LEN)
 					; X is source.
 					; U is destination.
@@ -99,7 +99,7 @@ FROM_SUB_CPU
 					LEAY	SUBCPU_TFR_SRC,PCR
 
 					STX		(SUBCPU_TFR_SRC-SUBCPU_TFR_SRC),Y	; X is free now.
-					LDX		#$D393 ; main $FC93
+					LDX		#($D380+SUBCPU_CMD_DATA_BUFFER-SUBCPU_TFR_CMD)
 					STX		(SUBCPU_TFR_DST-SUBCPU_TFR_SRC),Y
 
 					PSHS	A,B
@@ -117,7 +117,7 @@ FROM_SUB_CPU_OUTER_LOOP
 
 					BSR		HALT_SUBCPU	; B register is preserved.
 
-					LDX		#$FC93
+					LDX		#($FC80+SUBCPU_CMD_DATA_BUFFER-SUBCPU_TFR_CMD)
 					; B is one-time transfer length. (From TAKE_MIN_TFR_LEN)
 					; X is source.
 					; U is destination.
@@ -157,7 +157,7 @@ SET_YAMAUCHI_COMMAND
 					PSHS	A,B,X,U
 					LDU		#$FC80
 					LEAX	SUBCPU_TFR_CMD,PCR
-					LDB		#$13
+					LDB		#(SUBCPU_CMD_DATA_BUFFER-SUBCPU_TFR_CMD)
 					BSR		TFR_X_TO_U_FOR_B
 					PULS	A,B,X,U,PC
 
@@ -174,11 +174,26 @@ HALT_CHECK			LDA		$FD05
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-					; $FC80 +0  +1  +2 +3  +4  +5  +6  +7  +8  +9  +A  +B 
-SUBCPU_TFR_CMD		FCB		$00,$00,$3F,'Y','A','M','A','U','C','H','I',$91
-					;       +C  +D 
-SUBCPU_TFR_SRC		FCB		$D3,$93
-					;       +E  +F
-SUBCPU_TFR_DST		FCB		$C0,$00
-					;       +10 +11 +12
-SUBCPU_TFR_LEN		FCB		$00,$6D,$90
+SUBCPU_TFR_CMD
+					FCB		0,0
+					FCB		$3F
+
+					; FCB		"YAMAUCHI"	FM-8 Requied these 8 bytes to be "YAMAUCHI", but not FM-7 and later.
+
+SUBCPU_CMD_SET_VRAMACCESS
+					TST		$D409	; 3 bytes
+					RTS				; 1 byte
+SUBCPU_CMD_CLR_VRAMACCESS
+					STA		$D409	; 3 bytes
+					RTS				; 1 bytes
+
+					FCB		$93
+					FDB		$D380+(SUBCPU_CMD_SET_VRAMACCESS-SUBCPU_TFR_CMD)
+					FCB		$91
+SUBCPU_TFR_SRC		FDB	0
+SUBCPU_TFR_DST			FDB	0
+SUBCPU_TFR_LEN			FDB	0
+					FCB		$93
+					FDB		$D380+(SUBCPU_CMD_CLR_VRAMACCESS-SUBCPU_TFR_CMD)
+					FCB		$90
+SUBCPU_CMD_DATA_BUFFER
