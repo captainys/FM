@@ -60,10 +60,10 @@ int main(int ac,char *av[])
 	printf("%d files found.\n",(int)t77Dec.fileDump.size());
 	for(auto &dump : t77Dec.fileDump)
 	{
-		auto fmDat=t77Dec.DumpToFMFormat(dump);
+		auto fmDat=t77Dec.DumpToFMFormat(dump.data);
 		if(16<=fmDat.size())
 		{
-			auto fName=t77Dec.GetDumpFileName(dump);
+			auto fName=t77Dec.GetDumpFileName(dump.data);
 			printf("%-8s  ",fName.c_str());
 			printf("RawSize:%-8d",fmDat.size());
 
@@ -85,10 +85,10 @@ int main(int ac,char *av[])
 	int num=0;
 	for(auto &dump : t77Dec.fileDump)
 	{
-		auto fmDat=t77Dec.DumpToFMFormat(dump);
+		auto fmDat=t77Dec.DumpToFMFormat(dump.data);
 		if(16<=fmDat.size())
 		{
-			auto fName=t77Dec.GetDumpFileName(dump);
+			auto fName=t77Dec.GetDumpFileName(dump.data);
 			auto fType=FM7File::DecodeFMHeaderFileType(fmDat[10],fmDat[11]);
 
 			char c_outFName[256];

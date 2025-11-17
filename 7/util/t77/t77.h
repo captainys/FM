@@ -95,8 +95,13 @@ public:
 	unsigned int OneZeroThr;
 	// By default, 0x1A+0x1A=0x34 (Off bit), 0x30+0x30=0x60 (On bit).
 	// To take in the middle, it should be somewhere like 0x48.
-	std::vector <long long int> filePtr;  // Index to T77File::t77.
-	std::vector <std::vector <unsigned char> > fileDump;
+	class File
+	{
+	public:
+		size_t beginPtr,endPtr;
+		std::vector <unsigned char> data;
+	};
+	std::vector <File> fileDump;
 
 public:
 	T77Decoder();

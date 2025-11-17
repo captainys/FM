@@ -488,30 +488,25 @@ void FM7CassetteTape::Remake(
 	t77Dec.t77=rawT77file;
 	t77Dec.Decode();
 
-	auto ptrStop=t77Dec.filePtr;
-	ptrStop.push_back(t77Dec.t77.size());
-
 	for(long long int fileIdx=0; fileIdx<t77Dec.fileDump.size(); ++fileIdx)
 	{
-		auto fmDat=t77Dec.DumpToFMFormat(t77Dec.fileDump[fileIdx]);
+		auto fmDat=t77Dec.DumpToFMFormat(t77Dec.fileDump[fileIdx].data);
 		bool processed=false;
 
 		FM7CassetteTape::FileInfo file;
 		file.ptr=byteString.size();
-
 		if(16<=fmDat.size())
 		{
-			auto fName=t77Dec.GetDumpFileName(t77Dec.fileDump[fileIdx]);
+			auto fName=t77Dec.GetDumpFileName(t77Dec.fileDump[fileIdx].data);
 			file.fType=FM7File::DecodeFMHeaderFileType(fmDat[10],fmDat[11]);
 			if(file.fType!=FM7File::FTYPE_UNKNOWN)
 			{
 				file.fName=fName;
 			}
-
 			if(file.fType==FM7File::FTYPE_BINARY)
 			{
 				FM7BinaryFile binFile;
-				if(true==binFile.Decode2B0(t77Dec.DumpToFMFormat(t77Dec.fileDump[fileIdx])))
+				if(true==binFile.Decode2B0(t77Dec.DumpToFMFormat(t77Dec.fileDump[fileIdx].data)))
 				{
 					file.len=binFile.dat.size();
 					file.storeAddr=binFile.storeAddr;
@@ -541,9 +536,9 @@ void FM7CassetteTape::Remake(
 			    true==redirectBiosCallBinaryString)
 			{
 				auto info=t77Dec.BeginRawDecoding();
-				info.ptr=ptrStop[fileIdx];
+				info.ptr=t77Dec.fileDump[fileIdx].beginPtr;
 				std::vector <unsigned char> bin;
-				while(info.ptr<ptrStop[fileIdx+1] && true!=info.endOfFile)
+				while(info.ptr<t77Dec.fileDump[fileIdx].endPtr && true!=info.endOfFile)
 				{
 					info=t77Dec.RawReadByte(info);
 					bin.push_back(info.byteData);
@@ -553,13 +548,12 @@ void FM7CassetteTape::Remake(
 				processed=true;
 			}
 		}
-
-		if(true!=processed)
+		if(true!=processed) // Something is recognized as a file, but not processed.
 		{
 			int c=0;
 			auto info=t77Dec.BeginRawDecoding();
-			info.ptr=ptrStop[fileIdx];
-			while(true!=info.endOfFile)
+			info.ptr=t77Dec.fileDump[fileIdx].beginPtr;
+			while(true!=info.endOfFile && info.ptr<t77Dec.fileDump[fileIdx].endPtr)
 			{
 				info=t77Dec.RawReadByteNoSync(info);
 				byteString.push_back(info.byteData);

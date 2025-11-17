@@ -708,7 +708,6 @@ bool T77Decoder::Decode(void)
 	unsigned char lastBlkIdent[4],lastFive[5];
 	long long int blkSize=0;
 
-	filePtr.clear();
 	fileDump.clear();
 
 	while(ptr+4<(long long)t77.size())
@@ -764,8 +763,12 @@ bool T77Decoder::Decode(void)
 			if(0!=bit[0] || 0==bit[9] || 0==bit[10])
 			{
 				printf("Device I/O Error at ptr=%d (0x%08x)\n",(int)ptr0,(int)ptr0);
-				filePtr.push_back(dumpStart);
-				fileDump.push_back((std::vector <unsigned char> &&)dump);
+
+				File newFile;
+				fileDump.push_back(newFile);
+				fileDump.back().beginPtr=dumpStart;
+				fileDump.back().endPtr=ptr;
+				std::swap(fileDump.back().data,dump);
 				dump.clear();
 				state=0;
 				continue;
@@ -829,8 +832,11 @@ bool T77Decoder::Decode(void)
 
 			if(0!=bit[0] || 0==bit[9] || 0==bit[10])
 			{
-				filePtr.push_back(dumpStart);
-				fileDump.push_back((std::vector <unsigned char> &&)dump);
+				File newFile;
+				fileDump.push_back(newFile);
+				fileDump.back().beginPtr=dumpStart;
+				fileDump.back().endPtr=ptr;
+				std::swap(fileDump.back().data,dump);
 				dump.clear();
 				printf("End of file.\n");
 				state=0;
@@ -855,8 +861,16 @@ bool T77Decoder::Decode(void)
 
 	if(0<dump.size())
 	{
-		filePtr.push_back(dumpStart);
-		fileDump.push_back((std::vector <unsigned char> &&)dump);
+		File newFile;
+		fileDump.push_back(newFile);
+		fileDump.back().beginPtr=dumpStart;
+		fileDump.back().endPtr=ptr;
+		std::swap(fileDump.back().data,dump);
+	}
+
+	if(0<fileDump.size())
+	{
+		printf("Recognized to T77 Ptr %lld out of %lld\n",fileDump.back().endPtr,t77.size());
 	}
 
 	if(0!=state && 2!=state)

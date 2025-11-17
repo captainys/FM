@@ -36,30 +36,28 @@ BIOS_HOOK				; Typical way of handling I/O can bd
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+BIOS_CTBRED				STA		<IO_RS232C_COMMAND_LO
+						DECA					; A=#$B7 -> #$B6
+						; A=#$B6=READ_REQUEST
+						BSR		RS232C_WRITE	; 7 clocks
+
+RS232C_READ				LDA		#2
+						ANDA	<IO_RS232C_COMMAND_LO
+						BEQ		RS232C_READ
+						LDA		<IO_RS232C_DATA_LO
+
+BIOS_CTBRED_EXIT		STA		2,X
+						CLRA
+						RTS
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 						; If [2,X] is $FF, turn on motor, turn off otherwise.
 						; When motor is turned off, reset RS232C so that it won't fire IRQ any more.
 BIOS_MOTOR				LDA		2,X
 						INCA
-						BNE		BIOS_MOTOR_OFF
-
-BIOS_MOTOR_ON			LEAX	RS232C_RESET_CMD,PCR
-						; According to http://vorkosigan.cocolog-nifty.com/blog/2009/12/a-b085.html
-						; Need to wait 8 clocks between writes.
-MOTOR_RS232C_RESET_LOOP
-						CLRA								; 2 clocks
-						LDA		,X+							; 5 clocks
-						STA		<IO_RS232C_COMMAND_LO
-						BPL		MOTOR_RS232C_RESET_LOOP	; Only last command is negative ; 3 clocks
-
-						; CLRA clears carry flag.
-						; LDA, STA, and BPL does not change.
-						; Can take 10 clocks after each STA 7,U
-
-						RTS
-
-						; 8251A Data Sheet pp.12 'NOTE' paragraph
-						; Regarding Internal Reset on Power-up.
-RS232C_RESET_CMD		FCB		0,0,0,$40,$4E,$B7
+						BEQ		BIOS_MOTOR_ON
 
 						; Need to make sure RS232C does nothing after MOTOR OFF.
 						; "Emergency" (COMPAC) cannot take key inputs unless
@@ -83,6 +81,24 @@ BIOS_MOTOR_OFF
 						CLR		<IO_RS232C_COMMAND_LO
 						RTS		; Previous CLR 7,U also clears carry
 
+BIOS_MOTOR_ON			LEAX	RS232C_RESET_CMD,PCR
+						; According to http://vorkosigan.cocolog-nifty.com/blog/2009/12/a-b085.html
+						; Need to wait 8 clocks between writes.
+MOTOR_RS232C_RESET_LOOP
+						CLRA								; 2 clocks
+						LDA		,X+							; 5 clocks
+						STA		<IO_RS232C_COMMAND_LO
+						BPL		MOTOR_RS232C_RESET_LOOP	; Only last command is negative ; 3 clocks
+
+						; CLRA clears carry flag.
+						; LDA, STA, and BPL does not change.
+						; Can take 10 clocks after each STA 7,U
+
+						RTS
+
+						; 8251A Data Sheet pp.12 'NOTE' paragraph
+						; Regarding Internal Reset on Power-up.
+RS232C_RESET_CMD		FCB		0,0,0,$40,$4E,$B7
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -101,24 +117,6 @@ RS232C_WRITE			LDB		<IO_RS232C_COMMAND_LO
 						BCC		RS232C_WRITE
 						STA		<IO_RS232C_DATA_LO
 
-						CLRA
-						RTS
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-BIOS_CTBRED				STA		<IO_RS232C_COMMAND_LO
-						DECA					; A=#$B7 -> #$B6
-						; A=#$B6=READ_REQUEST
-						BSR		RS232C_WRITE	; 7 clocks
-
-RS232C_READ				LDA		#2
-						ANDA	<IO_RS232C_COMMAND_LO
-						BEQ		RS232C_READ
-						LDA		<IO_RS232C_DATA_LO
-
-BIOS_CTBRED_EXIT		STA		2,X
 						CLRA
 						RTS
 
