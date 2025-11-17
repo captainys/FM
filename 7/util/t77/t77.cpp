@@ -807,7 +807,7 @@ bool T77Decoder::Decode(void)
 					blkSize=lastBlkIdent[3];
 					if(0xff==blkType)
 					{
-						printf("Last block detected.\n");
+						printf("Last block detected at %d.\n",ptr);
 						state=2;
 					}
 				}
@@ -821,7 +821,7 @@ bool T77Decoder::Decode(void)
 				}
 			}
 		}
-		else
+		else // state==2
 		{
 			auto ptr0=ptr;
 			int bit[11];
@@ -838,7 +838,7 @@ bool T77Decoder::Decode(void)
 				fileDump.back().endPtr=ptr;
 				std::swap(fileDump.back().data,dump);
 				dump.clear();
-				printf("End of file.\n");
+				printf("End of file at %d.\n",ptr);
 				state=0;
 			}
 			else

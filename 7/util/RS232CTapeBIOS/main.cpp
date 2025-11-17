@@ -96,6 +96,9 @@ void ShowCommandHelp(void)
 	printf("SAVEBIN\n");
 	printf("    Save byte dump sent to the real FM-7 to file.\n");
 	printf("    File name is DEBUG.BIN\n");
+	printf("SAVELOG\n");
+	printf("    Save binary log of the sent bytes.\n");
+	printf("    File name is LOG.BIN\n");
 }
 
 void Title(int bps)
@@ -380,6 +383,8 @@ public:
 	std::vector <FileInfo> dir;
 	std::vector <unsigned char> byteString;
 	long long int currentPtr,nextPrintPtr;
+
+	std::vector <unsigned char> sendLog;
 
 	/*! Returns how many occurrences have been replaced.
 	*/
@@ -1003,6 +1008,22 @@ void MainCPU(void)
 				}
 				processed=true;
 			}
+			if("SAVELOG"==CMD)
+			{
+				std::lock_guard <std::mutex> guard(fd05);
+				FILE *fp=fopen("LOG.BIN","wb");
+				if(NULL!=fp)
+				{
+					fwrite(fc80.loadTape.sendLog.data(),1,fc80.loadTape.sendLog.size(),fp);
+					fclose(fp);
+					printf("Saved LOG.BIN (%d bytes)\n",fc80.loadTape.sendLog.size());
+				}
+				else
+				{
+					printf("Failed to open LOG.BIN for writing.\n");
+				}
+				processed=true;
+			}
 			break;
 		}
 		if(true!=processed)
@@ -1313,6 +1334,8 @@ void SendOneByte(YsCOMPort &comPort)
 	{
 		toSend=fc80.loadTapePtr->byteString[fc80.loadTapePtr->currentPtr++];
 	}
+
+	fc80.loadTapePtr->sendLog.push_back(toSend);
 
 	long long int nSend=1;
 	unsigned char sendByte[1]={toSend};
