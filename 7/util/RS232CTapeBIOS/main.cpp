@@ -93,6 +93,9 @@ void ShowCommandHelp(void)
 	printf("SV..Save current save-tape to a T77 file.\n");
 	printf("    SVfilename for specifying a save file name.\n");
 	printf("    No space between SVfilename\n");
+	printf("SAVEBIN\n");
+	printf("    Save byte dump sent to the real FM-7 to file.\n");
+	printf("    File name is DEBUG.BIN\n");
 }
 
 void Title(int bps)
@@ -982,6 +985,21 @@ void MainCPU(void)
 				else
 				{
 					fc80.SaveT77(cmdIn+2);
+				}
+				processed=true;
+			}
+			if("SAVEBIN"==CMD)
+			{
+				FILE *fp=fopen("DEBUG.BIN","wb");
+				if(NULL!=fp)
+				{
+					fwrite(fc80.loadTape.byteString.data(),1,fc80.loadTape.byteString.size(),fp);
+					fclose(fp);
+					printf("Saved DEBUG.BIN\n");
+				}
+				else
+				{
+					printf("Failed to open DEBUG.BIN for writing.\n");
 				}
 				processed=true;
 			}

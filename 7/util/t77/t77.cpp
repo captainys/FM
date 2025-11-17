@@ -716,7 +716,7 @@ bool T77Decoder::Decode(void)
 		{
 			if(true==FindFirstFFFFFF(ptr))
 			{
-				printf("Found FFFFFF at 0x%08x\n",(int)ptr);
+				printf("Found FFFFFF at %d\n",(int)ptr);
 				state=1;
 				dumpStart=ptr;
 				dump.clear();
@@ -751,7 +751,7 @@ bool T77Decoder::Decode(void)
 				{
 					if(true==FindFirstFFFFFF(ptr))
 					{
-						printf("Re-synced FFFFFF\n");
+						printf("Re-synced FFFFFF at %d\n",ptr);
 						for(int i=0; i<11; ++i)
 						{
 							bit[i]=GetBit(ptr);
