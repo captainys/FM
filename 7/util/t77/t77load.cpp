@@ -10,6 +10,8 @@
 void CommandHelp(void)
 {
 	printf("Usage: t77load t77file.t77\n");
+	printf("  Extracts files in the FM file format.\n");
+	printf("  Extracted files can be written to F-BASIC disk by FMWRITE command in d77fileutil.\n");
 	printf("Options:\n");
 	printf("  -raw       Write raw (except F-BASIC binary).\n");
 }
