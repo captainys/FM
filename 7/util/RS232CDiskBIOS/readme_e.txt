@@ -4,6 +4,8 @@ by CaptainYS
 http://www.ysflight.com
 
 Updates
+2025/11/27 Looks like sometimes (probably on reset), a garbage byte is sent from FM-7 and put the server in an undefined state.  I make the server so that the command times out if it does not complete in one second.  Also FM-7 side can send a command by PRINT #1,"REQ0"; then the server sends back binary loader. Semi-colon after double-quote is absolutely needed. 
+
 2021/04/16 Confirmed with COM1-mode RS232C card.
 
 
@@ -26,6 +28,9 @@ The disk titles you can run are limited to the ones that access disk via BIOS ca
 
 To use this program you need a working Fujitsu FM-7 hardware.  I am not talking about an emulator.  I am talking about an actual hardware.  You also need a Windows PC that works as a server.  The Windows PC and the FM-7 must be connected by an RS232C (aka serial) cross cable.  Modern PCs don't have an onboard RS232C connector.  You probably want to get a USB to RS232C adapter like Sabrent USB to RS232C adapter:
 
+
+
+(Usage #1)
 You need to type a short program on FM-7.
 
 10 OPEN "I",#1,"COM0:(F8N1)"
@@ -46,6 +51,23 @@ Once the server starts, type:
 IL
 
 on the server prompt.  FM-7 will restart and boot from the disk image you specify in the server command line.
+
+
+
+(Usage #2)
+If you don't want to touch the server, you can do the following program instead.
+
+10 OPEN"O",#1,"COM0:(F8N1)
+20 OPEN"I",#2,"COM0:(F8N1)
+30 PRINT #1,"REQ0";
+40 LINE INPUT #2,A$
+50 CLOSE
+60 EXEC VARPTR(A$)
+
+The program gets a bit longer, but for example, if you put your FM-7 on display, and want to keep the server locked, this would work.
+
+
+
 
 If your FM-7 series hardware is FM77AV20/40 or newer, you first need to enable RS232C before the above steps.  Start your unit, and type the following.
 

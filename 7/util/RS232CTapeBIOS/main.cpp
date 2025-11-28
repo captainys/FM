@@ -1045,6 +1045,7 @@ void SubCPU(void)
 	bool activity=false;
 	auto activityTimer=std::chrono::system_clock::now();
 	auto lastSentTimer=std::chrono::system_clock::now();
+	auto lastRecvTimer=std::chrono::system_clock::now();
 
 	comPort.SetDesiredBaudRate(fc80.cpi.bps);
 	comPort.SetDesiredBitLength(YsCOMPort::BITLENGTH_8);
@@ -1234,6 +1235,7 @@ void SubCPU(void)
 			// If something incoming, don't sleep next 10ms.
 			activity=true;
 			activityTimer=std::chrono::system_clock::now()+std::chrono::milliseconds(100);
+			lastRecvTimer=std::chrono::system_clock::now();
 
 			if(true==fc80.verbose) // don't use fc80.GetVerboseMode().  Mutex is already locked.
 			{
@@ -1260,6 +1262,20 @@ void SubCPU(void)
 				{
 					state=STATE_WAIT_WRITE_BYTE;
 					yamakawaCount=0;
+				}
+				else if("REQ0"[yamakawaCount]==c)
+				{
+					printf("[%02x](%c)\n",c,c);
+					++yamakawaCount;
+					if(4==yamakawaCount)
+					{
+						fc80.installBinaryLoader=true;
+						fc80.FM7COMPort=0;
+						yamakawaCount=0;
+
+						fc80.loadTapePtr->currentPtr=0;
+						fc80.loadTapePtr->nextPrintPtr=0;
+					}
 				}
 				else if("YAMAKAWA"[yamakawaCount]==c || "YAMAKAWa"[yamakawaCount]==c)
 				{
@@ -1293,6 +1309,7 @@ void SubCPU(void)
 				break;
 			}
 		}
+
 		fc80.Unhalt();
 
 		if(true!=fc80.tapeSaved && 

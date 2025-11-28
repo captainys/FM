@@ -1570,6 +1570,7 @@ void SubCPU(void)
 	bool activity=false;
 	auto activityTimer=std::chrono::system_clock::now();
 	auto lastSentTimer=std::chrono::system_clock::now();
+	auto lastRecvTimer=std::chrono::system_clock::now();
 
 	comPort.SetDesiredBaudRate(fc80.cpi.bps);
 	comPort.SetDesiredBitLength(YsCOMPort::BITLENGTH_8);
@@ -1723,6 +1724,7 @@ void SubCPU(void)
 			// If something incoming, don't sleep next 10ms.
 			activity=true;
 			activityTimer=std::chrono::system_clock::now()+std::chrono::milliseconds(100);
+			lastRecvTimer=std::chrono::system_clock::now();
 
 			switch(state)
 			{
@@ -1732,6 +1734,15 @@ void SubCPU(void)
 					printf("[%02x]",c);
 				}
 				biosCmdBuf[biosCmdFilled++]=c;
+				if(4==biosCmdFilled)
+				{
+					if(0==strncmp((const char *)biosCmdBuf,"REQ",3))
+					{
+						fc80.cpi.FM7COMPort=biosCmdBuf[2]-'0';
+						fc80.installBinaryLoader=true;
+						biosCmdFilled=0;
+					}
+				}
 				if(8==biosCmdFilled)
 				{
 					if(0==strncmp((const char *)biosCmdBuf,"YAMAKAWA",8))
@@ -1954,6 +1965,26 @@ void SubCPU(void)
 			}
 			fc80.lastByteReceivedClock=std::chrono::system_clock::now();
 		}
+
+		if(0<biosCmdFilled)
+		{
+			auto dt=std::chrono::system_clock::now()-lastRecvTimer;
+			auto ms=std::chrono::duration_cast<std::chrono::milliseconds>(dt).count();
+			if(1000<=ms)
+			{
+				printf("Command did not complete in 1000 milliseconds.\n");
+				printf("Command Time Out.\n");
+				printf("Discarding:");
+				for(int i=0; i<biosCmdFilled; ++i)
+				{
+					printf(" $%02x",biosCmdBuf[i]);
+				}
+				state=STATE_NORMAL;
+				biosCmdFilled=0;
+				sectorDataFilled=0;
+			}
+		}
+
 		fc80.Unhalt();
 
 		for(auto &fm7Disk : fc80.diskSet.fm7Disk)
