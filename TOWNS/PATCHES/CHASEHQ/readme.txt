@@ -1,60 +1,13 @@
-TAITO Chase HQ for FM TOWNS  YSSCSICD.SYS Patch
+Chase H.Q. for FM TOWNS CD-ROM BIOS Patch
 
-This patch enables TAITO Chase HQ for FM TOWNS to start from external SCSI CD-ROM drive by redirecting CD-ROM I/O manipulations to CD-ROM BIOS.
+This patch is to run TAITO Chase H.Q. for FM TOWNS on a real FM TOWNS hardware from an external CD drive using YSSCSICD.SYS or Rescue IPL.
 
-CDDAPlay will use an expanded function of YSSCSICD.SYS (AX=72C0H) therefore you need to install YSSCSICD.SYS in the boot disk to play CDDA BGM.
+If you only run TAITO Chase H.Q. in an emulator, you do not need this patch.
 
-Thanks nabe-abk (https://github.com/nabe-abk) for the file format of .EXP!  The executables were encrypted, and without appending patch-applier after the decryptor, I could not make it work.  Without his documentation, I could not append my code after the decryptor.
+TAITO Chase H.Q. for FM TOWNS directly writes to CD-ROM I/O to play CDDA BGM.  This patch modifies that part of the code of all three LASINT.EXP, LASINT2.EXP, and ENDING.EXP and force them to use CD-ROM BIOS.  CD-ROM BIOS can be interecepted and re-interpreted to SCSI commands by YSSCSICD.YS and Rescue IPL.  Therefore, the game becomes playable with music from an external CD drive.
 
-By the way, you don't need a boot floppy if you have a working hard-drive TownsOS installation.  I was able to start directly (without rebooting) from Towns OS V2.1 L31 GUI.
+After applying this patch, you will see one or two frames of flicker when BGM changes while playing, but it is because Chase H.Q. for FM TOWNS does palette magic to draw more than 16 colors in the 16-color screen mode.  The program cannot do palette switch while CD-ROM BIOS is starting to play BGM.  So, it's inevitable.
 
+Compile this patch with a C compiler, and apply the patch to a BIN, IMG, or MDF file.  Before writing back to a CD-R, CRC and error correction code need to be re-calculated.  I have confirmed that edcre (https://github.com/alex-free/edcre) works.  But, the original edcre uses UNIX-standard library, and cannot be compiled by Visual C++.  So, I made a fork that you can compile with Visual C++ in https://github.com/captainys/edcre
 
-
-Usage:
-
-(1) Compile patch.c and patch2.c to build patch.exe and patch2.exe.
-(2) Copy LASINT.EXP and LASINT2.EXP to the same directory as the patches from TAITO Chase HQ for FM TOWNS CD-ROM..
-(3) Run patch.exe, and then patch2.exe.  No parameters are needed.
-(4) If things go well, you get LASINTP.EXP and LASINT2P.EXP.
-(5) Copy LASINTP.EXP and LASINT2P.EXP to a Towns OS SCSI CD Boot floppy disk.
-(6) Use the following AUTOEXEC.BAT
-
-
-
-Q:
-RUN386 SYS
-IF ERRORLEVEL 1 GOTO NORMAL
-:LABEL
-RUN386 A:LASINTP
-RUN386 ENDING
-GOTO LABEL
-
-:NORMAL
-RUN386 A:LASINT2P
-GOTO NORMAL
-
-
-
-
-
-TAITO Chase HQ for FM TOWNS YSSCSICD.SYS対応パッチ
-
-このパッチを適用することで、FM TOWNS版TAITO Chase HQを外付けCD-ROMドライブから実行できるようになる。
-
-CDDAによるBGMはYSSCSICD.SYSの拡張機能(AX=72C0H)を使用するので、YSSCSICD.SYSを組み込まないとCDDAによるBGMは演奏されない。
-
-ハードディスクからTowns OSが起動可能であれば起動フロッピーディスクを使わなくてもGUIから直接起動できる模様。Towns OS V2.1 L31 GUIから普通に起動できた。
-
-使い方:
-
-(1) patch.c, patch2.cをコンパイルしてpatch.exeとpatch2.exeをビルド。
-(2) LASINT.EXPとLASINT2.EXPをTAITO Chase HQのCD-ROMからパッチの実行ファイルと同じディレクトリにコピー。
-(3) patch.exeとpatch2.exeを順に実行。順番は逆でもいいけど。
-(4) うまく行ってたらLASINTP.EXPとLASINT2P.EXPができているはず。
-(5) 作成したLASINTP.EXPとLASINT2P.EXPをTowns OS SCSI CD起動フロッピーディスクにコピー。
-(7) 上に書いたようなAUTOEXEC.BATを使って起動。
-
-
-
-Free386作者のnabe-abkさん(https://github.com/nabe-abk)がEXPファイルフォーマットを公開していただいたおかげでこのパッチが実現できました！実行ファイルは暗号化されていたので、複合コードの末尾にパッチ適用コードを追加する必要があったのですが、EXPファイルのフォーマットがわからなかったのでできずにいました！ありがとうございます！
-
+If you are interested, the source file is also available here.  The game executable first self-uncompress the binary, and then jump to the real entry point.  Only timing I could find to patch the code was after uncompressing and before jumping to the real entry point.  This patch extends the executable by 256 bytes, and inserts the patch-application code at the end of the uncompressor.
