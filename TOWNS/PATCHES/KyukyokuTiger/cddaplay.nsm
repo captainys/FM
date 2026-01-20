@@ -1,0 +1,99 @@
+					BITS	32
+
+JUMP_TABLE			EQU		00150A32H
+TOC_TABLE			EQU		000019F0H
+PLAYING_TRACK		EQU		00001A74H
+
+
+					CALL	CAPTURE_EIP
+CAPTURE_EIP:		POP		ESI			; ESI is CAPTURE_EIP
+					ADD		ESI,(PATCH_CODE_BEGIN-CAPTURE_EIP)
+					MOV		EDI,JUMP_TABLE
+					MOV		ECX,(PATCH_CODE_END-PATCH_CODE_BEGIN)
+					REP		MOVSB
+					RET
+
+; Table at 000C:001A7FFD
+PATCH_CODE_BEGIN:
+TABLE_BEGIN:
+					; Different command number from Chase HQ.
+					; Also ES not pushed.
+					DD		JUMP_TABLE+(CDDAPLAY -TABLE_BEGIN)
+					DD		JUMP_TABLE+(CDDAPLAY -TABLE_BEGIN)
+					DD		JUMP_TABLE+(CDDAPLAY -TABLE_BEGIN)
+					DD		JUMP_TABLE+(CDDAPLAY -TABLE_BEGIN)
+					DD		JUMP_TABLE+(CDDAPLAY -TABLE_BEGIN)
+					DD		JUMP_TABLE+(CDDAPAUSE-TABLE_BEGIN)
+
+
+CDDAPAUSE:
+					MOV		AH,55h
+					MOV		AL,0C0H
+					XOR		ECX,ECX
+					INT		93H
+					RET
+
+
+CDDAPLAY:
+					PUSH	ES
+					MOV		[PLAYING_TRACK],AL
+
+					SUB		ESP,14H		; Make a register table for INT 21H AX=2511H
+
+					MOVZX	ECX,AL		; By this I clear High-24bits of ECX.
+					LEA		EAX,[ECX+ECX*2]
+					LEA		ESI,[EAX*2+TOC_TABLE];
+
+					MOV		BX,1
+					MOV		AX,25C0h	; DOS Alloc -> AX=segment
+					INT		21H			; It shouldn't change ECX.  High-24bits of ECX is stil zero.
+					JC		CDDAPLAY_EXIT
+
+					; Set Up INT 93H via INT 21H AX=2511H before forgetting the real-mode segment.
+					MOV		WORD [ESP],93H			; INT 93H
+					MOV		[ESP+2],AX				; DS in the real mode
+					MOV		WORD [ESP+0AH],50C0H	; 50H CDDA Play
+
+					MOV		CL,060h		; DOS Extender GDT 0060H DOS memory space.  High-24bits of ECX is still clear.
+					MOV		ES,CX		; ES is backed up above, so don't worry about destroying it.
+					MOVZX	EDI,AX
+					SHL		EDI,4
+
+					SHR		ECX,4		; DOS memory-space selector happens to be 0060H.  I can get 6 by right-shifting by 4.
+BCD2BIN_LOOP:		LODSB
+
+					; BCD2BIN >>>>
+					MOV		BL,AL
+
+					SHR		AL,4
+					MOV		AH,10
+					MUL		AH		; Make AL is 10*high_digit
+
+					AND		BL,0Fh
+					ADD		AL,BL
+					; BCD2BIN <<<<
+
+					STOSB
+					LOOP	BCD2BIN_LOOP
+
+					MOV		AX,52C0h
+					; XOR		CX,CX	; Just got out of LOOP BCD2BIN_LOOP, therefore ECX is already zero.
+					INT		93H			; CDDA Stop
+
+					XOR		EDI,EDI
+					MOV		EDX,ESP		; DS:EDX is parameter block, already set up above.
+					MOV		CX,1
+					MOV		AX,2511H	; Call Real Mode INT
+					INT		21H
+
+					MOV		CX,[ESP+2]				; Recover real-mode segment.  Fetch it before PUSH EAX.
+					PUSH	EAX			; Save return value.
+					MOV		AX,25C1h	; DOS Free <- CX=segment
+					INT		21H
+					POP		EAX
+
+CDDAPLAY_EXIT:
+					ADD		ESP,14H
+					POP		ES
+					RET
+PATCH_CODE_END:
