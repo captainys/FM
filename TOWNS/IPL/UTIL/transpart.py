@@ -264,6 +264,10 @@ def main(argv):
 
 	srcSize=os.path.getsize(argv[1])
 	dstSize=os.path.getsize(argv[3])
+
+	print("Size of "+argv[1]+"="+str(srcSize))
+	print("Size of "+argv[3]+"="+str(dstSize))
+
 	if 0!=srcSize%512:
 		ErrorExit("Source hard disk image size is not 512 times integer.")
 	if 0!=dstSize%512:
