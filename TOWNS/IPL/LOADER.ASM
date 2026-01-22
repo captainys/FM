@@ -2,13 +2,19 @@
 
 						PAGE	99,160
 
-VERSION_STRING			EQU		"VERSION 20241204"
+VERSION_STRING			EQU		"VERSION 20250121"
 
 						.386p
 CODE					SEGMENT	USE16
 
 						INCLUDE		IODEF.ASM
 						INCLUDE		DEF.ASM
+
+; If making a .COM executable, the offset needs to be 0100h
+IFDEF	COMEXE
+						ORG			0100H
+ENDIF
+
 
 MAIN					PROC
 						; ****ing MASM kindly inserts NOP after JMP and messes up the offsets.  Good job, Microsoft.
@@ -32,10 +38,26 @@ REALMAIN:
 						PUSH	CS
 						POP		DS
 
+
+
+IFNDEF	COMEXE
 						MOV		BP,CS
 						SUB		BP,1000H
 						MOV		SS,BP
 						MOV		SP,0FFFEH ; IO.SYS will reset the stack pointer anyway.
+ELSE
+						MOV		BP,CS
+						MOV		SS,BP
+						MOV		SP,0100H
+
+						MOV		DX,0FDA0h	; CRTC Page
+						MOV		AL,0Ch		; Only show page 0.
+						OUT		DX,AL
+
+						MOV		BX,8		; Pretend to be from a CD.
+ENDIF
+
+
 
 						MOV		CS:[INCOMING_BX],BX
 						AND		BX,0F0FH
@@ -127,10 +149,14 @@ DEVICE_ID_SET:
 						POP		FS
 
 
+; If starting a .COM executable, always start into MENU
+IFNDEF	COMEXE
 						TEST	WORD PTR [CONTROL_FLAGS],CONTROL_FLAG_BOOT_MENU
 						JNE		MAINMENU
 
 						CALL	BOOT_FROM_SCSI_CD
+ENDIF
+
 
 						JMP		MAINMENU
 
