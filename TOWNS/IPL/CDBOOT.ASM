@@ -683,3 +683,23 @@ SCSI_ID_CDROM			DB		0
 
 
 IOSYS_INTERCEPT			ENDP
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+CHECK_INTERNAL_CD_READY	PROC
+						MOV		AX,0EC0h
+						XOR		CX,CX
+
+						; How can I write CALL 		FAR PTR 0FFFBH:0014H
+						DB		9AH		; CALLF FFFB:0014
+						DW		 0014H
+						DW		0FFFBH
+
+						JC		SHORT @f
+						SUB		AH,1
+						CMC
+@@:
+						RET
+CHECK_INTERNAL_CD_READY	ENDP
