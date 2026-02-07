@@ -25,6 +25,13 @@ IOSYS_SEARCH_END		EQU		80	; Search up to this sector-1.
 MAIN					PROC
 						DB		"IPL4"
 
+						JMP		SHORT REALMAIN
+
+						ORG		0020H
+						DD		0	; LBA of IO.SYS (FBIOS) to be set.
+						DD		64	; Sector count
+
+REALMAIN:
 						CLI
 						CLD
 						PUSH	CS
@@ -54,35 +61,14 @@ INTERNALCDBOOT:
 						MOV		SI,OFFSET MSG_INTERNAL_CD_BOOT
 						CALL	PRINT_TALL
 
+						MOV		EDX,CS:[0020H]
+						CALL	FIND_FBIOS_INTERNAL_CD
+						JAE		INTERNAL_FIND_FBIOS_SECTOR_FOUND
+
 						MOV		DX,IOSYS_SEARCH_BEGIN
-
 INTERNAL_FIND_FBIOS_LOOP:
-						PUSH	DS
-						PUSH	DX
-
-						MOV		AX,0040H
-						MOV		DS,AX
-						MOV		FS,AX		; For later comparison
-						XOR		DI,DI
-
-						MOV		AX,05C0H	; Read Sector, Device=C0H
-						XOR		CX,CX		; CH must be 0, CL=High-byte of LBA
-						MOV		BX,1
-						; How can I write CALL 		FAR PTR 0FFFBH:0014H
-						DB		9AH		; CALLF FFFB:0014
-						DW		 0014H
-						DW		0FFFBH
-
-						POP		DX
-						POP		DS
-
-						JB		@f
-
-						CMP		DWORD PTR FS:[0],4F494246H ; "FBIO"
-						JNE		@f
-						CMP		BYTE PTR FS:[4],53H ; 'S'
-						JE		INTERNAL_FIND_FBIOS_SECTOR_FOUND
-@@:
+						CALL	FIND_FBIOS_INTERNAL_CD
+						JAE		INTERNAL_FIND_FBIOS_SECTOR_FOUND
 
 						INC		DX
 						CMP		DX,IOSYS_SEARCH_END
@@ -127,6 +113,42 @@ JUMP_TO_IOSYS:
 						JMP		DWORD PTR CS:[IOSYS_ENTRY_IP]
 
 
+; Input DX=LBA
+FIND_FBIOS_INTERNAL_CD:
+						PUSH	DS
+						PUSH	DX
+
+						MOV		AX,0040H
+						MOV		DS,AX
+						MOV		FS,AX		; For later comparison
+						XOR		DI,DI
+
+						MOV		AX,05C0H	; Read Sector, Device=C0H
+						XOR		CX,CX		; CH must be 0, CL=High-byte of LBA
+						MOV		BX,1
+						; How can I write CALL 		FAR PTR 0FFFBH:0014H
+						DB		9AH		; CALLF FFFB:0014
+						DW		 0014H
+						DW		0FFFBH
+
+						POP		DX
+						POP		DS
+
+						JB		FIND_FBIOS_INTERNAL_CD_NOT
+
+						CMP		DWORD PTR FS:[0],4F494246H ; "FBIO"
+						JNE		FIND_FBIOS_INTERNAL_CD_NOT
+						CMP		BYTE PTR FS:[4],53H ; 'S'
+						JNE		FIND_FBIOS_INTERNAL_CD_NOT
+
+						CLC
+						RET
+
+FIND_FBIOS_INTERNAL_CD_NOT:
+						STC
+						RET
+
+
 
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -165,32 +187,15 @@ SCSICDBOOT_CONTINUE:
 						MOV		AX,0040H
 						MOV		FS,AX
 
+						MOV		EDX,CS:[0020H]
+						CALL	FIND_FBIOS_SCSI_CD
+						JAE		SCSI_FIND_FBIOS_SECTOR_FOUND
+
 						MOV		EDX,IOSYS_SEARCH_BEGIN
 SCSI_FIND_FBIOS_SECTOR_LOOP:
-						PUSH	EAX
-						PUSH	ECX
-						PUSH	EDX
+						CALL	FIND_FBIOS_SCSI_CD
+						JAE		SCSI_FIND_FBIOS_SECTOR_FOUND
 
-						MOV		SI,OFFSET SCSI_CMD
-						MOV		EDI,0400H
-						MOV		[SI+4],DH
-						MOV		[SI+5],DL
-						ROR		EDX,16
-						MOV		[SI+2],DH
-						MOV		[SI+3],DL
-						ROR		EDX,16
-						MOV		CL,[YSSCSICD_SCSI_ID]
-						CALL	SCSI_COMMAND
-
-						POP		EDX
-						POP		ECX
-						POP		EAX
-
-						CMP		DWORD PTR FS:[0],4F494246H ; "FBIO"
-   						JNE		@f
-						CMP		BYTE PTR FS:[4],53H ; 'S'
-						JE		SCSI_FIND_FBIOS_SECTOR_FOUND
-@@:
 						ADD		EDX,1
 						CMP		EDX,IOSYS_SEARCH_END
 						JNE		SCSI_FIND_FBIOS_SECTOR_LOOP
@@ -265,6 +270,43 @@ FOUND_FIRST_INT21H:
 						MOV		CS:[IOSYS_ENTRY_CS],AX		; FS:0000 is IO.SYS Entry
 
 						JMP		JUMP_TO_IOSYS
+
+
+FIND_FBIOS_SCSI_CD:
+						PUSH	EAX
+						PUSH	ECX
+						PUSH	EDX
+
+						MOV		SI,OFFSET SCSI_CMD
+						MOV		EDI,0400H
+						MOV		[SI+4],DH
+						MOV		[SI+5],DL
+						ROR		EDX,16
+						MOV		[SI+2],DH
+						MOV		[SI+3],DL
+						ROR		EDX,16
+						MOV		CL,[YSSCSICD_SCSI_ID]
+						CALL	SCSI_COMMAND
+
+						POP		EDX
+						POP		ECX
+						POP		EAX
+
+						CMP		DWORD PTR FS:[0],4F494246H ; "FBIO"
+   						JNE		FIND_FBIOS_SCSI_CD_NOT
+						CMP		BYTE PTR FS:[4],53H ; 'S'
+   						JNE		FIND_FBIOS_SCSI_CD_NOT
+
+						CLC
+						RET
+
+
+FIND_FBIOS_SCSI_CD_NOT:
+						STC
+						RET
+
+
+
 MAIN					ENDP
 
 
