@@ -39,6 +39,21 @@ unsigned char uncompressor_size_to[]=
 };
 
 
+// If CMOS is clear due to battery depretion, or corrupted, T_OAK2.EXE, which is not used
+// by Kyukyoku Tiger, will fail, and Kyukyoku Tiger fails to start.  Which is rediculous.
+// This patch will by-pass the error check after T_OAK2.EXE so that the game can start
+// regardless of the state of CMOS RAM.
+unsigned char ignore_T_OAK2_error_from[]=
+{
+0x72,0x11,0xb4,0x4d,0xcd,0x21,0x0a,0xc0,0x74,0x03,0xe9,0x30,0x02
+};
+
+unsigned char ignore_T_OAK2_error_to[]=
+{
+0x72,0x11,0xb4,0x4d,0xcd,0x21,0x0a,0xc0,0xEB,0x03,0xe9,0x30,0x02
+};
+
+
 // Force CD BIOS
 unsigned char forceCDBIOS_pattern[]=
 {
@@ -169,6 +184,7 @@ int main(int ac,char *av[])
 		auto applied=ApplyPatch(2352,buf,sizeof(expSize_from),expSize_from,sizeof(expSize_to),expSize_to)+
                      ApplyPatch(2352,buf,sizeof(fileSize_from),fileSize_from,sizeof(fileSize_to),fileSize_to)+
                      ApplyPatch(2352,buf,sizeof(uncompressor_size_from),uncompressor_size_from,sizeof(uncompressor_size_to),uncompressor_size_to)+
+                     ApplyPatch(2352,buf,sizeof(ignore_T_OAK2_error_from),ignore_T_OAK2_error_from,sizeof(ignore_T_OAK2_error_to),ignore_T_OAK2_error_to)+
 
 					ApplyPatchExternal(
 					    2352,buf,

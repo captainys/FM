@@ -2,6 +2,9 @@ Kyukyoku Tiger. for FM TOWNS CD-ROM BIOS Patch
 
 This patch is to run Kyukyoku Tiger for FM TOWNS on a real FM TOWNS hardware from an external CD drive using YSSCSICD.SYS or Rescue IPL.
 
+Also, it is know that Kyukyoku Tiger cannot start if CMOS RAM was clear due to backup-battery depretion or corrupted for some reason, because
+T_OAK2.EXE fails during the starting process.  This patch also by-passes T_OAK2.EXE test so that Kyukyoku Tiger can start regardless of the CMOS state.
+
 If you only run this game in an emulator, you do not need this patch.
 
 Kyukyoku Tiger for FM TOWNS directly writes to CD-ROM I/O to play CDDA BGM.  This patch modifies that part of the code of KTIGER.EXP and forces them to use CD-ROM BIOS.  CD-ROM BIOS can be interecepted and re-interpreted to SCSI commands by YSSCSICD.YS and Rescue IPL.  Therefore, the game becomes playable with music from an external CD drive.
