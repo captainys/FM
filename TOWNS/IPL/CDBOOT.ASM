@@ -157,17 +157,19 @@ WAIT_SCSI_CD_READY_MSG	DB		"WAITING SCSI CD READY",0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
+LISTSCSI_TYPE		DB		8 dup(0FFh)		; Type=4 or 5 means CD drive.
 
 ; Input
 ;    DS=CS
+; Output
+;   Screen output + CS:[LISTSCSI_TYPE+0] to CS:[LISTSCSI_TYPE+6] Device type
 LISTSCSI				PROC
 						MOV			AX,010AH
 						CALL		LOCATE
 						MOV			SI,OFFSET LISTSCSI_STR
 						CALL		PRINT_TALL
 
-						MOV			CL,0
+						XOR			CX,CX
 @@:
 						PUSH		CX
 
@@ -180,6 +182,10 @@ LISTSCSI				PROC
 						POP			CX
 						PUSH		CX
 						CALL		IDENTIFY_SCSI_DEVICE
+
+						POP			BX		; Get SCSI ID to BX.
+						PUSH		BX
+						MOV			CS:[LISTSCSI_TYPE+BX],CL
 
 						MOV			AL,CL
 						CALL		ITOX8
