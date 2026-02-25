@@ -67,7 +67,6 @@ INT21H_RUN386_SEARCH:
 						JNE		INT21H_RUN386_SEARCH
 
 ; INT21H_IS_RUN386:
-						OUT		0EBh,AL		; Tsugaru Status Message.  Use brkon iow EB to break.
 						MOV		BYTE PTR CS:[DO_PATCH_RUN386],1	; INT 93H AX=05C0H will check this flag, and will apply patch.
 
 INT21H_NOT_RUN386:

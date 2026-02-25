@@ -191,6 +191,7 @@ INTERRUPT				ENDP
 						INCLUDE YS_EXT.ASM
 						INCLUDE	REDRFUNC.ASM
 						INCLUDE	..\SCSILIB\SCSIIO.ASM
+						INCLUDE	PATCH.ASM
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
