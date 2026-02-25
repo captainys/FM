@@ -31,6 +31,76 @@
 
 
 INT93_TOWNS				DD		0
+INT21_MSDOS				DD		0
+
+DO_PATCH_RUN386			DB		0
+RUN386_FILENAME			DB		"RUN386",0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+INT21H_HOOKPROC			PROC
+
+						CMP		AH,4BH		; EXEC
+						JNE		DO_NOT_OVERRIDE_21H
+
+						PUSH	CX
+						PUSH	DX
+						PUSH	DS
+						PUSH	ES
+						PUSH	SI
+						PUSH	DI
+
+						MOV		CX,CS
+						MOV		ES,CX
+						CLD
+
+INT21H_RUN386_SEARCH:
+						MOV		SI,DX
+						MOV		DI,OFFSET RUN386_FILENAME
+						CMP		BYTE PTR [SI],0
+						JE		INT21H_NOT_RUN386
+
+						INC		DX
+
+						MOV		CX,3
+						REP		CMPSW
+						JNE		INT21H_RUN386_SEARCH
+
+; INT21H_IS_RUN386:
+						OUT		0EBh,AL		; Tsugaru Status Message.  Use brkon iow EB to break.
+						MOV		BYTE PTR CS:[DO_PATCH_RUN386],1	; INT 93H AX=05C0H will check this flag, and will apply patch.
+
+INT21H_NOT_RUN386:
+						POP		DI
+						POP		SI
+						POP		ES
+						POP		DS
+						POP		DX
+						POP		CX
+
+						PUSHF
+						CALL	CS:[INT21_MSDOS]
+						MOV		BYTE PTR CS:[DO_PATCH_RUN386],0
+
+						CLI
+						XCHG	SP,BP
+						JNC		DONE_WITH_RUN386_OK
+
+DONE_WITH_RUN386_ERR:
+						OR		BYTE PTR [BP+4],1
+						XCHG	SP,BP
+						IRET
+DONE_WITH_RUN386_OK:
+						AND		BYTE PTR [BP+4],0FEH
+						XCHG	SP,BP
+						IRET
+
+
+
+
+DO_NOT_OVERRIDE_21H:
+						JMP		CS:[INT21_MSDOS]
+INT21H_HOOKPROC			ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
