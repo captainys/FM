@@ -1,8 +1,86 @@
+
+; V1.1 L20
+; 0008:00001058 66837D0801                CMP     WORD PTR [EBP+08H],01H
+; 0008:0000105D 7423                      JE      00001082
+; 0008:0000105F 66681400                  PUSH    WORD PTR 0014H
+; 0008:00001063 FF751C                    PUSH    DWORD PTR [EBP+1CH]
+; 0008:00001066 FF750C                    PUSH    DWORD PTR [EBP+0CH]
+; 0008:00001069 FF7520                    PUSH    DWORD PTR [EBP+20H]
+; 0008:0000106C 6800000000                PUSH    DWORD PTR 00000000H
+; 0008:00001071 E8D80A0000                CALL    00001B4E
+
+; V1.1 L30 and later
+; V1.1L30
+; 0008:0000105E 66837D0801                CMP     WORD PTR [EBP+08H],01H
+; 0008:00001063 7426                      JE      0000108B
+; 0008:00001065 FF7514                    PUSH    DWORD PTR [EBP+14H]
+; 0008:00001068 66685800                  PUSH    WORD PTR 0058H
+; 0008:0000106C FF751C                    PUSH    DWORD PTR [EBP+1CH]
+; 0008:0000106F FF750C                    PUSH    DWORD PTR [EBP+0CH]
+; 0008:00001072 FF7520                    PUSH    DWORD PTR [EBP+20H]
+; 0008:00001075 6800000000                PUSH    DWORD PTR 00000000H
+; 0008:0000107A E8450C0000                CALL    00001CC4              -> B8 80 00 00 00
+
+RUN386_FROM_PTN_V1_1	DB		066h,083h,07Dh,008h,001h,074h,023h,066h,068h,014h,000h,0FFh,075h,01Ch,0FFh,075h,00Ch,0FFh,075h,020h,068h,000h,000h,000h,000h,0E8h
+RUN386_FROM_PTN_V1_1_END:
+
+RUN386_FROM_PTN_V2_1	DB		066h,083h,07Dh,008h,001h,074h,026h,0FFh,075h,014h,066h,068h,058h,000h,0FFh,075h,01Ch,0FFh,075h,00Ch,0FFh,075h,020h,068h,000h,000h,000h,000h,0E8h
+RUN386_FROM_PTN_V2_1_END:
+
+
+
+
 ; Input
 ;   BX    Sector count
 ;   DS:SI Pointer where sectors are read.
 PATCH_RUN386			PROC
 
+						; Sector Count x 2048 = bytes
+						; bytes / 16 = pages.
+						; pages=((sector count << 11)>>4)=(sector count<<7)
+
+						MOV		DX,DS
+						SHR		SI,4
+						ADD		DX,SI
+						MOV		DS,DX
+
+						MOV		DX,CS
+						MOV		ES,DX
+
+						SHL		BX,7
+						CLD
+
+PATCH_RUN386_OUTER_LOOP:
+						XOR		AX,AX
+
+PATCH_RUN386_INNER_LOOP:
+						MOV		SI,AX
+						MOV		DI,OFFSET RUN386_FROM_PTN_V1_1
+						MOV		CX,OFFSET RUN386_FROM_PTN_V1_1_END-OFFSET RUN386_FROM_PTN_V1_1
+						REP		CMPSB
+						JE		PATCH_RUN386_FOUND
+
+						MOV		SI,AX
+						MOV		DI,OFFSET RUN386_FROM_PTN_V2_1
+						MOV		CX,OFFSET RUN386_FROM_PTN_V2_1_END-OFFSET RUN386_FROM_PTN_V2_1
+						REP		CMPSB
+						JE		PATCH_RUN386_FOUND
+
+						INC		AX
+						CMP		AL,16
+						JNE		PATCH_RUN386_INNER_LOOP
+
+						MOV		AX,DS
+						INC		AX
+						MOV		DS,AX
+
+						DEC		BX
+						JNE		PATCH_RUN386_OUTER_LOOP
+
+						RET
+
+
+PATCH_RUN386_FOUND:		MOV		BYTE PTR [SI-1],0B8H		; CALL ????????  -> MOV EAX,????????
 						OUT		0EBh,AL		; Tsugaru Status Message.  Use brkon iow EB to break.
 						RET
 
