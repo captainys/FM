@@ -71,10 +71,58 @@ IOSYS_ENTRY_IP			DW		0000H ; Fixed
 IOSYS_ENTRY_CS			DW		0000
 
 
+; To disable the original CD-ROM BIOS.
+;From:
+;	3C16                      CMP     AL,16H
+;	7F04                      JG      000018AF
+;	3CFB                      CMP     AL,FBH
+;	7D1C                      JGE     000018CB
+;	2C50                      SUB     AL,50H
+;	BF                        MOV     DI,xxxxH
+DISABLE_ORG_CDBIOS_FROM	DB		03CH,016H,07FH,004H,03CH,0FBH,07DH,01CH,02CH,050H,0BFH
+DISABLE_ORG_CDBIOS_FROM_END:
+
+;To:
+;	B90100                    MOV     CX,1
+;	B480                      MOV     AH,80H
+;	894E06                    MOV     [BP+06H],CX
+;	886603                    MOV     [BP+03H],AH
+;	804E0001                  OR      BYTE PTR [BP],01H
+;	CB                        RETF
+DISABLE_ORG_CDBIOS_TO	DB		0B9H,001H,000H,0B4H,080H,089H,04EH,006H,088H,066H,003H,080H,04EH,000H,001H,0CBH
+DISABLE_ORG_CDBIOS_TO_END:
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 INJECT_YSSCSICD_INSTALL_CALLBACK	PROC
+
+						; Disable original CD-ROM BIOS.
+						MOV		AX,0050H
+						MOV		DS,AX			; Target 0040:0000
+						MOV		DX,2000H		; 16 times 2000h = 128KB target size
+						MOV		CX,OFFSET DISABLE_ORG_CDBIOS_FROM_END-OFFSET DISABLE_ORG_CDBIOS_FROM
+						PUSH	CS
+						POP		ES
+						MOV		DI,OFFSET DISABLE_ORG_CDBIOS_FROM
+						CALL	FIND_SOURCE_PATTERN
+						JC		CDBIOS_ENTRY_NOT_FOUND
+
+						;DS:SI is the source pattern location in FBIOS.
+						PUSH	DS
+						POP		ES
+						MOV		DI,SI
+
+						MOV		CX,OFFSET DISABLE_ORG_CDBIOS_TO_END-OFFSET DISABLE_ORG_CDBIOS_TO
+						MOV		SI,OFFSET DISABLE_ORG_CDBIOS_TO
+						PUSH	CS
+						POP		DS
+						REP		MOVSB
+
+CDBIOS_ENTRY_NOT_FOUND:
+
+
 						MOV		AX,0050H
 						MOV		FS,AX
 						MOV		AX,FS:[0]

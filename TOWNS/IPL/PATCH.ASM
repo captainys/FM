@@ -5,32 +5,9 @@
 ; ES:BX					Write Pattern
 APPLY_PATCH				PROC
 
-APPLY_PATCH_OUTSIDE_LOOP:
-						XOR		SI,SI
-APPLY_PATCH_INSIDE_LOOP:
-						PUSH	CX
-						PUSH	SI
-						PUSH	DI
-						REPE	CMPSB
-						POP		DI
-						POP		SI
-						POP		CX
-						JE		SHORT APPLY_PATCH_FOUND
+						CALL	FIND_SOURCE_PATTERN
+						JC		SHORT APPLY_PATCH_EXIT
 
-						INC		SI
-						CMP		SI,16
-						JNE		APPLY_PATCH_INSIDE_LOOP
-
-						MOV		AX,DS
-						INC		AX
-						MOV		DS,AX
-
-						DEC		DX
-						JNE		APPLY_PATCH_OUTSIDE_LOOP
-
-						JMP		SHORT APPLY_PATCH_EXIT
-
-APPLY_PATCH_FOUND:
 						PUSH	DS
 						PUSH	ES
 						POP		DS
@@ -46,6 +23,54 @@ APPLY_PATCH_EXIT:
 						RET
 
 APPLY_PATCH				ENDP
+
+
+
+
+
+; DS:0000h				Target Location
+; DX					Target Length in number of 16-byte pages
+; CX					Pattern Length
+; ES:DI					Source Pattern
+;
+; Output:
+;   CF=0  DS:SI Pattern location
+;   CF=1  Pattern not found
+FIND_SOURCE_PATTERN		PROC
+
+FIND_PATTERN_OUTSIDE_LOOP:
+						XOR		SI,SI
+FIND_PATTERN_INSIDE_LOOP:
+						PUSH	CX
+						PUSH	SI
+						PUSH	DI
+						REPE	CMPSB
+						POP		DI
+						POP		SI
+						POP		CX
+						JE		SHORT FIND_PATTERN_FOUND
+
+						INC		SI
+						CMP		SI,16
+						JNE		FIND_PATTERN_INSIDE_LOOP
+
+						MOV		AX,DS
+						INC		AX
+						MOV		DS,AX
+
+						DEC		DX
+						JNE		FIND_PATTERN_OUTSIDE_LOOP
+
+						STC
+						RET
+
+FIND_PATTERN_FOUND:
+						CLC
+						RET
+
+FIND_SOURCE_PATTERN		ENDP
+
+
 
 
 
