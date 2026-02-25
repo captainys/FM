@@ -76,11 +76,14 @@ IOSYS_ENTRY_CS			DW		0000
 ;	3C16                      CMP     AL,16H
 ;	7F04                      JG      000018AF
 ;	3CFB                      CMP     AL,FBH
-;	7D1C                      JGE     000018CB
+;	7D1C                      JGE     000018CB  <- V1.1 7D 0F
 ;	2C50                      SUB     AL,50H
 ;	BF                        MOV     DI,xxxxH
 DISABLE_ORG_CDBIOS_FROM	DB		03CH,016H,07FH,004H,03CH,0FBH,07DH,01CH,02CH,050H,0BFH
 DISABLE_ORG_CDBIOS_FROM_END:
+
+DISABLE_ORG_CDBIOS_1_1_FROM	DB		03CH,016H,07FH,004H,03CH,0FBH,07DH,00FH,02CH,050H,0BFH
+DISABLE_ORG_CDBIOS_1_1_FROM_END:
 
 ;To:
 ;	B90100                    MOV     CX,1
@@ -107,8 +110,19 @@ INJECT_YSSCSICD_INSTALL_CALLBACK	PROC
 						POP		ES
 						MOV		DI,OFFSET DISABLE_ORG_CDBIOS_FROM
 						CALL	FIND_SOURCE_PATTERN
+						JNC		CDBIOS_ENTRY_FOUND
+
+						MOV		AX,0050H
+						MOV		DS,AX			; Target 0040:0000
+						MOV		DX,2000H		; 16 times 2000h = 128KB target size
+						MOV		CX,OFFSET DISABLE_ORG_CDBIOS_1_1_FROM_END-OFFSET DISABLE_ORG_CDBIOS_1_1_FROM
+						PUSH	CS
+						POP		ES
+						MOV		DI,OFFSET DISABLE_ORG_CDBIOS_1_1_FROM
+						CALL	FIND_SOURCE_PATTERN
 						JC		CDBIOS_ENTRY_NOT_FOUND
 
+CDBIOS_ENTRY_FOUND:
 						;DS:SI is the source pattern location in FBIOS.
 						PUSH	DS
 						POP		ES
@@ -743,6 +757,28 @@ IOSYS_INTERCEPT			ENDP
 
 
 CHECK_INTERNAL_CD_READY	PROC
+						MOV		ECX,2000000
+						MOV		DX,04C0H
+
+WAIT_CDC_READY:
+						IN		AL,DX
+						AND		AL,1
+						JNE		INTERNAL_CD_CONTROLLER_READY	; CDC is ready to accept a command
+
+						OUT		06Ch,AL		; Wait 1us.  For earlier models, don't worry.  CPU is slow enough.
+
+						DEC		ECX
+						JNE		WAIT_CDC_READY
+
+						; If CDC doesn't become ready in 2 seconds, probably the drive is removed.
+						STC
+						RET
+
+
+
+
+
+INTERNAL_CD_CONTROLLER_READY:
 						MOV		AX,0EC0h
 						XOR		CX,CX
 
