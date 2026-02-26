@@ -81,14 +81,6 @@ PATCH_RUN386_INNER_LOOP:
 
 
 PATCH_RUN386_FOUND:		MOV		BYTE PTR [SI-1],0B8H		; CALL ????????  -> MOV EAX,????????
-						OUT		0EBh,AL		; Tsugaru Status Message.  Use brkon iow EB to break.
 						RET
 
 PATCH_RUN386			ENDP
-
-
-PATCH_DRIVE_R			PROC
-
-						RET
-
-PATCH_DRIVE_R			ENDP

@@ -97,6 +97,19 @@ DISABLE_ORG_CDBIOS_TO_END:
 
 
 
+; Disable CD-ROM Caps Check.
+;	0EFE:0000070B BAC004                    MOV     DX,04C0H
+;	0EFE:0000070E EC                        IN      AL,DX
+;	0EFE:0000070F A801                      TEST    AL,01H
+;	0EFE:00000711 750B                      JNE     0000071E
+;	0EFE:00000713 51                        PUSH    CX
+;	0EFE:00000714 B91E00                    MOV     CX,001EH
+;	0EFE:00000717 CDFD                      INT     FDH (Wait CX*10us)
+;	0EFE:00000719 59                        POP     CX
+;	0EFE:0000071A E2EF                      LOOP    0000070B  ->  33C9 XOR     CX,CX
+DISABLE_CDROM_CAPS_CHECK	DB	0BAh,0C0h,004h,0ECh,0A8h,001h,075h,00Bh,051h,0B9h,01Eh,000h,0CDh,0FDh,059h,0E2h,0EFh
+DISABLE_CDROM_CAPS_CHECK_END:
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 INJECT_YSSCSICD_INSTALL_CALLBACK	PROC
@@ -133,8 +146,24 @@ CDBIOS_ENTRY_FOUND:
 						PUSH	CS
 						POP		DS
 						REP		MOVSB
-
 CDBIOS_ENTRY_NOT_FOUND:
+
+
+
+
+						MOV		AX,0050H
+						MOV		DS,AX			; Target 0040:0000
+						MOV		DX,2000H		; 16 times 2000h = 128KB target size
+						MOV		CX,OFFSET DISABLE_CDROM_CAPS_CHECK_END-OFFSET DISABLE_CDROM_CAPS_CHECK
+						PUSH	CS
+						POP		ES
+						MOV		DI,OFFSET DISABLE_CDROM_CAPS_CHECK
+						CALL	FIND_SOURCE_PATTERN
+						JC		CDROM_CAPS_CHECK_NOT_FOUND
+
+						MOV		WORD PTR DS:[SI+OFFSET DISABLE_CDROM_CAPS_CHECK_END-OFFSET DISABLE_CDROM_CAPS_CHECK-2],0C933H
+
+CDROM_CAPS_CHECK_NOT_FOUND:
 
 
 						MOV		AX,0050H
