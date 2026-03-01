@@ -55,50 +55,21 @@ Amiga版では、ラスボス戦で、背景にタイムトンネルみたいなのが表示されますが、TOWNS
 
 Rocket Ranger is one of the games that should be permanently remembered as a game that impacted the history of the video game.  And, it was very lucky for FM TOWNS users that the game was available for the platform.  However, FM TOWNS port was bugged.
 
+This patch fixes following bugs and issues.
 
-1. Opening DEMO Crashes if you start in the FAST mode.
+(1) Opening BGM Crash
+If the game is started in FAST mode, the opening movie finishes before the music. The program then attempts to load the "Main Theme" while the opening music is still playing, causing an audio interrupt handler crash. While the game "miraculously" continues to run, the audio remains broken. This patch ensures the music transitions correctly.
 
-If you start Rocket Ranger in the FAST mode, the opening movie runs too fast relative to the BGM.  Then, the program tries to load the main-theme music while the intro BGM is still playing, and the program crashes.
+(2) Interrogation Scene Logic Error
+During the movie scene where the Rocket Ranger and Jane are interrogated, making the wrong choices would abruptly warp the player to the destination/SOS screen without explanation. This created a narrative plot hole, as a prisoner of war should not have access to a rocket pack or radio.  The original code correctly loaded the "Captured" message ID into the EAX register, but the programmer forgot to call the function to display that text and wait for a button press. This patch restores the missing dialogue and transition.
 
-However, miraculously the game program continues.  But, In-Service Regiser of PIC is not cleared.  Therefore, once crashed, the game continues without music.
+(3) Fort Dix Theme Loop
+In the original FM Towns release, the Fort Dix main theme would play only once during the entire game. If the player returned to the base later, the scene would be silent. To match the Amiga version’s behavior, this patch ensures the theme plays every time the Rocket Ranger returns to Fort Dix.
 
-I didn't know about it in 199x (I think it was 1993 when I tried it for the first time).  I felt that Rocket Ranger was a silent game because I did not hear music.
-
-One of the reasons why Rocket Ranger should be remembered is its superb music.  I didn't know it had such a nice music until 2025.
-
-Maybe other FM TOWNS users did not know there Rocket Ranger had a music.  If you are one of such FM TOWNS and Rocket Ranger users, try this patch, and play again on the real hardware or FM TOWNS emulator Tsugaru.  Now you can listen to one of the greates game music in history.
-
-
-
-2. Fort Dix BGM plays only once after the opening demo.
-
-In Amiga version, it plays Fort Dix theme BGM every time you come back to Fort Dix.  But, FM TOWNS version plays only once after the opening demo.
-
-You will hear Fort Dix BGM every time you come back to the home base after this patch.
+(4) Boss Battle Background Restoration
+In the FM Towns version, the boss battle took place against a blank, black background. Interestingly, the bitmap data for the background existed in the executable and was even being rendered for exactly one frame before disappearing. This patch fixes the draw calls so the background remains visible throughout the entire battle, bringing it in line with the Amiga version’s visuals.
 
 
-
-3. Interrogation scene bug
-
-When you fly for rescue Jane and the doctor and be captured.  You will be interrogated by Colonel Leermeister.  If you make wrong choices, you are tortured and then taken to the prisoner camp, and you eventually escape.
-
-But, in FM TOWNS version, if you make wrong choices, you are suddenly taken to the screen in which you can choose the next destination, or you can send SOS signal.  What's the F**K?  I was in the interrogation room, and all of a sudden, I was free!?  What happened to me?
-
-There is a text explaining what happened in the code, but the programmer who ported it to FM TOWNS was setting the message ID 00000036H in EAX register but apparently forgot calling a function to show it on the screen.
-
-This patch will fix this problem.
-
-But, even the text did not explain how you got back your rocket pack.  There was a discontinuity in the game scenario here anyway.
-
-
-
-4. Background during the last-boss battle.
-
-The Amiga version had a background like a time tunnel during the last-boss battle.  FM TOWNS version had no background.
-
-But, FM TOWNS version had a bitmap pattern of the background.  It is shown only for the one frame at the beginning of the last-boss battle.
-
-This patch will make it visible during the last-boss battle.  Unfortunately it does not do palette animation like the Amiga version.
 
 
 
