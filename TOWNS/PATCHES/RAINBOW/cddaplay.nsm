@@ -1,0 +1,134 @@
+					BITS	32
+
+JUMP_TABLE			EQU		0000789AH
+TOC_TABLE			EQU		00022550H
+PLAYING_TRACK		EQU		00022E06H
+
+FUNC_READTOC		EQU		000078B6H
+FUNC_COPY_PROT		EQU		00007902H
+OVERRIDE_TOP		EQU		00007972H
+
+					CALL	CAPTURE_EIP
+CAPTURE_EIP:		POP		ESI			; ESI is CAPTURE_EIP
+					MOV		EAX,ESI
+					ADD		ESI,(PATCH_CODE_BEGIN-CAPTURE_EIP)
+					MOV		EDI,JUMP_TABLE
+					MOV		ECX,(CDDACODE_TOP-PATCH_CODE_BEGIN)
+					REP		MOVSB
+
+					MOV		EDI,OVERRIDE_TOP
+					LEA		ESI,[EAX+CDDACODE_TOP-CAPTURE_EIP]
+					MOV		ECX,(PATCH_CODE_END-CDDACODE_TOP)
+					REP		MOVSB
+
+					RET
+
+; Table at 000C:001A7FFD
+PATCH_CODE_BEGIN:
+TABLE_BEGIN:
+					; Different command number from Chase HQ.
+					; Also ES not pushed.
+					DD		FUNC_READTOC
+					DD		OVERRIDE_TOP+(CDDAPLAYNOLOOP -CDDACODE_TOP)
+					DD		OVERRIDE_TOP+(CDDAPLAYLOOP -CDDACODE_TOP)
+					DD		OVERRIDE_TOP+(CDDASTOP -CDDACODE_TOP)
+					DD		FUNC_COPY_PROT
+					DD		OVERRIDE_TOP+(CDDAPAUSE -CDDACODE_TOP)
+					DD		OVERRIDE_TOP+(CDDARESUME-CDDACODE_TOP)
+
+
+CDDACODE_TOP:
+
+CDDAPLAYLOOP:
+					MOV		CH,0FFH	; CH=FF, CH=01  Repeat indefinite
+					JMP		SHORT CDDAPLAY
+
+CDDAPLAYNOLOOP:
+					MOV		CH,00H	; CH=00, CH=01  No repeat
+
+CDDAPLAY:
+					PUSH	ES
+					MOV		[PLAYING_TRACK],AL
+
+					SUB		ESP,14H		; Make a register table for INT 21H AX=2511H
+
+					MOVZX	EAX,AL
+					LEA		EAX,[EAX+EAX*2]
+					LEA		ESI,[EAX*2+TOC_TABLE];
+
+					MOV		BX,1
+					MOV		AX,25C0h	; DOS Alloc -> AX=segment
+					INT		21H			; It shouldn't change ECX.  High-24bits of ECX is stil zero.
+					JC		CDDAPLAY_EXIT
+
+					; ECX still should be 0001H or FF01H
+
+					; Set Up INT 93H via INT 21H AX=2511H before forgetting the real-mode segment.
+					MOV		WORD [ESP],93H			; INT 93H
+					MOV		[ESP+2],AX				; DS in the real mode
+					MOV		WORD [ESP+0AH],50C0H	; 50H CDDA Play
+
+					MOV		BX,060h		; DOS Extender GDT 0060H DOS memory space.
+					MOV		ES,BX		; ES is backed up above, so don't worry about destroying it.
+					MOVZX	EDI,AX
+					SHL		EDI,4
+
+					MOV		BH,6
+BCD2BIN_LOOP:		LODSB
+
+					; BCD2BIN >>>>
+					MOV		BL,AL
+
+					SHR		AL,4
+					MOV		AH,10
+					MUL		AH		; Make AL is 10*high_digit
+
+					AND		BL,0Fh
+					ADD		AL,BL
+					; BCD2BIN <<<<
+
+					STOSB
+					DEC		BH
+					JNE		BCD2BIN_LOOP
+
+					PUSH	ECX
+					MOV		AX,52C0h
+					XOR		CX,CX
+					INT		93H			; CDDA Stop
+					POP		ECX
+
+					XOR		EDI,EDI
+					MOV		EDX,ESP		; DS:EDX is parameter block, already set up above.
+					MOV		CL,1		; CH is set above
+					MOV		AX,2511H	; Call Real Mode INT
+					INT		21H
+
+					MOV		CX,[ESP+2]				; Recover real-mode segment.  Fetch it before PUSH EAX.
+					PUSH	EAX			; Save return value.
+					MOV		AX,25C1h	; DOS Free <- CX=segment
+					INT		21H
+					POP		EAX
+
+CDDAPLAY_EXIT:
+					ADD		ESP,14H
+					POP		ES
+					RET
+
+
+CDDASTOP:
+					MOV		AX,52C0H
+					JMP		SHORT CALLINT93H
+
+CDDAPAUSE:
+					MOV		AX,55C0H
+					JMP		SHORT CALLINT93H
+
+CDDARESUME:
+					MOV		AX,56C0H
+CALLINT93H:
+					XOR		ECX,ECX
+					INT		93H
+					RET
+
+
+PATCH_CODE_END:
