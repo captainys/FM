@@ -958,7 +958,7 @@ int main(int ac,char *av[])
 	unsigned char buf[2352];
 	while(2352==fread(buf,1,2352,fp))
 	{
-		auto applied[]=
+		int applied[]=
 		{
 			ApplyPatch(2352,buf,sizeof(RIEXPFileSize_from),RIEXPFileSize_from,sizeof(RIEXPFileSize_to),RIEXPFileSize_to),
 			ApplyPatch(2352,buf,sizeof(EXPHeader_1_from),EXPHeader_1_from,sizeof(EXPHeader_1_to),EXPHeader_1_to),
