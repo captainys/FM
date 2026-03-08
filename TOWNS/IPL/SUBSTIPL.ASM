@@ -525,6 +525,11 @@ MSG_DEMOSPLASH_3		DB		"http://demosplash.org",0
 						INCLUDE		MEMBANK.ASM
 						INCLUDE		PATCH.ASM
 						INCLUDE		CRTC.ASM
+
+						; Question:
+						; Does 386SX model load the IPL from SCSI CD?
+						; It is known that it does not load IPL from internal CD, it instead uses its own IPL in the SYSROM.
+
 						INCLUDE		386SX.ASM
 						INCLUDE		../MISCLIB/UNREAL.ASM
 
