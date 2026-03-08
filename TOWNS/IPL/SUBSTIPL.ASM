@@ -158,6 +158,7 @@ FIND_FBIOS_INTERNAL_CD_NOT:
 SCSICDBOOT:
 						PUSh	BX
 						MOV		BX,8000H
+						MOV		CX,OFFSET END_OF_THE_WORLD
 						CALL	TRANSFER_SELF
 						POP		BX
 
@@ -259,9 +260,9 @@ LOADED_IOSYS:
 						MOV		SI,OFFSET MSG_LOADED_IOSYS
 						CALL	PRINT_TALL
 
-						; CALL	DO_386SX_THINGS
+						CALL	DO_386SX_THINGS
 
-						; CALL	PATCH_V21L20
+						CALL	PATCH_V21L20
 
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -366,7 +367,7 @@ IOSYS_INTERCEPT			PROC
 						CLD
 
 
-						; CALL	UNPATCH_V21L20
+						CALL	UNPATCH_V21L20
 
 						TEXTLOCATION	28H,00H
 						MOV		SI,OFFSET IOSYS_INTERCEPTED_MSG
@@ -403,6 +404,7 @@ MALLOCED_SPACE_FOR_YSSCSICD:
 
 						MOV		CS:[YSSCSICD_INSTALL_CS],AX
 						MOV		BX,AX
+						MOV		CX,(OFFSET SCSI_DATA_BUF)+SCSI_DATA_BUF_LENGTH
 						CALL	TRANSFER_SELF
 
 						MOV		AL,CS:[YSSCSICD_SCSI_ID]
@@ -514,8 +516,8 @@ MSG_DEMOSPLASH_3		DB		"http://demosplash.org",0
 						INCLUDE		MEMBANK.ASM
 						INCLUDE		PATCH.ASM
 						INCLUDE		CRTC.ASM
-						; INCLUDE		386SX.ASM
-						; INCLUDE		../MISCLIB/UNREAL.ASM
+						INCLUDE		386SX.ASM
+						INCLUDE		../MISCLIB/UNREAL.ASM
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -601,6 +603,7 @@ FIND_JUMP_INSTRUCTION	ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+; CX: Bytes
 TRANSFER_SELF			PROC
 						PUSH	ES
 						PUSH	DS
@@ -613,7 +616,6 @@ TRANSFER_SELF			PROC
 						MOV		ES,BX
 						XOR		SI,SI
 						XOR		DI,DI
-						MOV		CX,OFFSET END_OF_THE_WORLD
 						REP		MOVSB
 
 						POP		CX
