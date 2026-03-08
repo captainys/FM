@@ -178,6 +178,7 @@ SCSICDBOOT_CONTINUE:
 						MOV		SI,OFFSET MSG_DIRECT_SCSI_CD_BOOT
 						CALL	PRINT_TALL
 
+						CALL	WAIT_SCSI_CD_READY
 
 						TEXTLOCATION	1,2
 						MOV		SI,OFFSET MSG_LOOKING_FOR_IOSYS
@@ -258,7 +259,9 @@ LOADED_IOSYS:
 						MOV		SI,OFFSET MSG_LOADED_IOSYS
 						CALL	PRINT_TALL
 
+						; CALL	DO_386SX_THINGS
 
+						; CALL	PATCH_V21L20
 
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -338,65 +341,6 @@ MAIN					ENDP
 
 
 
-; Input
-;   CL    SCSI ID
-;   EDX   Starting Sector
-;   BX    Number of Sectors
-;   EDI   Data Buffer Physical Address
-;   DS=CS
-; Output
-;   CF    Set if error
-;   AX    Return from SCSI
-SCSI_READ_SECTOR		PROC
-
-						MOV		SI,OFFSET SCSI_CMD
-						AND		CL,7
-						MOV		BYTE PTR [SI+1],0 ; Looks like Logical Unit ID needs to be zero.
-
-						MOV		[SI+4],DH
-						MOV		[SI+5],DL
-						ROR		EDX,16
-						MOV		[SI+2],DH
-						MOV		[SI+3],DL
-
-						MOV		[SI+7],BH
-						MOV		[SI+8],BL
-
-						CALL	SCSI_COMMAND
-
-						CMP		AH,SCSI_STATUS_CHECK_CONDITION
-						JNE		SHORT SCSI_READ_SECTOR_RETURN
-						CALL	SCSI_SENSE
-						STC
-						RET
-
-SCSI_READ_SECTOR_RETURN:
-						CLC
-						RET
-
-SCSI_READ_SECTOR		ENDP
-
-
-
-; Input
-;   CL SCSI ID
-SCSI_SENSE				PROC
-						PUSH	DS
-
-						PUSH	CS
-						POP		DS
-						AND		CL,7
-						MOV		SI,OFFSET SCSI_SENSE_CMD
-						MOV		EDI,0400H ; Just throw away.
-						CALL	SCSI_COMMAND
-						POP		DS
-						RET
-
-SCSI_SENSE				ENDP
-
-SCSI_SENSE_CMD			DB	03H,0,0,0,18,0
-
-
 
 ; IOSYS_INTERCEPT <-> IOSYS_INTERCEPT in CDBOOT.ASM
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -420,6 +364,9 @@ IOSYS_INTERCEPT			PROC
 						POP		DS
 
 						CLD
+
+
+						; CALL	UNPATCH_V21L20
 
 						TEXTLOCATION	28H,00H
 						MOV		SI,OFFSET IOSYS_INTERCEPTED_MSG
@@ -567,6 +514,8 @@ MSG_DEMOSPLASH_3		DB		"http://demosplash.org",0
 						INCLUDE		MEMBANK.ASM
 						INCLUDE		PATCH.ASM
 						INCLUDE		CRTC.ASM
+						; INCLUDE		386SX.ASM
+						; INCLUDE		../MISCLIB/UNREAL.ASM
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -674,6 +623,106 @@ TRANSFER_SELF			PROC
 						POP		ES
 						RET
 TRANSFER_SELF			ENDP
+
+
+
+WAIT_SCSI_CD_READY		PROC
+
+						TEXTLOCATION	00H,0AH
+						MOV		SI,OFFSET WAIT_SCSI_CD_READY_MSG
+						CALL	PRINT_TALL
+
+@@:
+						CALL	BUSY_WAIT_FFFFH
+
+						MOV		SI,OFFSET SCSI_TEST_UNIT_READY_CMD
+						MOV		EDI,0400H ; Throw away.
+						MOV		CL,CS:[YSSCSICD_SCSI_ID]
+						CALL	SCSI_COMMAND
+						AND		AH,AH
+						JNE		@b
+
+						TEXTLOCATION	00H,0AH
+						CALL	ERASE_LINE_TALL
+
+						RET
+
+WAIT_SCSI_CD_READY		ENDP
+
+WAIT_SCSI_CD_READY_MSG	DB		"WAITING SCSI CD READY",0
+
+SCSI_TEST_UNIT_READY_CMD			DB	00H,0,0,0,0,0
+
+
+
+
+BUSY_WAIT_FFFFH			PROC
+						PUSH	CX
+						MOV		CX,0FFFFH
+@@:
+						LOOP	@b
+						POP		CX
+						RET
+BUSY_WAIT_FFFFH			ENDP
+
+
+; Input
+;   CL    SCSI ID
+;   EDX   Starting Sector
+;   BX    Number of Sectors
+;   EDI   Data Buffer Physical Address
+;   DS=CS
+; Output
+;   CF    Set if error
+;   AX    Return from SCSI
+SCSI_READ_SECTOR		PROC
+
+						MOV		SI,OFFSET SCSI_CMD
+						AND		CL,7
+						MOV		BYTE PTR [SI+1],0 ; Looks like Logical Unit ID needs to be zero.
+
+						MOV		[SI+4],DH
+						MOV		[SI+5],DL
+						ROR		EDX,16
+						MOV		[SI+2],DH
+						MOV		[SI+3],DL
+
+						MOV		[SI+7],BH
+						MOV		[SI+8],BL
+
+						CALL	SCSI_COMMAND
+
+						CMP		AH,SCSI_STATUS_CHECK_CONDITION
+						JNE		SHORT SCSI_READ_SECTOR_RETURN
+						CALL	SCSI_SENSE
+						STC
+						RET
+
+SCSI_READ_SECTOR_RETURN:
+						CLC
+						RET
+
+SCSI_READ_SECTOR		ENDP
+
+
+
+; Input
+;   CL SCSI ID
+SCSI_SENSE				PROC
+						PUSH	DS
+
+						PUSH	CS
+						POP		DS
+						AND		CL,7
+						MOV		SI,OFFSET SCSI_SENSE_CMD
+						MOV		EDI,0400H ; Just throw away.
+						CALL	SCSI_COMMAND
+						POP		DS
+						RET
+
+SCSI_SENSE				ENDP
+
+SCSI_SENSE_CMD			DB	03H,0,0,0,18,0
 
 
 ; <<
