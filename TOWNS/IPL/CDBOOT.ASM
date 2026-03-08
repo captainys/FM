@@ -687,6 +687,8 @@ BUSY_WAIT_FFFFH			ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; IOSYS_INTERCEPT <-> IOSYS_INTERCEPT in SUBSTIPL.ASM
+
 
 ; Intercept IO.SYS jump to MSDOS.SYS
 IOSYS_INTERCEPT			PROC

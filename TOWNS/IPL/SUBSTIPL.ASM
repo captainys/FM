@@ -179,6 +179,10 @@ SCSICDBOOT_CONTINUE:
 						CALL	PRINT_TALL
 
 
+						TEXTLOCATION	1,2
+						MOV		SI,OFFSET MSG_LOOKING_FOR_IOSYS
+						CALL	PRINT_TALL
+
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -211,6 +215,12 @@ FBIOS_NOT_FOUND:
 SCSI_FIND_FBIOS_SECTOR_FOUND:
 
 
+						PUSH	EDX
+						TEXTLOCATION	1,3
+						MOV		SI,OFFSET MSG_FOUND_IOSYS
+						CALL	PRINT_TALL
+						POP		EDX
+
 
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -218,12 +228,20 @@ SCSI_FIND_FBIOS_SECTOR_FOUND:
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						; Read FBIOS (IO.SYS)
 						; EDX is the LBA for FBIOS.
-						; Actually, SCSI_CMD is pointing FBIOS already.
-						MOV		SI,OFFSET SCSI_CMD
-						MOV		BYTE PTR [SI+8],64
+
+						; Input
+						;   CL    SCSI ID
+						;   EDX   Starting Sector
+						;   BX    Number of Sectors
+						;   EDI   Data Buffer Physical Address
+						;   DS=CS
+						; Output
+						;   CF    Set if error
+						;   AX    Return from SCSI
+						MOV		BX,64
 						MOV		EDI,0400H
 						MOV		CL,[YSSCSICD_SCSI_ID]
-						CALL	SCSI_COMMAND
+						CALL	SCSI_READ_SECTOR
 						JAE		LOADED_IOSYS
 
 IOSYS_LOAD_FAILURE:
@@ -236,6 +254,9 @@ IOSYS_LOAD_FAILURE:
 
 
 LOADED_IOSYS:
+						TEXTLOCATION	1,4
+						MOV		SI,OFFSET MSG_LOADED_IOSYS
+						CALL	PRINT_TALL
 
 
 
@@ -277,20 +298,25 @@ FIND_FBIOS_SCSI_CD:
 						PUSH	ECX
 						PUSH	EDX
 
-						MOV		SI,OFFSET SCSI_CMD
-						MOV		EDI,0400H
-						MOV		[SI+4],DH
-						MOV		[SI+5],DL
-						ROR		EDX,16
-						MOV		[SI+2],DH
-						MOV		[SI+3],DL
-						ROR		EDX,16
+						; Input
+						;   CL    SCSI ID
+						;   EDX   Starting Sector
+						;   BX    Number of Sectors
+						;   EDI   Data Buffer Physical Address
+						;   DS=CS
+						; Output
+						;   CF    Set if error
+						;   AX    Return from SCSI
 						MOV		CL,[YSSCSICD_SCSI_ID]
-						CALL	SCSI_COMMAND
+						MOV		BX,1
+						MOV		EDI,0400H
+						CALL	SCSI_READ_SECTOR
 
 						POP		EDX
 						POP		ECX
 						POP		EAX
+
+						JC		FIND_FBIOS_SCSI_CD_NOT
 
 						CMP		DWORD PTR FS:[0],4F494246H ; "FBIO"
    						JNE		FIND_FBIOS_SCSI_CD_NOT
@@ -311,6 +337,68 @@ MAIN					ENDP
 
 
 
+
+; Input
+;   CL    SCSI ID
+;   EDX   Starting Sector
+;   BX    Number of Sectors
+;   EDI   Data Buffer Physical Address
+;   DS=CS
+; Output
+;   CF    Set if error
+;   AX    Return from SCSI
+SCSI_READ_SECTOR		PROC
+
+						MOV		SI,OFFSET SCSI_CMD
+						AND		CL,7
+						MOV		BYTE PTR [SI+1],0 ; Looks like Logical Unit ID needs to be zero.
+
+						MOV		[SI+4],DH
+						MOV		[SI+5],DL
+						ROR		EDX,16
+						MOV		[SI+2],DH
+						MOV		[SI+3],DL
+
+						MOV		[SI+7],BH
+						MOV		[SI+8],BL
+
+						CALL	SCSI_COMMAND
+
+						CMP		AH,SCSI_STATUS_CHECK_CONDITION
+						JNE		SHORT SCSI_READ_SECTOR_RETURN
+						CALL	SCSI_SENSE
+						STC
+						RET
+
+SCSI_READ_SECTOR_RETURN:
+						CLC
+						RET
+
+SCSI_READ_SECTOR		ENDP
+
+
+
+; Input
+;   CL SCSI ID
+SCSI_SENSE				PROC
+						PUSH	DS
+
+						PUSH	CS
+						POP		DS
+						AND		CL,7
+						MOV		SI,OFFSET SCSI_SENSE_CMD
+						MOV		EDI,0400H ; Just throw away.
+						CALL	SCSI_COMMAND
+						POP		DS
+						RET
+
+SCSI_SENSE				ENDP
+
+SCSI_SENSE_CMD			DB	03H,0,0,0,18,0
+
+
+
+; IOSYS_INTERCEPT <-> IOSYS_INTERCEPT in CDBOOT.ASM
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -456,6 +544,9 @@ SCSI_DATA_BUF			DB		0
 INT_21_AH_48_LEN	EQU	14
 INT_21_AH_48_PTN	DB	08BH,0D8H,083H,0C3H,010H,0B4H,048H,0CDH,021H,005H,010H,000H,02EH,0A3H
 
+MSG_LOOKING_FOR_IOSYS	DB		"LOOKING FOR IO.SYS",0
+MSG_FOUND_IOSYS			DB		"FOUND IO.SYS",0
+MSG_LOADED_IOSYS		DB		"LOADED IO.SYS",0
 IOSYS_INTERCEPTED_MSG	DB		"INTERCEPTED IO.SYS.",0
 INSTALLED_HOOK_MSG		DB		"INSTALLED INT 93H HOOK.",0
 CANNOT_MALLOC			DB		"MALLOC FAILED, CANNOT INSTALL YSSCSICD",0
