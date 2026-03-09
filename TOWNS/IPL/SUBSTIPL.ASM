@@ -7,6 +7,11 @@
 						ASSUME	CS:DATA_CODE,DS:DATA_CODE
 
 
+; When overwrite an ISO or IMG, make sure to copy 0020H to 0027H to the Subst IPL.
+; Towns OS V2.1 L20 is expecting DRIVE_R.IMG is certain sectors after IO.SYS.
+; Unless IO.SYS location is correctly written in 0020H (DWORD), it fails to start.
+
+
 						.386p
 
 						PAGE	99,160
@@ -28,8 +33,9 @@ MAIN					PROC
 						JMP		SHORT REALMAIN
 
 						ORG		0020H
-						DD		0	; LBA of IO.SYS (FBIOS) to be set.
-						DD		64	; Sector count
+IOSYS_LBA				DD		0	; LBA of IO.SYS (FBIOS) to be set.
+IOSYS_SECTCOUNT			DD		64	; Sector count
+
 
 REALMAIN:
 						CLI
@@ -87,7 +93,7 @@ INTERNAL_FIND_FBIOS_SECTOR_FOUND:
 
 						MOV		AX,05C0H	; Read Sector, Device=C0H
 						XOR		CX,CX		; CH must be 0, CL=High-byte of LBA
-						MOV		BX,64
+						MOV		BX,CS:[IOSYS_SECTCOUNT]
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
 						DB			9AH		; CALLF FFFB:0014
 						DW			 0014H
@@ -358,86 +364,9 @@ PREP_YSSCSICD_INSTALL	MACRO
 						ENDM
 
 
-; IOSYS_INTERCEPT <-> IOSYS_INTERCEPT in CDBOOT.ASM
-						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-						;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-						;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-						; IO.SYS Intercept
-; Intercept IO.SYS jump to MSDOS.SYS
-IOSYS_INTERCEPT			PROC
-						; Do what's replaced by CALLF 8000:IOSYS_INTERCEPT >>
-						INT     21H
-						ADD     AX,0010H
-						; Do what's replaced by CALLF 8000:IOSYS_INTERCEPT <<
+						; IOSYS_INTERCEPT is written in here.
+						INCLUDE	IOSYSINT.ASM
 
-						PUSHF
-						PUSH	DS
-						PUSH	ES
-						PUSHA
-
-						PUSH	CS
-						POP		DS
-
-						CLD
-
-
-						CALL	UNPATCH_V21L20
-
-						TEXTLOCATION	28H,00H
-						MOV		SI,OFFSET IOSYS_INTERCEPTED_MSG
-						CALL	PRINT_TALL
-
-						CALL	DEMOSPLASH_MESSAGE
-
-						CALL	DRAW_AOMORI
-
-						; Turned out MSDOS.SYS is copied to the conventional memory, but not installed yet.
-						; It is possible to patch at this time, but not doing it any more.
-
-						; At this time, it is safe to use MALLOC
-						CALC_YSSCSICD_ALLOC_SIZE
-						MOV		AH,48H
-						INT		21H
-						JNC		MALLOCED_SPACE_FOR_YSSCSICD
-
-						TEXTLOCATION	28H,01H
-						MOV		SI,OFFSET CANNOT_MALLOC
-						CALL	PRINT_TALL
-						JMP		SHORT IOSYS_INTERCEPT_EXIT
-
-MALLOCED_SPACE_FOR_YSSCSICD:
-						; AX is the segment.
-						; IO.SYS assumes that the PSP owner of the memory control block allocated
-						; during the initialization is this segment.
-						DEC		AX
-						MOV		ES,AX
-						INC		AX
-						MOV		ES:[0001h],AX
-						; Unless doing it, IO.SYS will go into infinite loop for searching last MCB.
-
-						PREP_YSSCSICD_INSTALL
-						CALL	DWORD PTR CS:[YSSCSICD_INSTALL_IP]
-
-						PUSH	CS
-						POP		DS
-						TEXTLOCATION	28H,01H
-						MOV		SI,OFFSET INSTALLED_HOOK_MSG
-						CALL	PRINT_TALL
-
-IOSYS_INTERCEPT_EXIT:
-						POPA
-						POP		ES
-						POP		DS
-						POPF
-
-						RETF
-
-IOSYS_INTERCEPT			ENDP
-
-IOSYS_INTERCEPTED_MSG	DB		"INTERCEPTED IO.SYS.",0
-INSTALLED_HOOK_MSG		DB		"INSTALLED INT 93H HOOK.",0
-CANNOT_MALLOC			DB		"MALLOC FAILED, CANNOT INSTALL YSSCSICD",0
 
 YSSCSICD_INSTALL_IP		DW		OFFSET INSTALL_HOOK_DIRECT
 YSSCSICD_INSTALL_CS		DW		0
@@ -515,8 +444,8 @@ MSG_FBIOS_NOT_FOUND		DB		"IO.SYS NOT FOUND",0
 MSG_IOSYS_READ_FAILURE	DB		"FAILED TO LOAD IO.SYS",0
 MSG_JUMP_INST_NOT_FOUND	DB		"JUMP INSTRUCTION NOT FOUND",0
 
-MSG_DEMOSPLASH_1		DB		"PLEASE JOIN US AT DEMOSPLASH 2022",0
-MSG_DEMOSPLASH_2		DB		"AND 2023, 2024, ...",0
+MSG_DEMOSPLASH_1		DB		"PLEASE JOIN US AT DEMOSPLASH 2026",0
+MSG_DEMOSPLASH_2		DB		"AND 2027, 2028, ...",0
 MSG_DEMOSPLASH_3		DB		"http://demosplash.org",0
 
 						INCLUDE		../RESOURCE/AOMORI.ASM
@@ -529,6 +458,7 @@ MSG_DEMOSPLASH_3		DB		"http://demosplash.org",0
 						; Question:
 						; Does 386SX model load the IPL from SCSI CD?
 						; It is known that it does not load IPL from internal CD, it instead uses its own IPL in the SYSROM.
+						; If it does not, there is little point to keep 386SX support in this 
 
 						INCLUDE		386SX.ASM
 						INCLUDE		../MISCLIB/UNREAL.ASM
