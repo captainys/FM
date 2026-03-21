@@ -9,9 +9,9 @@
 
 extern void RS232C_STI(void);
 extern void RS232C_CLI(void);
-extern void RS232C_INIT(int baudRate); // 2:38400bps  4:19200bps
-extern int RS232C_GETC(void); // Return value<0 means no data.
-extern void RS232C_PUTC(int byteData);
+extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
+extern int RS232C_GETC(int COMPort); // Return value<0 means no data.
+extern void RS232C_PUTC(int COMPort,int byteData);
 
 void Wait10ms(void)
 {
@@ -25,7 +25,7 @@ void Wait10ms(void)
 unsigned int nBuffFilled=0;
 unsigned char buffer[BUFFER_SIZE];
 
-void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
+void XModemReceive(const char fName[],int port,int baud,int checkSumOrCrc)
 {
 	FILE *fp=fopen(fName,"wb");
 	if(NULL==fp)
@@ -35,15 +35,15 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 	}
 
 	RS232C_CLI();
-	RS232C_INIT(baud);
+	RS232C_INIT(port,baud);
 
 	switch(checkSumOrCrc)
 	{
 	case XMODEM_MODE_CHECKSUM:
-		RS232C_PUTC(XMODEM_NAK);
+		RS232C_PUTC(port,XMODEM_NAK);
 		break;
 	case XMODEM_MODE_CRC:
-		RS232C_PUTC(XMODEM_C);
+		RS232C_PUTC(port,XMODEM_C);
 		break;
 	}
 
@@ -58,14 +58,14 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 		// Wait for SOH or EOT
 		for(;;)
 		{
-			int c=RS232C_GETC();
+			int c=RS232C_GETC(port);
 			if(c==XMODEM_SOH)
 			{
 				break;
 			}
 			else if(c==XMODEM_EOT)
 			{
-				RS232C_PUTC(XMODEM_ACK); // End of Transmission
+				RS232C_PUTC(port,XMODEM_ACK); // End of Transmission
 				goto EOT;
 			}
 		}
@@ -74,7 +74,7 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 		for(i=0; i<2; ++i)
 		{
 			int c;
-			while((c=RS232C_GETC())<0)
+			while((c=RS232C_GETC(port))<0)
 			{
 			}
 			index[i]=c;
@@ -103,7 +103,7 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int i,c;
-				while((c=RS232C_GETC())<0)
+				while((c=RS232C_GETC(port))<0)
 				{
 				}
 				buffer[nBuffFilled++]=(unsigned char)c;
@@ -120,11 +120,11 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 			}
 
 			int c;
-			while((c=RS232C_GETC())<0)
+			while((c=RS232C_GETC(port))<0)
 			{
 			}
 			checkRecv=(c<<8);
-			while((c=RS232C_GETC())<0)
+			while((c=RS232C_GETC(port))<0)
 			{
 			}
 			checkRecv|=c;
@@ -134,7 +134,7 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int c;
-				while((c=RS232C_GETC())<0)
+				while((c=RS232C_GETC(port))<0)
 				{
 				}
 				buffer[nBuffFilled++]=(unsigned char)c;
@@ -142,7 +142,7 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 			}
 
 			int c;
-			while((c=RS232C_GETC())<0)
+			while((c=RS232C_GETC(port))<0)
 			{
 			}
 			checkRecv=c;
@@ -155,7 +155,7 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 			RS232C_STI();
 			Wait10ms();
 			RS232C_CLI();
-			RS232C_PUTC(XMODEM_NAK);
+			RS232C_PUTC(port,XMODEM_NAK);
 			nBuffFilled-=XMODEM_PACKET_SIZE;
 		}
 		else
@@ -169,7 +169,7 @@ void XModemReceive(const char fName[],int baud,int checkSumOrCrc)
 				nBuffFilled=0;
 				RS232C_CLI();
 			}
-			RS232C_PUTC(XMODEM_ACK);
+			RS232C_PUTC(port,XMODEM_ACK);
 		}
 	}
 EOT:
@@ -177,7 +177,7 @@ EOT:
 	clock_t clk0=clock(); // Might receive ETB
 	while(clock()-clk0<CLOCKS_PER_SEC/2)
 	{
-		int c=RS232C_GETC();
+		int c=RS232C_GETC(port);
 		if(0<=c)
 		{
 		}
@@ -210,13 +210,14 @@ int main(int ac,char *av[])
 		printf("Options:\n");
 		printf("  -19200bps   Slow down to 19200bps (default 38400bps)\n");
 		printf("  -checksum   Use XMODEM Checksum (default XMODEM CRC)\n");
+		printf("  -COM0 -COM1 -COM2 -COM3 -COM4  Select COM port.\n");
 		printf("Start XMODEM Transfer in the host, and then run this command.\n");
 		return 1;
 	}
 
 	int i;
 	char fName[512];
-	int baud=2;
+	int baud=2,port=0;
 	int mode=XMODEM_MODE_CRC;
 	fName[0]=0;
 	for(i=1; i<ac; ++i)
@@ -228,6 +229,18 @@ int main(int ac,char *av[])
 		else if(0==strcmp("-checksum",av[i]) || 0==strcmp("-CHECKSUM",av[i]))
 		{
 			mode=XMODEM_MODE_CHECKSUM;
+		}
+		else if(0==strncmp("-COM",av[i],4) || 0==strncmp("-com",av[i],4))
+		{
+			if('0'<=av[i][4] && av[i][4]<='4')
+			{
+				port=av[i][4]-'0';
+			}
+			else
+			{
+				printf("Port number needs to be between 0 and 4.\n");
+				return 1;
+			}
 		}
 		else
 		{
@@ -265,7 +278,7 @@ int main(int ac,char *av[])
 	}
 	printf("Download to %s\n",fName);
 
-	XModemReceive(fName,baud,mode);
+	XModemReceive(fName,port,baud,mode);
 
 	return 0;
 }

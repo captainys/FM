@@ -9,9 +9,9 @@
 
 extern void RS232C_STI(void);
 extern void RS232C_CLI(void);
-extern void RS232C_INIT(int baudRate); // 2:38400bps  4:19200bps
-extern int RS232C_GETC(void); // Return value<0 means no data.
-extern void RS232C_PUTC(int byteData);
+extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
+extern int RS232C_GETC(int COMPort); // Return value<0 means no data.
+extern void RS232C_PUTC(int COMPort,int byteData);
 
 void WaitMS(unsigned int ms)
 {
@@ -25,7 +25,7 @@ void WaitMS(unsigned int ms)
 unsigned int nBuffFilled=0;
 unsigned char buffer[BUFFER_SIZE];
 
-void XModemSend(const char fName[],int baud)
+void XModemSend(const char fName[],int port,int baud)
 {
 	FILE *fp=fopen(fName,"rb");
 	unsigned int sz=0;
@@ -43,11 +43,11 @@ void XModemSend(const char fName[],int baud)
 	WaitMS(500);
 
 	RS232C_CLI();
-	RS232C_INIT(baud);
+	RS232C_INIT(port,baud);
 
 
 	int c,checkSumOrCrc;
-	while((c=RS232C_GETC())<0)
+	while((c=RS232C_GETC(port))<0)
 	{
 	}
 	switch(c)
@@ -92,14 +92,14 @@ void XModemSend(const char fName[],int baud)
 
 		if(nBuffFilled<BUFFER_SIZE && nBuffFilled<=nBuffUsed)
 		{
-			RS232C_PUTC(XMODEM_EOT); // End of Transmission
+			RS232C_PUTC(port,XMODEM_EOT); // End of Transmission
 			break;
 		}
 
 
-		RS232C_PUTC(XMODEM_SOH);
-		RS232C_PUTC(count);
-		RS232C_PUTC(~count);
+		RS232C_PUTC(port,XMODEM_SOH);
+		RS232C_PUTC(port,count);
+		RS232C_PUTC(port,~count);
 
 
 		checkCalc=0;
@@ -124,7 +124,7 @@ void XModemSend(const char fName[],int baud)
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int i,c=buffer[nBuffUsed++];
-				RS232C_PUTC(c);
+				RS232C_PUTC(port,c);
 
 				checkCalc^=(c<<8);
 				for(i=0; i<8; ++i)
@@ -137,21 +137,21 @@ void XModemSend(const char fName[],int baud)
 				}
 			}
 
-			RS232C_PUTC(checkCalc>>8);
-			RS232C_PUTC(checkCalc&0xFF);
+			RS232C_PUTC(port,checkCalc>>8);
+			RS232C_PUTC(port,checkCalc&0xFF);
 		}
 		else // Check Sum
 		{
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int c=buffer[nBuffUsed++];
-				RS232C_PUTC(c);
+				RS232C_PUTC(port,c);
 				checkCalc+=c;
 			}
-			RS232C_PUTC(checkCalc);
+			RS232C_PUTC(port,checkCalc);
 		}
 
-		while((c=RS232C_GETC())<0)
+		while((c=RS232C_GETC(port))<0)
 		{
 		}
 
@@ -185,19 +185,32 @@ int main(int ac,char *av[])
 		printf("  Run386 XMSEND filename\n");
 		printf("Options:\n");
 		printf("  -19200bps   Slow down to 19200bps (default 38400bps)\n");
+		printf("  -COM0 -COM1 -COM2 -COM3 -COM4  Select COM port.\n");
 		printf("Start this program and then start XMODEM Transfer in the host.\n");
 		return 1;
 	}
 
 	int i;
 	char fName[512];
-	int baud=2;
+	int baud=2,port=0;
 	fName[0]=0;
 	for(i=1; i<ac; ++i)
 	{
 		if(0==strcmp("-19200bps",av[i]) || 0==strcmp("-19200BPS",av[i]))
 		{
 			baud=4;
+		}
+		else if(0==strncmp("-COM",av[i],4) || 0==strncmp("-com",av[i],4))
+		{
+			if('0'<=av[i][4] && av[i][4]<='4')
+			{
+				port=av[i][4]-'0';
+			}
+			else
+			{
+				printf("Port number needs to be between 0 and 4.\n");
+				return 1;
+			}
 		}
 		else
 		{
@@ -223,7 +236,7 @@ int main(int ac,char *av[])
 	}
 	printf("Upload %s\n",fName);
 
-	XModemSend(fName,baud);
+	XModemSend(fName,port,baud);
 
 	return 0;
 }
