@@ -5,7 +5,9 @@
 
 #include "XMODEM.H"
 
-#define VERSION 20231119
+#define VERSION "20260321b"
+
+#define WaitByMicrosec(microsec) {int i; for(i=0; i<microsec; ++i){_inline(0xE6,0x6C);}}
 
 extern void RS232C_STI(void);
 extern void RS232C_CLI(void);
@@ -25,7 +27,7 @@ void Wait10ms(void)
 unsigned int nBuffFilled=0;
 unsigned char buffer[BUFFER_SIZE];
 
-void XModemReceive(const char fName[],int port,int baud,int checkSumOrCrc)
+void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int checkSumOrCrc)
 {
 	FILE *fp=fopen(fName,"wb");
 	if(NULL==fp)
@@ -36,6 +38,8 @@ void XModemReceive(const char fName[],int port,int baud,int checkSumOrCrc)
 
 	RS232C_CLI();
 	RS232C_INIT(port,baud);
+
+	WaitByMicrosec(byteWaitMicroSec);
 
 	switch(checkSumOrCrc)
 	{
@@ -65,6 +69,7 @@ void XModemReceive(const char fName[],int port,int baud,int checkSumOrCrc)
 			}
 			else if(c==XMODEM_EOT)
 			{
+				WaitByMicrosec(byteWaitMicroSec);
 				RS232C_PUTC(port,XMODEM_ACK); // End of Transmission
 				goto EOT;
 			}
@@ -199,7 +204,7 @@ EOT:
 int main(int ac,char *av[])
 {
 	printf("XMRECV (XMODEM Receive) Utility by CaptainYS\n");
-	printf("Version %d\n",VERSION);
+	printf("Version " VERSION "\n");
 	printf("http://www.ysflight.com\n");
 	Wait10ms();  // Let Towns console emulator flush.
 
@@ -208,16 +213,21 @@ int main(int ac,char *av[])
 		printf("Usage:\n");
 		printf("  Run386 XMRECV filename\n");
 		printf("Options:\n");
-		printf("  -19200bps   Slow down to 19200bps (default 38400bps)\n");
-		printf("  -checksum   Use XMODEM Checksum (default XMODEM CRC)\n");
-		printf("  -COM0 -COM1 -COM2 -COM3 -COM4  Select COM port.\n");
+		printf("  -19200bps\n");
+		printf("     Slow down to 19200bps (default 38400bps)\n");
+		printf("  -checksum\n");
+		printf("     Use XMODEM Checksum (default XMODEM CRC)\n");
+		printf("  -COM0 -COM1 -COM2 -COM3 -COM4\n");
+		printf("     Select COM port.\n");
+		printf("  -wait microsec\n");
+		printf("     Wait specified micro seconds before sending a byte.\n");
 		printf("Start XMODEM Transfer in the host, and then run this command.\n");
 		return 1;
 	}
 
 	int i;
 	char fName[512];
-	int baud=2,port=0;
+	int baud=2,port=0,byteWaitMicroSec=0;
 	int mode=XMODEM_MODE_CRC;
 	fName[0]=0;
 	for(i=1; i<ac; ++i)
@@ -229,6 +239,11 @@ int main(int ac,char *av[])
 		else if(0==strcmp("-checksum",av[i]) || 0==strcmp("-CHECKSUM",av[i]))
 		{
 			mode=XMODEM_MODE_CHECKSUM;
+		}
+		else if((0==strcmp("-WAIT",av[i]) || 0==strcmp("-wait",av[i])) && i+1<ac)
+		{
+			byteWaitMicroSec=atoi(av[i+1]);
+			++i;
 		}
 		else if(0==strncmp("-COM",av[i],4) || 0==strncmp("-com",av[i],4))
 		{
@@ -271,6 +286,10 @@ int main(int ac,char *av[])
 		printf("Undefined baud rate.\n");
 		return 1;
 	}
+	if(0!=byteWaitMicroSec)
+	{
+		printf("Wait %d us before sending each byte\n",byteWaitMicroSec);
+	}
 	if(0==fName[0])
 	{
 		printf("File name not specified.\n");
@@ -278,7 +297,7 @@ int main(int ac,char *av[])
 	}
 	printf("Download to %s\n",fName);
 
-	XModemReceive(fName,port,baud,mode);
+	XModemReceive(fName,port,baud,byteWaitMicroSec,mode);
 
 	return 0;
 }

@@ -5,7 +5,9 @@
 
 #include "XMODEM.H"
 
-#define VERSION 20231119
+#define VERSION "20260321b"
+
+#define WaitByMicrosec(microsec) {int i; for(i=0; i<microsec; ++i){_inline(0xE6,0x6C);}}
 
 extern void RS232C_STI(void);
 extern void RS232C_CLI(void);
@@ -25,7 +27,7 @@ void WaitMS(unsigned int ms)
 unsigned int nBuffFilled=0;
 unsigned char buffer[BUFFER_SIZE];
 
-void XModemSend(const char fName[],int port,int baud)
+void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
 {
 	FILE *fp=fopen(fName,"rb");
 	unsigned int sz=0;
@@ -92,13 +94,17 @@ void XModemSend(const char fName[],int port,int baud)
 
 		if(nBuffFilled<BUFFER_SIZE && nBuffFilled<=nBuffUsed)
 		{
+			WaitByMicrosec(byteWaitMicroSec);
 			RS232C_PUTC(port,XMODEM_EOT); // End of Transmission
 			break;
 		}
 
 
+		WaitByMicrosec(byteWaitMicroSec);
 		RS232C_PUTC(port,XMODEM_SOH);
+		WaitByMicrosec(byteWaitMicroSec);
 		RS232C_PUTC(port,count);
+		WaitByMicrosec(byteWaitMicroSec);
 		RS232C_PUTC(port,~count);
 
 
@@ -124,6 +130,7 @@ void XModemSend(const char fName[],int port,int baud)
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int i,c=buffer[nBuffUsed++];
+				WaitByMicrosec(byteWaitMicroSec);
 				RS232C_PUTC(port,c);
 
 				checkCalc^=(c<<8);
@@ -137,7 +144,9 @@ void XModemSend(const char fName[],int port,int baud)
 				}
 			}
 
+			WaitByMicrosec(byteWaitMicroSec);
 			RS232C_PUTC(port,checkCalc>>8);
+			WaitByMicrosec(byteWaitMicroSec);
 			RS232C_PUTC(port,checkCalc&0xFF);
 		}
 		else // Check Sum
@@ -145,9 +154,11 @@ void XModemSend(const char fName[],int port,int baud)
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int c=buffer[nBuffUsed++];
+				WaitByMicrosec(byteWaitMicroSec);
 				RS232C_PUTC(port,c);
 				checkCalc+=c;
 			}
+			WaitByMicrosec(byteWaitMicroSec);
 			RS232C_PUTC(port,checkCalc);
 		}
 
@@ -176,7 +187,7 @@ void XModemSend(const char fName[],int port,int baud)
 int main(int ac,char *av[])
 {
 	printf("XMSEND (XMODEM Send) Utility by CaptainYS\n");
-	printf("Version %d\n",VERSION);
+	printf("Version " VERSION "\n");
 	printf("http://www.ysflight.com\n");
 
 	if(1==ac)
@@ -184,15 +195,20 @@ int main(int ac,char *av[])
 		printf("Usage:\n");
 		printf("  Run386 XMSEND filename\n");
 		printf("Options:\n");
+		printf("  -19200bps\n");
+		printf("     Slow down to 19200bps (default 38400bps)\n");
+		printf("  -COM0 -COM1 -COM2 -COM3 -COM4\n");
+		printf("     Select COM port.\n");
+		printf("  -wait microsec\n");
+		printf("     Wait specified micro seconds before sending a byte.\n");
 		printf("  -19200bps   Slow down to 19200bps (default 38400bps)\n");
-		printf("  -COM0 -COM1 -COM2 -COM3 -COM4  Select COM port.\n");
 		printf("Start this program and then start XMODEM Transfer in the host.\n");
 		return 1;
 	}
 
 	int i;
 	char fName[512];
-	int baud=2,port=0;
+	int baud=2,port=0,byteWaitMicroSec=0;
 	fName[0]=0;
 	for(i=1; i<ac; ++i)
 	{
@@ -212,6 +228,11 @@ int main(int ac,char *av[])
 				return 1;
 			}
 		}
+		else if((0==strcmp("-WAIT",av[i]) || 0==strcmp("-wait",av[i])) && i+1<ac)
+		{
+			byteWaitMicroSec=atoi(av[i+1]);
+			++i;
+		}
 		else
 		{
 			strcpy(fName,av[i]);
@@ -229,6 +250,10 @@ int main(int ac,char *av[])
 		printf("Undefined baud rate.\n");
 		return 1;
 	}
+	if(0!=byteWaitMicroSec)
+	{
+		printf("Wait %d us before sending each byte\n",byteWaitMicroSec);
+	}
 	if(0==fName[0])
 	{
 		printf("File name not specified.\n");
@@ -236,7 +261,7 @@ int main(int ac,char *av[])
 	}
 	printf("Upload %s\n",fName);
 
-	XModemSend(fName,port,baud);
+	XModemSend(fName,port,byteWaitMicroSec,baud);
 
 	return 0;
 }
