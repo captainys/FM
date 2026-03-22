@@ -150,17 +150,26 @@ RS232C_DELAY			ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;   Second Param     Wait in microsec between TxRDY and writing to data I/O.
 ;   First Param      COM Port
 RS232C_PUTC			PROC
 						PUSH	EDX
 						PUSH	ESI
 
-						; [ESP]ESI  [ESP+4]EDX  [ESP+8]EIP  [ESP+12]COM Port  [ESP+16] Data
+						; [ESP]ESI  [ESP+4]EDX  [ESP+8]EIP  [ESP+12]COM Port  [ESP+16] Data  [ESP+20]Wait in us
 						MOV		EAX,[ESP+12]	; COM Port
 						SHL		EAX,4
 						LEA		ESI,[COM0+EAX]
 
 						CALL	RS232C_WAIT_TX_READY
+
+						XCHG	ECX,[ESP+20]
+						JECXZ	RS232C_PUTC_NO_WAIT
+RS232C_PUTC_WAIT_LOOP:	OUT		6CH,AL
+						LOOP	RS232C_PUTC_WAIT_LOOP
+RS232C_PUTC_NO_WAIT:
+						XCHG	ECX,[ESP+20]
+
 						MOV		EAX,[ESP+16]
 						MOV		DX,[ESI].DATA_IO	; 0A00H
 						OUT		DX,AL
@@ -180,7 +189,7 @@ RS232C_GETC				PROC
 						PUSH	EDX
 						PUSH	ESI
 
-						;[ESP]ESI  [ESP+4]EDX  [ESP+8]EIP  [ESP+12]COM Port
+						;[ESP]ESI  [ESP+4]EDX  [ESP+8]EIP  [ESP+12]COM Port  [ESP+16]Wait in microsec
 						MOV		EAX,[ESP+12]	; COM Port
 						SHL		EAX,4
 						LEA		ESI,[COM0+EAX]
@@ -196,6 +205,14 @@ RS232C_GETC				PROC
 						RET
 
 RS232C_GETC_DATA_READY:
+						XCHG	ECX,[ESP+16]
+						JECXZ	RS232C_GETC_NO_WAIT
+RS232C_GETC_WAIT_LOOP:	OUT		6CH,AL
+						LOOP	RS232C_GETC_WAIT_LOOP
+RS232C_GETC_NO_WAIT:
+						XCHG	ECX,[ESP+16]
+
+
 						MOV		DX,[ESI].DATA_IO	; 0A00H
 						IN		AL,DX
 						POP		ESI

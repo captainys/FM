@@ -5,15 +5,15 @@
 
 #include "XMODEM.H"
 
-#define VERSION "20260321b"
+#define VERSION "20260321c"
 
 #define __CLI _inline(0xFA)
 #define __STI _inline(0xFB)
-#define WaitByMicrosec(microsec) {int i; for(i=0; i<microsec; ++i){_inline(0xE6,0x6C);}}
+#define __WAIT_1US _inline(0xE6,0x6C)
 
 extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
-extern int RS232C_GETC(int COMPort); // Return value<0 means no data.
-extern void RS232C_PUTC(int COMPort,int byteData);
+extern int RS232C_GETC(int COMPort,int waitInUS); // Return value<0 means no data.
+extern void RS232C_PUTC(int COMPort,int byteData,int waitInUS);
 
 void WaitMS(unsigned int ms)
 {
@@ -27,7 +27,7 @@ void WaitMS(unsigned int ms)
 unsigned int nBuffFilled=0;
 unsigned char buffer[BUFFER_SIZE];
 
-void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
+void XModemSend(const char fName[],int port,int baud,int waitInUS)
 {
 	FILE *fp=fopen(fName,"rb");
 	unsigned int sz=0;
@@ -49,7 +49,7 @@ void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
 
 
 	int c,checkSumOrCrc;
-	while((c=RS232C_GETC(port))<0)
+	while((c=RS232C_GETC(port,waitInUS))<0)
 	{
 	}
 	switch(c)
@@ -94,18 +94,14 @@ void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
 
 		if(nBuffFilled<BUFFER_SIZE && nBuffFilled<=nBuffUsed)
 		{
-			WaitByMicrosec(byteWaitMicroSec);
-			RS232C_PUTC(port,XMODEM_EOT); // End of Transmission
+			RS232C_PUTC(port,XMODEM_EOT,waitInUS); // End of Transmission
 			break;
 		}
 
 
-		WaitByMicrosec(byteWaitMicroSec);
-		RS232C_PUTC(port,XMODEM_SOH);
-		WaitByMicrosec(byteWaitMicroSec);
-		RS232C_PUTC(port,count);
-		WaitByMicrosec(byteWaitMicroSec);
-		RS232C_PUTC(port,~count);
+		RS232C_PUTC(port,XMODEM_SOH,waitInUS);
+		RS232C_PUTC(port,count,waitInUS);
+		RS232C_PUTC(port,~count,waitInUS);
 
 
 		checkCalc=0;
@@ -130,8 +126,7 @@ void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int i,c=buffer[nBuffUsed++];
-				WaitByMicrosec(byteWaitMicroSec);
-				RS232C_PUTC(port,c);
+				RS232C_PUTC(port,c,waitInUS);
 
 				checkCalc^=(c<<8);
 				for(i=0; i<8; ++i)
@@ -144,25 +139,21 @@ void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
 				}
 			}
 
-			WaitByMicrosec(byteWaitMicroSec);
-			RS232C_PUTC(port,checkCalc>>8);
-			WaitByMicrosec(byteWaitMicroSec);
-			RS232C_PUTC(port,checkCalc&0xFF);
+			RS232C_PUTC(port,checkCalc>>8,waitInUS);
+			RS232C_PUTC(port,checkCalc&0xFF,waitInUS);
 		}
 		else // Check Sum
 		{
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int c=buffer[nBuffUsed++];
-				WaitByMicrosec(byteWaitMicroSec);
-				RS232C_PUTC(port,c);
+				RS232C_PUTC(port,c,waitInUS);
 				checkCalc+=c;
 			}
-			WaitByMicrosec(byteWaitMicroSec);
-			RS232C_PUTC(port,checkCalc);
+			RS232C_PUTC(port,checkCalc,waitInUS);
 		}
 
-		while((c=RS232C_GETC(port))<0)
+		while((c=RS232C_GETC(port,waitInUS))<0)
 		{
 		}
 
@@ -261,7 +252,7 @@ int main(int ac,char *av[])
 	}
 	printf("Upload %s\n",fName);
 
-	XModemSend(fName,port,byteWaitMicroSec,baud);
+	XModemSend(fName,port,baud,byteWaitMicroSec);
 
 	return 0;
 }

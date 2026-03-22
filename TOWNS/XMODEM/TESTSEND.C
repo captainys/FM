@@ -5,8 +5,8 @@
 #define __STI _inline(0xFB)
 
 extern void RS232C_INIT(int port,int baudRate); // 2:38400bps  4:19200bps
-extern int RS232C_GETC(int port); // Return value<0 means no data.
-extern void RS232C_PUTC(int port,int byteData);
+extern int RS232C_GETC(int port,int waitInUS); // Return value<0 means no data.
+extern void RS232C_PUTC(int port,int byteData,int waitInUS);
 
 int main(int ac,char *av[])
 {
@@ -23,7 +23,7 @@ int main(int ac,char *av[])
 	const char *str="Hello from TESTSEND";
 
 	int i;
-	int baud=2,port=0;
+	int baud=2,port=0,waitInUS=0;
 	for(i=1; i<ac; ++i)
 	{
 		if(0==strcmp("-19200bps",av[i]) || 0==strcmp("-19200BPS",av[i]))
@@ -62,7 +62,7 @@ int main(int ac,char *av[])
 	RS232C_INIT(port,baud);
 	for(i=0; 0!=str[i]; ++i)
 	{
-		RS232C_PUTC(port,str[i]);
+		RS232C_PUTC(port,str[i],waitInUS);
 	}
 	__STI;
 	return 0;

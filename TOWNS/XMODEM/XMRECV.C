@@ -5,15 +5,15 @@
 
 #include "XMODEM.H"
 
-#define VERSION "20260321b"
+#define VERSION "20260321c"
 
 #define __CLI _inline(0xFA)
 #define __STI _inline(0xFB)
-#define WaitByMicrosec(microsec) {int i; for(i=0; i<microsec; ++i){_inline(0xE6,0x6C);}}
+#define __WAIT_1US _inline(0xE6,0x6C)
 
 extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
-extern int RS232C_GETC(int COMPort); // Return value<0 means no data.
-extern void RS232C_PUTC(int COMPort,int byteData);
+extern int RS232C_GETC(int COMPort,int waitInUS); // Return value<0 means no data.
+extern void RS232C_PUTC(int COMPort,int byteData,int waitInUS);
 
 void Wait10ms(void)
 {
@@ -27,7 +27,7 @@ void Wait10ms(void)
 unsigned int nBuffFilled=0;
 unsigned char buffer[BUFFER_SIZE];
 
-void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int checkSumOrCrc)
+void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSumOrCrc)
 {
 	FILE *fp=fopen(fName,"wb");
 	if(NULL==fp)
@@ -39,15 +39,13 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 	__CLI;
 	RS232C_INIT(port,baud);
 
-	WaitByMicrosec(byteWaitMicroSec);
-
 	switch(checkSumOrCrc)
 	{
 	case XMODEM_MODE_CHECKSUM:
-		RS232C_PUTC(port,XMODEM_NAK);
+		RS232C_PUTC(port,XMODEM_NAK,waitInUS);
 		break;
 	case XMODEM_MODE_CRC:
-		RS232C_PUTC(port,XMODEM_C);
+		RS232C_PUTC(port,XMODEM_C,waitInUS);
 		break;
 	}
 
@@ -62,15 +60,14 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 		// Wait for SOH or EOT
 		for(;;)
 		{
-			int c=RS232C_GETC(port);
+			int c=RS232C_GETC(port,waitInUS);
 			if(c==XMODEM_SOH)
 			{
 				break;
 			}
 			else if(c==XMODEM_EOT)
 			{
-				WaitByMicrosec(byteWaitMicroSec);
-				RS232C_PUTC(port,XMODEM_ACK); // End of Transmission
+				RS232C_PUTC(port,XMODEM_ACK,waitInUS); // End of Transmission
 				goto EOT;
 			}
 		}
@@ -79,7 +76,7 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 		for(i=0; i<2; ++i)
 		{
 			int c;
-			while((c=RS232C_GETC(port))<0)
+			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
 			index[i]=c;
@@ -108,7 +105,7 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int i,c;
-				while((c=RS232C_GETC(port))<0)
+				while((c=RS232C_GETC(port,waitInUS))<0)
 				{
 				}
 				buffer[nBuffFilled++]=(unsigned char)c;
@@ -125,11 +122,11 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 			}
 
 			int c;
-			while((c=RS232C_GETC(port))<0)
+			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
 			checkRecv=(c<<8);
-			while((c=RS232C_GETC(port))<0)
+			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
 			checkRecv|=c;
@@ -139,7 +136,7 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 			for(dataCount=0; dataCount<XMODEM_PACKET_SIZE; ++dataCount)
 			{
 				int c;
-				while((c=RS232C_GETC(port))<0)
+				while((c=RS232C_GETC(port,waitInUS))<0)
 				{
 				}
 				buffer[nBuffFilled++]=(unsigned char)c;
@@ -147,7 +144,7 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 			}
 
 			int c;
-			while((c=RS232C_GETC(port))<0)
+			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
 			checkRecv=c;
@@ -160,7 +157,7 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 			__STI;
 			Wait10ms();
 			__CLI;
-			RS232C_PUTC(port,XMODEM_NAK);
+			RS232C_PUTC(port,XMODEM_NAK,waitInUS);
 			nBuffFilled-=XMODEM_PACKET_SIZE;
 		}
 		else
@@ -174,7 +171,7 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 				nBuffFilled=0;
 				__CLI;
 			}
-			RS232C_PUTC(port,XMODEM_ACK);
+			RS232C_PUTC(port,XMODEM_ACK,waitInUS);
 		}
 	}
 EOT:
@@ -182,7 +179,7 @@ EOT:
 	clock_t clk0=clock(); // Might receive ETB
 	while(clock()-clk0<CLOCKS_PER_SEC/2)
 	{
-		int c=RS232C_GETC(port);
+		int c=RS232C_GETC(port,waitInUS);
 		if(0<=c)
 		{
 		}
