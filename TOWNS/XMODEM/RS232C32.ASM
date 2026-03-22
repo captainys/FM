@@ -131,8 +131,9 @@ RS232C_INIT			ENDP
 RS232C_WAIT_TX_READY	PROC
 						MOV		DX,[ESI].STATUS_COMMAND_IO ; 0A02H
 						IN		AL,DX
-						AND		AL,03H		; Just exit if RxD.
-						JE		RS232C_WAIT_TX_READY
+						AND		AL,05H
+						CMP		AL,5	; TxE and TxRDY
+						JNE		RS232C_WAIT_TX_READY
 						RET
 RS232C_WAIT_TX_READY	ENDP
 
@@ -150,6 +151,19 @@ RS232C_DELAY			ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+WAIT_BY_EDX_TIMES_MICROSEC	PROC
+						XCHG	EDX,ECX
+						JECXZ	WAIT_BY_EDX_NO_WAIT
+WAIT_BY_EDX_LOOP:
+						OUT		6CH,AL
+						LOOP	WAIT_BY_EDX_LOOP
+WAIT_BY_EDX_NO_WAIT:
+						XCHG	ECX,EDX
+						RET
+WAIT_BY_EDX_TIMES_MICROSEC	ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;   Second Param     Wait in microsec between TxRDY and writing to data I/O.
 ;   First Param      COM Port
 RS232C_PUTC			PROC
@@ -163,16 +177,15 @@ RS232C_PUTC			PROC
 
 						CALL	RS232C_WAIT_TX_READY
 
-						XCHG	ECX,[ESP+20]
-						JECXZ	RS232C_PUTC_NO_WAIT
-RS232C_PUTC_WAIT_LOOP:	OUT		6CH,AL
-						LOOP	RS232C_PUTC_WAIT_LOOP
-RS232C_PUTC_NO_WAIT:
-						XCHG	ECX,[ESP+20]
+						MOV		EDX,[ESP+20]
+						CALL	WAIT_BY_EDX_TIMES_MICROSEC
 
 						MOV		EAX,[ESP+16]
 						MOV		DX,[ESI].DATA_IO	; 0A00H
 						OUT		DX,AL
+
+						MOV		EDX,[ESP+20]
+						CALL	WAIT_BY_EDX_TIMES_MICROSEC
 
 						POP		ESI
 						POP		EDX
@@ -205,16 +218,15 @@ RS232C_GETC				PROC
 						RET
 
 RS232C_GETC_DATA_READY:
-						XCHG	ECX,[ESP+16]
-						JECXZ	RS232C_GETC_NO_WAIT
-RS232C_GETC_WAIT_LOOP:	OUT		6CH,AL
-						LOOP	RS232C_GETC_WAIT_LOOP
-RS232C_GETC_NO_WAIT:
-						XCHG	ECX,[ESP+16]
-
+						MOV		EDX,[ESP+16]
+						CALL	WAIT_BY_EDX_TIMES_MICROSEC
 
 						MOV		DX,[ESI].DATA_IO	; 0A00H
 						IN		AL,DX
+
+						MOV		EDX,[ESP+16]
+						CALL	WAIT_BY_EDX_TIMES_MICROSEC
+
 						POP		ESI
 						POP		EDX
 						MOVZX	EAX,AL
