@@ -7,10 +7,10 @@
 
 #define VERSION "20260321b"
 
+#define __CLI _inline(0xFA)
+#define __STI _inline(0xFB)
 #define WaitByMicrosec(microsec) {int i; for(i=0; i<microsec; ++i){_inline(0xE6,0x6C);}}
 
-extern void RS232C_STI(void);
-extern void RS232C_CLI(void);
 extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
 extern int RS232C_GETC(int COMPort); // Return value<0 means no data.
 extern void RS232C_PUTC(int COMPort,int byteData);
@@ -36,7 +36,7 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 		exit(1);
 	}
 
-	RS232C_CLI();
+	__CLI;
 	RS232C_INIT(port,baud);
 
 	WaitByMicrosec(byteWaitMicroSec);
@@ -157,9 +157,9 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 		if(checkRecv!=checkCalc)
 		{
 			printf("CRC or Checksum Error! %04x %04x\n",checkRecv,checkCalc);
-			RS232C_STI();
+			__STI;
 			Wait10ms();
-			RS232C_CLI();
+			__CLI;
 			RS232C_PUTC(port,XMODEM_NAK);
 			nBuffFilled-=XMODEM_PACKET_SIZE;
 		}
@@ -169,10 +169,10 @@ void XModemReceive(const char fName[],int port,int baud,int byteWaitMicroSec,int
 			{
 				totalReceived+=nBuffFilled;
 				printf("%d\n",totalReceived);
-				RS232C_STI();
+				__STI;
 				fwrite(buffer,1,nBuffFilled,fp);
 				nBuffFilled=0;
-				RS232C_CLI();
+				__CLI;
 			}
 			RS232C_PUTC(port,XMODEM_ACK);
 		}
@@ -188,7 +188,7 @@ EOT:
 		}
 	}
 
-	RS232C_STI();
+	__STI;
 
 	if(0<nBuffFilled)
 	{

@@ -7,10 +7,10 @@
 
 #define VERSION "20260321b"
 
+#define __CLI _inline(0xFA)
+#define __STI _inline(0xFB)
 #define WaitByMicrosec(microsec) {int i; for(i=0; i<microsec; ++i){_inline(0xE6,0x6C);}}
 
-extern void RS232C_STI(void);
-extern void RS232C_CLI(void);
 extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
 extern int RS232C_GETC(int COMPort); // Return value<0 means no data.
 extern void RS232C_PUTC(int COMPort,int byteData);
@@ -44,7 +44,7 @@ void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
 	printf("Now start XMODEM transfer on the receiver.\n");
 	WaitMS(500);
 
-	RS232C_CLI();
+	__CLI;
 	RS232C_INIT(port,baud);
 
 
@@ -63,14 +63,14 @@ void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
 		checkSumOrCrc=XMODEM_MODE_CRC;
 		break;
 	default:
-		RS232C_STI();
+		__STI;
 		printf("Unknown mode.\n");
 		exit(1);
 		break;
 	}
-	RS232C_STI();
+	__STI;
 	WaitMS(100);
-	RS232C_CLI();
+	__CLI;
 
 
 	unsigned int totalSent=0,count=1,nBuffUsed=0;
@@ -82,9 +82,9 @@ void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
 		if(nBuffFilled<=nBuffUsed)
 		{
 			printf("Sent %d/%d\n",totalSent,sz);
-			RS232C_STI();
+			__STI;
 			nBuffFilled=fread(buffer,1,BUFFER_SIZE,fp);
-			RS232C_CLI();
+			__CLI;
 			for(int i=nBuffFilled; i<BUFFER_SIZE; ++i)
 			{
 				buffer[i]=0;
@@ -177,7 +177,7 @@ void XModemSend(const char fName[],int port,int baud,int byteWaitMicroSec)
 		}
 	}
 
-	RS232C_STI();
+	__STI;
 
 	printf("Sent %d\n",totalSent);
 

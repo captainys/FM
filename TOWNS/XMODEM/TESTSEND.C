@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 
-extern void RS232C_STI(void);
-extern void RS232C_CLI(void);
+#define __CLI _inline(0xFA)
+#define __STI _inline(0xFB)
+
 extern void RS232C_INIT(int port,int baudRate); // 2:38400bps  4:19200bps
 extern int RS232C_GETC(int port); // Return value<0 means no data.
 extern void RS232C_PUTC(int port,int byteData);
@@ -57,12 +58,12 @@ int main(int ac,char *av[])
 
 
 
-	RS232C_CLI();
+	__CLI;
 	RS232C_INIT(port,baud);
 	for(i=0; 0!=str[i]; ++i)
 	{
 		RS232C_PUTC(port,str[i]);
 	}
-	RS232C_STI();
+	__STI;
 	return 0;
 }

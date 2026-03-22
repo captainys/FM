@@ -1,7 +1,5 @@
 						ASSUME	CS:CODE
 
-						PUBLIC	RS232C_STI
-						PUBLIC	RS232C_CLI
 						PUBLIC	RS232C_INIT
 						PUBLIC	RS232C_GETC
 						PUBLIC	RS232C_PUTC
@@ -126,20 +124,6 @@ RS232C_INIT			PROC
 						POP		EDX
 						RET
 RS232C_INIT			ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-RS232C_CLI				PROC
-						CLI
-						RET
-RS232C_CLI				ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-RS232C_STI				PROC
-						CLI
-						RET
-RS232C_STI				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
