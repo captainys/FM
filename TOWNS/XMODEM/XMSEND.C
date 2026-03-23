@@ -7,7 +7,7 @@
 #include "XMODEM.H"
 #include "DEBUG.H"
 
-#define VERSION "20260323a"
+#define VERSION "20260323c"
 
 // #define __CLI _inline(0xFA)
 // #define __STI _inline(0xFB)
@@ -226,6 +226,30 @@ ABORT:
 	RS232C_END();
 }
 
+void Help(void)
+{
+	printf("Usage:\n");
+	printf("  Run386 XMSEND filename\n");
+	printf("Options:\n");
+	printf("  -19200bps\n");
+	printf("     Slow down to 19200bps (default 38400bps)\n");
+	printf("  -COM0 -COM1 -COM2 -COM3 -COM4\n");
+	printf("     Select COM port.\n");
+	printf("  -wait microsec\n");
+	printf("     Wait specified micro seconds before sending a byte.\n");
+	printf("  -1200bps,-4800bps,-9600bps,-19200bps,-38400bps\n");
+	printf("     Specify baud rate.  Port 0 default is 38400bps, and other pots 19200bps.\n");
+	printf("     FM TOWNS's On-board RS232C can transmit at 3400bps maximum.\n");
+	printf("     Urban Corporation Fast RS232C board, Turbo 232CT, can go up to 115200bps.\n");
+	printf("     If you want to take advantage of 115200bps,\n");
+	printf("     (1) Connect cable to CH1 on the board.\n");
+	printf("     (2) Set dip switch 1 and 8 OFF, 2 to 7 ON.\n");
+	printf("     (3) Use -COM1 and -19200bps options.\n");
+	printf("     TOWNS will think it is communicating at 19200bps, but it is boosted to\n");
+	printf("     115200bps by Turbo 232CT.\n");
+	printf("Start this program and then start XMODEM Transfer in the host.\n");
+}
+
 int main(int ac,char *av[])
 {
 	printf("XMSEND (XMODEM Send) Utility by CaptainYS\n");
@@ -234,26 +258,7 @@ int main(int ac,char *av[])
 
 	if(1==ac)
 	{
-		printf("Usage:\n");
-		printf("  Run386 XMSEND filename\n");
-		printf("Options:\n");
-		printf("  -19200bps\n");
-		printf("     Slow down to 19200bps (default 38400bps)\n");
-		printf("  -COM0 -COM1 -COM2 -COM3 -COM4\n");
-		printf("     Select COM port.\n");
-		printf("  -wait microsec\n");
-		printf("     Wait specified micro seconds before sending a byte.\n");
-		printf("  -1200bps,-4800bps,-9600bps,-19200bps,-38400bps\n");
-		printf("     Specify baud rate.  Port 0 default is 38400bps, and other pots 19200bps.\n");
-		printf("     FM TOWNS's On-board RS232C can transmit at 3400bps maximum.\n");
-		printf("     Urban Corporation Fast RS232C board, Turbo 232CT, can go up to 115200bps.\n");
-		printf("     If you want to take advantage of 115200bps,\n");
-		printf("     (1) Connect cable to CH1 on the board.\n");
-		printf("     (2) Set dip switch 1 and 8 OFF, 2 to 7 ON.\n");
-		printf("     (3) Use -COM1 and -19200bps options.\n");
-		printf("     TOWNS will think it is communicating at 19200bps, but it is boosted to\n");
-		printf("     115200bps by Turbo 232CT.\n");
-		printf("Start this program and then start XMODEM Transfer in the host.\n");
+		Help();
 		return 1;
 	}
 
@@ -326,6 +331,7 @@ int main(int ac,char *av[])
 	}
 	if(0==fName[0])
 	{
+		Help();
 		printf("File name not specified.\n");
 		return 1;
 	}

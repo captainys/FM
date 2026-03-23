@@ -8,7 +8,7 @@
 #include "XMODEM.H"
 #include "DEBUG.H"
 
-#define VERSION "20260323a"
+#define VERSION "20260323c"
 
 //#define __CLI _inline(0xFA)
 //#define __STI _inline(0xFB)
@@ -29,6 +29,13 @@ void Wait10ms(void)
 	{
 	}
 }
+
+void Wait1000ms(void)
+{
+	auto t0=clock(); // It is real time clock in Towns.  clock() is not useless like in Unix.
+	while(clock()-t0<CLOCKS_PER_SEC)
+	{
+	}}
 
 #define BUFFER_SIZE 8192
 unsigned int nBuffFilled=0;
@@ -200,12 +207,24 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			checkCalc&=0xFF;
 		}
 
+		Palette(7,0xFF,0,0);
+
 		if(checkRecv!=checkCalc)
 		{
+			Palette(7,0xFF,0,0xFF);
 			printf("\nCRC or Checksum Error! %04x %04x\n",checkRecv,checkCalc);
 			__STI;
-			Wait10ms();
+			Wait1000ms();
 			__CLI;
+			while(0<=RS232C_GETC(port,waitInUS))
+			{
+				if(0!=PadABButton())
+				{
+					printf("Abort.\n");
+					goto ABORT;
+				}
+			}
+			Palette(7,0,0xFF,0xFF);
 			RS232C_PUTC(port,XMODEM_NAK,waitInUS);
 			nBuffFilled-=XMODEM_PACKET_SIZE;
 		}
@@ -261,6 +280,28 @@ ABORT:
 	Palette(7,0xFF,0xFF,0xFF);
 }
 
+void Help(void)
+{
+	printf("Usage:\n");
+	printf("  Run386 XMRECV filename\n");
+	printf("Options:\n");
+	printf("  -checksum\n");
+	printf("     Use XMODEM Checksum (default XMODEM CRC)\n");
+	printf("  -COM0 -COM1 -COM2 -COM3 -COM4\n");
+	printf("     Select COM port.\n");
+	printf("  -wait microsec\n");
+	printf("     Wait specified micro seconds before sending a byte.\n");
+	printf("  -1200bps,-4800bps,-9600bps,-19200bps,-38400bps\n");
+	printf("     Urban Corporation Fast RS232C board, Turbo 232CT, can go up to 115200bps.\n");
+	printf("     If you want to take advantage of 115200bps,\n");
+	printf("     (1) Connect cable to CH1 on the board.\n");
+	printf("     (2) Set dip switch 1 and 8 OFF, 2 to 7 ON.\n");
+	printf("     (3) Use -COM1 and -19200bps options.\n");
+	printf("     TOWNS will think it is communicating at 19200bps, but it is boosted to\n");
+	printf("     115200bps by Turbo 232CT.\n");
+	printf("Start XMODEM Transfer in the host, and then run this command.\n");
+}
+
 int main(int ac,char *av[])
 {
 	printf("XMRECV (XMODEM Receive) Utility by CaptainYS\n");
@@ -270,24 +311,7 @@ int main(int ac,char *av[])
 
 	if(1==ac)
 	{
-		printf("Usage:\n");
-		printf("  Run386 XMRECV filename\n");
-		printf("Options:\n");
-		printf("  -checksum\n");
-		printf("     Use XMODEM Checksum (default XMODEM CRC)\n");
-		printf("  -COM0 -COM1 -COM2 -COM3 -COM4\n");
-		printf("     Select COM port.\n");
-		printf("  -wait microsec\n");
-		printf("     Wait specified micro seconds before sending a byte.\n");
-		printf("  -1200bps,-4800bps,-9600bps,-19200bps,-38400bps\n");
-		printf("     Urban Corporation Fast RS232C board, Turbo 232CT, can go up to 115200bps.\n");
-		printf("     If you want to take advantage of 115200bps,\n");
-		printf("     (1) Connect cable to CH1 on the board.\n");
-		printf("     (2) Set dip switch 1 and 8 OFF, 2 to 7 ON.\n");
-		printf("     (3) Use -COM1 and -19200bps options.\n");
-		printf("     TOWNS will think it is communicating at 19200bps, but it is boosted to\n");
-		printf("     115200bps by Turbo 232CT.\n");
-		printf("Start XMODEM Transfer in the host, and then run this command.\n");
+		Help();
 		return 1;
 	}
 
@@ -377,6 +401,7 @@ int main(int ac,char *av[])
 	}
 	if(0==fName[0])
 	{
+		Help();
 		printf("File name not specified.\n");
 		return 1;
 	}
