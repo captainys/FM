@@ -7,7 +7,7 @@
 #include "XMODEM.H"
 #include "DEBUG.H"
 
-#define VERSION "20260322a"
+#define VERSION "20260322c"
 
 // #define __CLI _inline(0xFA)
 // #define __STI _inline(0xFB)

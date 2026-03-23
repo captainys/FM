@@ -275,6 +275,11 @@ RS232C_INIT			ENDP
 
 RS232C_END			PROC
 					PUSHFD
+					PUSH	ESI
+					PUSH	EBX
+					PUSH	ECX
+					PUSH	EDX
+
 					CLI
 
 					MOV		ESI,[OPEN_COM_INFO]
@@ -282,7 +287,7 @@ RS232C_END			PROC
 					ADD		CL,40H
 
 					PUSH	DS
-					LDS		EDX,FWORD PTR [PREV_INT_VECTOR+4]
+					LDS		EDX,FWORD PTR [PREV_INT_VECTOR]
 					MOV		AX,2504h	; Set Protected-Mode INT Vector
 					INT		21H
 					POP		DS
@@ -294,6 +299,10 @@ RS232C_END			PROC
 					MOV		AL,[PREV_PIC_INTMASK]
 					OUT		0002H,AL
 
+					POP		EDX
+					POP		ECX
+					POP		EBX
+					POP		ESI
 					POPFD
 					RET
 RS232C_END			ENDP
@@ -396,12 +405,12 @@ RS232C_PUTC			ENDP
 ; Output
 ;   EAX Positive  One byte was read from the RS232C.
 ;   EAX Negative  Nothing to read
-;       b30       Cleared error
 RS232C_GETC				PROC
+						PUShFD
 						PUSH	EDX
 						PUSH	ESI
 
-						;[ESP]ESI  [ESP+4]EDX  [ESP+8]EIP  [ESP+12]COM Port  [ESP+16]Wait in microsec
+						CLI
 
 						MOV		EAX,80000000H
 						CMP		WORD PTR [RECV_BUF_USED],0
@@ -419,6 +428,7 @@ RS232C_GETC				PROC
 RS232C_GOTC:
 						POP		ESI
 						POP		EDX
+						POPFD
 						RET
 RS232C_GETC				ENDP
 

@@ -2,11 +2,12 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <conio.h>
 
 #include "XMODEM.H"
 #include "DEBUG.H"
 
-#define VERSION "20260322a"
+#define VERSION "20260322c"
 
 //#define __CLI _inline(0xFA)
 //#define __STI _inline(0xFB)
@@ -40,6 +41,8 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 		exit(1);
 	}
 
+	Palette(7,0xFF,0,0);
+
 	__CLI;
 	RS232C_INIT(port,baud);
 
@@ -61,11 +64,12 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 		int index[2];
 		unsigned int dataCount,checkRecv,checkCalc;
 
+		Palette(7,0,0xFF,0);
+
 		// Wait for SOH or EOT
 		for(;;)
 		{
 			int c=RS232C_GETC(port,waitInUS);
-			c&=0xFF;
 			if(c==XMODEM_SOH)
 			{
 				break;
@@ -84,7 +88,6 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
-			c&=0xFF;
 			index[i]=c;
 		}
 
@@ -114,7 +117,6 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 				while((c=RS232C_GETC(port,waitInUS))<0)
 				{
 				}
-				c&=0xFF;
 				buffer[nBuffFilled++]=(unsigned char)c;
 
 				checkCalc^=(c<<8);
@@ -132,12 +134,10 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
-			c&=0xFF;
 			checkRecv=(c<<8);
 			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
-			c&=0xFF;
 			checkRecv|=c;
 		}
 		else // Check Sum
@@ -148,7 +148,6 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 				while((c=RS232C_GETC(port,waitInUS))<0)
 				{
 				}
-				c&=0xFF;
 				buffer[nBuffFilled++]=(unsigned char)c;
 				checkCalc+=c;
 			}
@@ -157,7 +156,6 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
-			c&=0xFF;
 			checkRecv=c;
 			checkCalc&=0xFF;
 		}
@@ -184,8 +182,12 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			}
 			RS232C_PUTC(port,XMODEM_ACK,waitInUS);
 		}
+
+		Palette(7,0,0,0xFF);
 	}
 EOT:
+
+	Palette(7,0xFF,0,0xFF);
 
 	clock_t clk0=clock(); // Might receive ETB
 	while(clock()-clk0<CLOCKS_PER_SEC/2)
@@ -194,10 +196,11 @@ EOT:
 		if(0<=c)
 		{
 		}
-		c&=0xFF;
 	}
 
 	__STI;
+
+	Palette(7,0xFF,0xFF,0);
 
 	if(0<nBuffFilled)
 	{
@@ -209,7 +212,12 @@ EOT:
 
 	fclose(fp);
 
+	Palette(7,0,0xFF,0xFF);
+
+ABORT:
 	RS232C_END();
+
+	Palette(7,0xFF,0xFF,0xFF);
 }
 
 int main(int ac,char *av[])
@@ -308,7 +316,12 @@ int main(int ac,char *av[])
 	}
 	printf("Download to %s\n",fName);
 
+	_outp(0x0448,1); // Writing to VIDEO OUT Register 1
+	_outp(0x044A,0x29);  // Palette for 16-color mode page 1, YS enabled, Layer1 has priority.
+
 	XModemReceive(fName,port,baud,byteWaitMicroSec,mode);
+
+	Palette(7,0xFF,0xFF,0xFF);
 
 	return 0;
 }
