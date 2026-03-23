@@ -64,6 +64,7 @@ int main(int ac,char *av[])
 	{
 		RS232C_PUTC(port,str[i],waitInUS);
 	}
+	RS232C_END();
 	__STI;
 	return 0;
 }

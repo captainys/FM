@@ -2,16 +2,21 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <conio.h>
 
 #include "XMODEM.H"
+#include "DEBUG.H"
 
-#define VERSION "20260321c"
+#define VERSION "20260322a"
 
-#define __CLI _inline(0xFA)
-#define __STI _inline(0xFB)
+// #define __CLI _inline(0xFA)
+// #define __STI _inline(0xFB)
+#define __CLI
+#define __STI
 #define __WAIT_1US _inline(0xE6,0x6C)
 
 extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
+extern void RS232C_END(void);
 extern int RS232C_GETC(int COMPort,int waitInUS); // Return value<0 means no data.
 extern void RS232C_PUTC(int COMPort,int byteData,int waitInUS);
 
@@ -47,36 +52,51 @@ void XModemSend(const char fName[],int port,int baud,int waitInUS)
 	__CLI;
 	RS232C_INIT(port,baud);
 
+	Palette(7,0xFF,0,0);
 
-	int c,checkSumOrCrc;
-	while((c=RS232C_GETC(port,waitInUS))<0)
+	int c,checkSumOrCrc,retry;
+	const int maxNumRetry=2;
+	for(retry=0; retry<maxNumRetry; ++retry)
 	{
+		while((c=RS232C_GETC(port,waitInUS))<0)
+		{
+		}
+		c&=0xFF;
+		if(XMODEM_NAK==c)
+		{
+			printf("XMODEM Checksum\n");
+			checkSumOrCrc=XMODEM_MODE_CHECKSUM;
+			break;
+		}
+		else if(XMODEM_C==c)
+		{
+			printf("XMODEM CRC\n");
+			checkSumOrCrc=XMODEM_MODE_CRC;
+			break;
+		}
+		else
+		{
+			__STI;
+			printf("Unknown mode.\n");
+		}
 	}
-	switch(c)
+	if(maxNumRetry==retry)
 	{
-	case XMODEM_NAK:
-		printf("XMODEM Checksum\n");
-		checkSumOrCrc=XMODEM_MODE_CHECKSUM;
-		break;
-	case XMODEM_C:
-		printf("XMODEM CRC\n");
-		checkSumOrCrc=XMODEM_MODE_CRC;
-		break;
-	default:
-		__STI;
-		printf("Unknown mode.\n");
-		exit(1);
-		break;
+		goto ABORT;
 	}
+
 	__STI;
 	WaitMS(100);
 	__CLI;
 
+	Palette(7,0,0xFF,0);
 
 	unsigned int totalSent=0,count=1,nBuffUsed=0;
 	nBuffFilled=0;
 	for(;;)
 	{
+		Palette(7,0xFF,0,0);
+
 		unsigned int dataCount,checkCalc;
 
 		if(nBuffFilled<=nBuffUsed)
@@ -98,11 +118,13 @@ void XModemSend(const char fName[],int port,int baud,int waitInUS)
 			break;
 		}
 
+		Palette(7,0,0xFF,0);
 
 		RS232C_PUTC(port,XMODEM_SOH,waitInUS);
 		RS232C_PUTC(port,count,waitInUS);
 		RS232C_PUTC(port,~count,waitInUS);
 
+		Palette(7,0,0,0xFF);
 
 		checkCalc=0;
 		if(XMODEM_MODE_CRC==checkSumOrCrc)
@@ -153,9 +175,17 @@ void XModemSend(const char fName[],int port,int baud,int waitInUS)
 			RS232C_PUTC(port,checkCalc,waitInUS);
 		}
 
+		Palette(7,0xFF,0,0xFF);
+
 		while((c=RS232C_GETC(port,waitInUS))<0)
 		{
 		}
+
+		if(c&0x40000000)
+		{
+			printf("                     i8251 Err\r");
+		}
+		c&=0xFF;
 
 		if(XMODEM_NAK==c)
 		{
@@ -166,13 +196,20 @@ void XModemSend(const char fName[],int port,int baud,int waitInUS)
 			totalSent+=XMODEM_PACKET_SIZE;
 			++count;
 		}
+
+		Palette(7,0,0xFF,0xFF);
 	}
 
 	__STI;
 
 	printf("Sent %d\n",totalSent);
 
+	Palette(7,0xFF,0xFF,0xFF);
+
 	fclose(fp);
+
+ABORT:
+	RS232C_END();
 }
 
 int main(int ac,char *av[])
@@ -252,7 +289,12 @@ int main(int ac,char *av[])
 	}
 	printf("Upload %s\n",fName);
 
+	_outp(0x0448,1); // Writing to VIDEO OUT Register 1
+	_outp(0x044A,0x29);  // Palette for 16-color mode page 1, YS enabled, Layer1 has priority.
+
 	XModemSend(fName,port,baud,byteWaitMicroSec);
+
+	Palette(7,0xFF,0xFF,0xFF);
 
 	return 0;
 }

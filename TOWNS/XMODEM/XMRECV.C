@@ -4,14 +4,18 @@
 #include <string.h>
 
 #include "XMODEM.H"
+#include "DEBUG.H"
 
-#define VERSION "20260321c"
+#define VERSION "20260322a"
 
-#define __CLI _inline(0xFA)
-#define __STI _inline(0xFB)
+//#define __CLI _inline(0xFA)
+//#define __STI _inline(0xFB)
+#define __CLI
+#define __STI
 #define __WAIT_1US _inline(0xE6,0x6C)
 
 extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
+extern void RS232C_END(void);
 extern int RS232C_GETC(int COMPort,int waitInUS); // Return value<0 means no data.
 extern void RS232C_PUTC(int COMPort,int byteData,int waitInUS);
 
@@ -61,6 +65,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 		for(;;)
 		{
 			int c=RS232C_GETC(port,waitInUS);
+			c&=0xFF;
 			if(c==XMODEM_SOH)
 			{
 				break;
@@ -79,6 +84,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
+			c&=0xFF;
 			index[i]=c;
 		}
 
@@ -108,6 +114,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 				while((c=RS232C_GETC(port,waitInUS))<0)
 				{
 				}
+				c&=0xFF;
 				buffer[nBuffFilled++]=(unsigned char)c;
 
 				checkCalc^=(c<<8);
@@ -125,10 +132,12 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
+			c&=0xFF;
 			checkRecv=(c<<8);
 			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
+			c&=0xFF;
 			checkRecv|=c;
 		}
 		else // Check Sum
@@ -139,6 +148,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 				while((c=RS232C_GETC(port,waitInUS))<0)
 				{
 				}
+				c&=0xFF;
 				buffer[nBuffFilled++]=(unsigned char)c;
 				checkCalc+=c;
 			}
@@ -147,6 +157,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			while((c=RS232C_GETC(port,waitInUS))<0)
 			{
 			}
+			c&=0xFF;
 			checkRecv=c;
 			checkCalc&=0xFF;
 		}
@@ -183,6 +194,7 @@ EOT:
 		if(0<=c)
 		{
 		}
+		c&=0xFF;
 	}
 
 	__STI;
@@ -196,6 +208,8 @@ EOT:
 	}
 
 	fclose(fp);
+
+	RS232C_END();
 }
 
 int main(int ac,char *av[])
