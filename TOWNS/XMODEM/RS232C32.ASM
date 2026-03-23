@@ -4,6 +4,7 @@
 						PUBLIC	RS232C_END
 						PUBLIC	RS232C_GETC
 						PUBLIC	RS232C_PUTC
+						PUBLIC	PadABButton
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -431,6 +432,39 @@ RS232C_GOTC:
 						POPFD
 						RET
 RS232C_GETC				ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; FM TOWNS Techincal Data Book pp.238
+; "To make it compatible with MSX game pads, COM out must be zero."
+; "To read A and B buttons, TRIG out must be one."
+; The value written to I/O 04D6H must be 0FH instead of 3FH.
+PAD_OUT_CONST			EQU		0FH
+IO_PADA_IN				EQU			04D0H
+IO_PAD_OUT				EQU			04D6H
+
+PadABButton				PROC
+						PUSH	EDX
+
+						MOV		AL,PAD_OUT_CONST
+						MOV		DX,IO_PAD_OUT
+						OUT		DX,AL
+
+						MOV		DX,IO_PADA_IN
+						IN		AL,DX
+
+						MOVZX	EAX,AL
+						MOV		EDX,EAX
+						SHR		AL,4	; A button -> b0
+						SHR		DL,5	; B button -> b0
+						OR		AL,DL
+						NOT		AL
+						AND		AL,1
+
+						POP		EDX
+						RET
+
+PadABButton				ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

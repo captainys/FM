@@ -5,6 +5,7 @@
 #define __STI _inline(0xFB)
 
 extern void RS232C_INIT(int port,int baudRate); // 2:38400bps  4:19200bps
+extern void RS232C_END(void);
 extern int RS232C_GETC(int port,int waitInUS); // Return value<0 means no data.
 extern void RS232C_PUTC(int port,int byteData,int waitInUS);
 

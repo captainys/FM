@@ -7,7 +7,7 @@
 #include "XMODEM.H"
 #include "DEBUG.H"
 
-#define VERSION "20260322c"
+#define VERSION "20260323a"
 
 // #define __CLI _inline(0xFA)
 // #define __STI _inline(0xFB)
@@ -19,6 +19,7 @@ extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
 extern void RS232C_END(void);
 extern int RS232C_GETC(int COMPort,int waitInUS); // Return value<0 means no data.
 extern void RS232C_PUTC(int COMPort,int byteData,int waitInUS);
+extern int PadABButton(void);
 
 void WaitMS(unsigned int ms)
 {
@@ -52,7 +53,7 @@ void XModemSend(const char fName[],int port,int baud,int waitInUS)
 	__CLI;
 	RS232C_INIT(port,baud);
 
-	Palette(7,0xFF,0,0);
+	Palette(7,0,0xFF,0);
 
 	int c,checkSumOrCrc,retry;
 	const int maxNumRetry=2;
@@ -60,6 +61,11 @@ void XModemSend(const char fName[],int port,int baud,int waitInUS)
 	{
 		while((c=RS232C_GETC(port,waitInUS))<0)
 		{
+			if(0!=PadABButton())
+			{
+				printf("Abort.\n");
+				goto ABORT;
+			}
 		}
 		c&=0xFF;
 		if(XMODEM_NAK==c)
@@ -101,7 +107,7 @@ void XModemSend(const char fName[],int port,int baud,int waitInUS)
 
 		if(nBuffFilled<=nBuffUsed)
 		{
-			printf("Sent %d/%d\n",totalSent,sz);
+			printf("Sent %10d/%10d\r",totalSent,sz);
 			__STI;
 			nBuffFilled=fread(buffer,1,BUFFER_SIZE,fp);
 			__CLI;
@@ -179,12 +185,13 @@ void XModemSend(const char fName[],int port,int baud,int waitInUS)
 
 		while((c=RS232C_GETC(port,waitInUS))<0)
 		{
+			if(0!=PadABButton())
+			{
+				printf("\nAbort.\n");
+				goto ABORT;
+			}
 		}
 
-		if(c&0x40000000)
-		{
-			printf("                     i8251 Err\r");
-		}
 		c&=0xFF;
 
 		if(XMODEM_NAK==c)
@@ -198,17 +205,24 @@ void XModemSend(const char fName[],int port,int baud,int waitInUS)
 		}
 
 		Palette(7,0,0xFF,0xFF);
+
+		if(0!=PadABButton())
+		{
+			printf("\nAbort.\n");
+			goto ABORT;
+		}
 	}
 
 	__STI;
 
-	printf("Sent %d\n",totalSent);
+	printf("\nSent %d\n",totalSent);
+	printf("Done\n");
 
 	Palette(7,0xFF,0xFF,0xFF);
 
+ABORT:
 	fclose(fp);
 
-ABORT:
 	RS232C_END();
 }
 
@@ -229,20 +243,35 @@ int main(int ac,char *av[])
 		printf("     Select COM port.\n");
 		printf("  -wait microsec\n");
 		printf("     Wait specified micro seconds before sending a byte.\n");
-		printf("  -19200bps   Slow down to 19200bps (default 38400bps)\n");
+		printf("  -1200bps,-4800bps,-9600bps,-19200bps,-38400bps\n");
+		printf("     Specify baud rate.  Port 0 default is 38400bps, and other pots 19200bps.\n");
+		printf("     FM TOWNS's On-board RS232C can transmit at 3400bps maximum.\n");
+		printf("     Urban Corporation Fast RS232C board, Turbo 232CT, can go up to 115200bps.\n");
+		printf("     If you want to take advantage of 115200bps,\n");
+		printf("     (1) Connect cable to CH1 on the board.\n");
+		printf("     (2) Set dip switch 1 and 8 OFF, 2 to 7 ON.\n");
+		printf("     (3) Use -COM1 and -19200bps options.\n");
+		printf("     TOWNS will think it is communicating at 19200bps, but it is boosted to\n");
+		printf("     115200bps by Turbo 232CT.\n");
 		printf("Start this program and then start XMODEM Transfer in the host.\n");
 		return 1;
 	}
 
 	int i;
 	char fName[512];
-	int baud=2,port=0,byteWaitMicroSec=0;
+	int baud=0,port=0,byteWaitMicroSec=0;
 	fName[0]=0;
 	for(i=1; i<ac; ++i)
 	{
-		if(0==strcmp("-19200bps",av[i]) || 0==strcmp("-19200BPS",av[i]))
+		if(0==strcmp("-1200bps",av[i]) || 0==strcmp("-1200BPS",av[i]) ||
+		   0==strcmp("-2400bps",av[i]) || 0==strcmp("-2400BPS",av[i]) ||
+		   0==strcmp("-4800bps",av[i]) || 0==strcmp("-4800BPS",av[i]) ||
+		   0==strcmp("-9600bps",av[i]) || 0==strcmp("-9600BPS",av[i]) ||
+		   0==strcmp("-19200bps",av[i]) || 0==strcmp("-19200BPS",av[i]) ||
+		   0==strcmp("-38400bps",av[i]) || 0==strcmp("-38400BPS",av[i]))
 		{
-			baud=4;
+			int bps=atoi(av[i]+1);
+			baud=76800/bps;
 		}
 		else if(0==strncmp("-COM",av[i],4) || 0==strncmp("-com",av[i],4))
 		{
@@ -266,13 +295,26 @@ int main(int ac,char *av[])
 			strcpy(fName,av[i]);
 		}
 	}
+	if(0==baud)
+	{
+		if(0==port)
+		{
+			baud=2; // 38400bps
+		}
+		else
+		{
+			baud=4; // 19200bps
+		}
+	}
 	switch(baud)
 	{
+	case 64:
+	case 32:
+	case 16:
+	case 8:
 	case 4:
-		printf("19200bps\n");
-		break;
 	case 2:
-		printf("38400bps\n");
+		printf("%dbps\n",76800/baud);
 		break;
 	default:
 		printf("Undefined baud rate.\n");
@@ -292,6 +334,7 @@ int main(int ac,char *av[])
 	_outp(0x0448,1); // Writing to VIDEO OUT Register 1
 	_outp(0x044A,0x29);  // Palette for 16-color mode page 1, YS enabled, Layer1 has priority.
 
+	printf("Press Game PAD0 A+B buttons to abort.\n");
 	XModemSend(fName,port,baud,byteWaitMicroSec);
 
 	Palette(7,0xFF,0xFF,0xFF);
