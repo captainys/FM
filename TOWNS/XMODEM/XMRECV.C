@@ -10,10 +10,8 @@
 
 #define VERSION "20260323c"
 
-//#define __CLI _inline(0xFA)
-//#define __STI _inline(0xFB)
-#define __CLI
-#define __STI
+#define __CLI _inline(0xFA)
+#define __STI _inline(0xFB)
 #define __WAIT_1US _inline(0xE6,0x6C)
 
 extern void RS232C_INIT(int COMPort,int baudRate); // 2:38400bps  4:19200bps
@@ -37,6 +35,25 @@ void Wait1000ms(void)
 	{
 	}}
 
+unsigned short MaskAllINTExceptRS232C(void)
+{
+	unsigned short prevMask;
+	__CLI;
+	prevMask=_inp(0x0002)|(_inp(0x0012)<<8);
+	_outp(0x0002,0xF3); // Only allow 42H and 43H
+	_outp(0x0012,0xFF);
+	__STI;
+	return prevMask;
+}
+
+void RestorePICMask(unsigned short mask)
+{
+	__CLI;
+	_outp(0x0012,(mask>>8));
+	_outp(0x0002,(mask&0xFF));
+	__STI;
+}
+
 #define BUFFER_SIZE 8192
 unsigned int nBuffFilled=0;
 unsigned char buffer[BUFFER_SIZE];
@@ -52,7 +69,6 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 
 	Palette(7,0xFF,0,0);
 
-	__CLI;
 	RS232C_INIT(port,baud);
 
 	switch(checkSumOrCrc)
@@ -74,6 +90,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 		int i;
 		int index[2];
 		unsigned int dataCount,checkRecv,checkCalc;
+		unsigned short PICMask=0;
 
 		Palette(7,0,0xFF,0);
 
@@ -113,6 +130,8 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			index[i]=c;
 		}
 
+		PICMask=MaskAllINTExceptRS232C();
+
 		checkRecv=0;
 		checkCalc=0;
 		if(XMODEM_MODE_CRC==checkSumOrCrc)
@@ -141,6 +160,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 					if(0!=PadABButton())
 					{
 						printf("\nAbort.\n");
+						RestorePICMask(PICMask);
 						goto ABORT;
 					}
 				}
@@ -163,6 +183,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 				if(0!=PadABButton())
 				{
 					printf("\nAbort.\n");
+					RestorePICMask(PICMask);
 					goto ABORT;
 				}
 			}
@@ -172,6 +193,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 				if(0!=PadABButton())
 				{
 					printf("\nAbort.\n");
+					RestorePICMask(PICMask);
 					goto ABORT;
 				}
 			}
@@ -187,6 +209,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 					if(0!=PadABButton())
 					{
 						printf("\nAbort.\n");
+						RestorePICMask(PICMask);
 						goto ABORT;
 					}
 				}
@@ -200,6 +223,7 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 				if(0!=PadABButton())
 				{
 					printf("\nAbort.\n");
+					RestorePICMask(PICMask);
 					goto ABORT;
 				}
 			}
@@ -207,15 +231,15 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			checkCalc&=0xFF;
 		}
 
+		RestorePICMask(PICMask);
+
 		Palette(7,0xFF,0,0);
 
 		if(checkRecv!=checkCalc)
 		{
 			Palette(7,0xFF,0,0xFF);
 			printf("\nCRC or Checksum Error! %04x %04x\n",checkRecv,checkCalc);
-			__STI;
 			Wait1000ms();
-			__CLI;
 			while(0<=RS232C_GETC(port,waitInUS))
 			{
 				if(0!=PadABButton())
@@ -234,10 +258,8 @@ void XModemReceive(const char fName[],int port,int baud,int waitInUS,int checkSu
 			{
 				totalReceived+=nBuffFilled;
 				printf("%d\r",totalReceived);
-				__STI;
 				fwrite(buffer,1,nBuffFilled,fp);
 				nBuffFilled=0;
-				__CLI;
 			}
 			RS232C_PUTC(port,XMODEM_ACK,waitInUS);
 		}
@@ -257,8 +279,6 @@ EOT:
 			printf("\nReceived ETB.");
 		}
 	}
-
-	__STI;
 
 	Palette(7,0xFF,0xFF,0);
 
