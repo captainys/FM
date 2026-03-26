@@ -34,6 +34,48 @@ SCSI_INQURY_CMD			DB		12H,0,0,0,8,0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; Input
+;   CL  SCSI ID
+;   Wait until unit ready by TEST UNIT READY before calling this.
+EJECT_SCSI_MEDIA		PROC
+						PUSH	DS
+						MOV		AX,CS
+						MOV		DS,AX
+						MOV		SI,OFFSET SCSI_EJECT_COMMAND
+
+						AND		CL,7
+						CALL	SCSI_COMMAND
+
+						POP		DS
+						RET
+EJECT_SCSI_MEDIA		ENDP
+
+SCSI_EJECT_COMMAND		DB		1BH,0,0,0,2,0	; 2=LoEJ
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Input
+;   CL  SCSI ID
+;   Wait until unit ready by TEST UNIT READY before calling this.
+SCSI_CLOSE_LID			PROC
+						PUSH	DS
+						MOV		AX,CS
+						MOV		DS,AX
+						MOV		SI,OFFSET SCSI_CLOSE_COMMAND
+
+						AND		CL,7
+						CALL	SCSI_COMMAND
+
+						POP		DS
+						RET
+SCSI_CLOSE_LID			ENDP
+
+SCSI_CLOSE_COMMAND		DB		1BH,0,0,0,3,0	; 3=LoEJ|Start
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 
 ; Input
