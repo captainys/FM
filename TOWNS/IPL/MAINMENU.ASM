@@ -32,7 +32,7 @@ MAINMENU_OUTER_LOOP:
 
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		@b
 
 						MOV		AH,CS:[MAINMENU_SELECTION]
@@ -216,7 +216,7 @@ TRIPLE_CONFIRM_LOOP:
 
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		@b
 
 						MOV		CH,2

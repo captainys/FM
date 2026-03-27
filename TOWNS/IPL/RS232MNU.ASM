@@ -61,7 +61,7 @@ RS232CMENU_WAIT_PAD:
 
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		RS232CMENU_WAIT_PAD
 
 
@@ -194,7 +194,7 @@ RS232CMENU_RECEIVE_CMOS	PROC
 
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		@b
 
 						CALL	MENU_WAIT_PAD_RELEASE
@@ -300,7 +300,7 @@ RS232CMENU_RECEIVE_CMOS_WRONG_SIZE:
 
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		@b
 
 						RET
