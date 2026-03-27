@@ -553,11 +553,20 @@ TRYBOOT_FD:
 						MOV		AL,CS:[BOOTMENU_SELECTION]
 						SUB		AL,BOOTMENU_ITEMNUM_FD0
 						OR		AL,20H
-						MOV		AH,3  ; Restore
+
+						PUSH	AX	; AL is supposed to be preserved..... but just in case.
+
+						MOV		AH,0EH ; Unpublished function.  Apparently initialize?  AL should be preserved.
 						XOR		CH,CH
 						DB		9AH		; CALLF FFFB:0014
 						DW		0014H,0FFFBH
 
+						POP		AX	; AL is supposed to be preserved..... but just in case.
+
+						MOV		AH,3  ; Restore
+						XOR		CH,CH
+						DB		9AH		; CALLF FFFB:0014
+						DW		0014H,0FFFBH
 
 						MOV		BH,CS:[BOOTMENU_SELECTION]
 						SUB		BH,BOOTMENU_ITEMNUM_FD0
