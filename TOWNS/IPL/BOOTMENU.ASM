@@ -426,8 +426,11 @@ BOOTMENU_SETUP_DONE:
 
 						MOV		CL,CS:[BOOTMENU_SELECTION]
 						CMP		CL,CS:[NUM_BOOTMENU_OPTIONS]
-						JAE		SHORT @f
-						MOV		CS:[BOOTMENU_SELECTION],CL
+						JB		SHORT @f
+
+						; If the previously-selected device is gone, reset menu selection to zero, and do not auto-boot.
+						MOV		BYTE PTR CS:[AUTOBOOT],0
+						MOV		BYTE PTR CS:[BOOTMENU_SELECTION],0
 
 @@:
 						CALL	RESET_MENU_INSTALL_YSSCSICD_HDFD
