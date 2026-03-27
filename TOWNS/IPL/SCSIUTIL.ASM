@@ -3,11 +3,17 @@
 ; Output
 ;   CL   05 or 04 means CD
 ;        00 means HD
+;   CH   00 Unknown Vendor ID
+;        01 BlueSCSI
+;        02 ZuluSCSI
+;        03 SCSI2SD
 ;   Carry  Set if error
 IDENTIFY_SCSI_DEVICE	PROC
 						PUSH	DS
+						PUSH	ES
 						MOV		AX,CS
 						MOV		DS,AX
+						MOV		ES,AX
 						MOV		SI,OFFSET SCSI_INQURY_CMD
 
 						AND		CL,7
@@ -20,24 +26,55 @@ IDENTIFY_SCSI_DEVICE	PROC
 
 						CALL	SCSI_COMMAND
 
-						MOV		CL,[SCSI_DATABUF]
-						JAE		SHORT @f
-						MOV		CL,0FFH
-@@:
+						MOV		AL,0FFH
+						JC		SHORT IDENTIFY_SCSI_DEVICE_ERR
+						MOV		AL,[SCSI_DATABUF]
+
+						MOV		AH,01
+						MOV		CX,8
+						MOV		SI,BLUESCSI_VENDORID
+						MOV		DI,OFFSET SCSI_DATABUF+8
+						REP		CMPSB
+						JE		IDENTIFY_SCSI_DEVICE_NOERR
+
+						MOV		AH,02
+						MOV		CX,8
+						MOV		SI,ZULUSCSI_VENDORID
+						MOV		DI,OFFSET SCSI_DATABUF+8
+						REP		CMPSB
+						JE		IDENTIFY_SCSI_DEVICE_NOERR
+
+						MOV		AH,03
+						MOV		CX,8
+						MOV		SI,SCSI2SD_VENDORID
+						MOV		DI,OFFSET SCSI_DATABUF+8
+						REP		CMPSB
+						JE		IDENTIFY_SCSI_DEVICE_NOERR
+
+						XOR		AH,AH
+
+IDENTIFY_SCSI_DEVICE_NOERR:
+						CLC
+
+IDENTIFY_SCSI_DEVICE_ERR:
+						MOV		CX,AX
+						POP		ES
 						POP		DS
 						RET
 IDENTIFY_SCSI_DEVICE	ENDP
 
-SCSI_INQURY_CMD			DB		12H,0,0,0,8,0
+SCSI_INQURY_CMD			DB		12H,0,0,0,36,0
 
-
+BLUESCSI_VENDORID		DB		"BlueSCSI"
+ZULUSCSI_VENDORID		DB		"ZuluSCSI"
+SCSI2SD_VENDORID		DB		" codesrc"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Input
 ;   CL  SCSI ID
 ;   Wait until unit ready by TEST UNIT READY before calling this.
-EJECT_SCSI_MEDIA		PROC
+SCSI_OPEN_LID			PROC
 						PUSH	DS
 						MOV		AX,CS
 						MOV		DS,AX
@@ -48,7 +85,7 @@ EJECT_SCSI_MEDIA		PROC
 
 						POP		DS
 						RET
-EJECT_SCSI_MEDIA		ENDP
+SCSI_OPEN_LID			ENDP
 
 SCSI_EJECT_COMMAND		DB		1BH,0,0,0,2,0	; 2=LoEJ
 
