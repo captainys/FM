@@ -56,7 +56,7 @@ CMOS_AFTER_RESET_INSTRUCTION	PROC
 
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		@b
 
 						RET

@@ -103,6 +103,9 @@ WAIT_PADA_RELEASE		ENDP
 
 
 
+; Return:
+;   AL  Pad state (b7 Select, b6 Run)
+;   AH  Key Scan Code
 READ_PADA				PROC
 
 						PUSH	DX
@@ -114,7 +117,19 @@ READ_PADA				PROC
 						MOV		DX,IO_PADA_IN
 						IN		AL,DX
 						AND		AL,3FH
+						XOR		AH,AH
 
+						MOV		DL,AL
+						AND		DL,03H
+						JE		READ_PADA_SELECTBTN_DOWN
+						OR		AL,80H
+
+READ_PADA_SELECTBTN_DOWN:
+						MOV		DL,AL
+						AND		DL,0CH
+						JE		READ_PADA_RUNBTN_DOWN
+						OR		AL,40H
+READ_PADA_RUNBTN_DOWN:
 
 						PUSH	AX
 						MOV		DX,IO_KEYBOARD_STATE
@@ -132,6 +147,8 @@ READ_PADA				PROC
 						JNE		SHORT READ_PADA_KEY_INPUT_DONE
 
 						MOV		DL,0FFH-04H
+						MOV		DH,AL
+
 						CMP		AL,4FH	; Left
 						JE		SHORT READ_PADA_THERE_WAS_KEY_INPUT
 
@@ -168,6 +185,7 @@ READ_PADA_KEY_INPUT_DONE:
 READ_PADA_THERE_WAS_KEY_INPUT:
 						POP		AX
 						AND		AL,DL
+						MOV		AH,DH
 						POP		DX
 						RET
 

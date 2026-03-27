@@ -121,7 +121,7 @@ DRVMENU_MAINLOOP:
 
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		@b
 
 						CALL	COUNT_DRVMENU_CHOICES
@@ -332,7 +332,7 @@ DRVMENU_HELP			PROC
 
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		@b
 
 
@@ -670,7 +670,7 @@ DRVMENU_CONFIRM_MAINLOOP:
 
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		@b
 
 						MOV		CH,3

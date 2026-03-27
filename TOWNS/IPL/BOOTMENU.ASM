@@ -140,7 +140,7 @@ BOOTMENU_PAD_LOOP:
 
 BOOTMENU_PAD_READ:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		BOOTMENU_PAD_LOOP
 						; Wait for PAD while count down for AUTOBOOT <<
 
@@ -377,7 +377,7 @@ BOOTMENU_PROMPT_CD_CHANGE	PROC
 						CALL	DRAW_TEXT
 @@:
 						CALL	READ_PADA
-						CMP		AL,3FH
+						CMP		AL,0FFH
 						JE		@b
 
 						RET
