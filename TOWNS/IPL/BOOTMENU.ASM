@@ -112,7 +112,7 @@ BOOTMENU_PAD_LOOP:
 						JE		BOOTMENU_PAD_READ
 
 						DEC		WORD PTR CS:[AUTOBOOT_COUNTER]
-						MOV		AL,0FH	; Virtually Press A button
+						MOV		AL,0CFH	; Virtually Press A button
 						CMP		WORD PTR CS:[AUTOBOOT_COUNTER],0
 						JE		BOOTMENU_PAD_IS_IN
 
