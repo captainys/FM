@@ -117,6 +117,18 @@ READ_PADA				PROC
 
 						MOV		DX,IO_PADA_IN
 						IN		AL,DX
+						AND		AL,3FH
+						CMP		AL,3FH
+						JE		READ_PADA_ANTI_CHATTER
+
+						; If, any button is pressed, wait for 10ms and then read again to prevent chattering.
+						MOV		DX,10000
+READ_PADA_ANTI_CHATTER:	OUT		IO_WAIT_1MICROSEC,AL
+						DEC		DX
+						JNE		READ_PADA_ANTI_CHATTER
+
+						MOV		DX,IO_PADA_IN
+						IN		AL,DX
 						OR		AL,0C0H
 						XOR		AH,AH
 
@@ -189,40 +201,52 @@ READ_PADA_THERE_WAS_KEY_INPUT:
 
 READ_PADA				ENDP
 
-
-; Read PADA
-;   If there is an input, wait until release, and then return.
-READ_PADA_WAIT_RELEASE	PROC
-						PUSH	DX
-
-						CALL	READ_PADA
-						CMP		AL,0FFH
-						JE		READ_PADA_WAIT_RELEASE_NO_PAD_INPUT
-
-						MOV		DX,AX	; Preserve AH (Key stroke)
-
-READ_PADA_WAITREL_WAIT:
-						CALL	READ_PADA
-
-						MOV		AH,AL
-						AND		AH,0C0H
-						CMP		AH,0C0H
-						JE		READ_PADA_WAITREL_NEXT
-
-						MOV		DL,AL	; If RUN/SELECT is pressed, update DL.  (F**k chattering!)
-
-READ_PADA_WAITREL_NEXT:
-						CMP		AL,0FFH
-						JNE		READ_PADA_WAITREL_WAIT
-
-						MOV		AX,DX
-
-READ_PADA_WAIT_RELEASE_NO_PAD_INPUT:
-						POP		DX
-						RET
-
-READ_PADA_WAIT_RELEASE	ENDP
-
-
 LAST_KEY_READ			DB		0
 
+
+
+
+
+HID_WAIT_VSYNC_CLEAR		PROC
+							PUSH	DX
+							PUSH	AX
+
+							MOV		DX,IO_VSYNC
+HID_WAIT_VSYNC_CLEAR_LOOP:	IN		AL,DX
+							AND		AL,1
+							JNE		HID_WAIT_VSYNC_CLEAR_LOOP
+
+							POP		DX
+							POP		AX
+							RET
+HID_WAIT_VSYNC_CLEAR		ENDP
+
+
+
+
+
+HID_WAIT_VSYNC_SET			PROC
+							PUSH	DX
+							PUSH	AX
+
+							MOV		DX,IO_VSYNC
+HID_WAIT_VSYNC_SET_LOOP:	IN		AL,DX
+							AND		AL,1
+							JE		HID_WAIT_VSYNC_SET_LOOP
+
+							POP		DX
+							POP		AX
+							RET
+HID_WAIT_VSYNC_SET			ENDP
+
+
+
+
+
+HID_WAIT_CX_VSYNC_CYCLES	PROC
+							CALL	HID_WAIT_VSYNC_CLEAR
+HID_WAIT_VSYNC_CYCLES_LOOP:	CALL	HID_WAIT_VSYNC_SET
+							CALL	HID_WAIT_VSYNC_CLEAR
+							LOOP	HID_WAIT_VSYNC_CYCLES_LOOP
+							RET
+HID_WAIT_CX_VSYNC_CYCLES	ENDP

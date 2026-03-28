@@ -74,6 +74,8 @@ SCSI2SD_VENDORID		DB		" codesrc"
 ; Input
 ;   CL  SCSI ID
 ;   Wait until unit ready by TEST UNIT READY before calling this.
+; Output
+;   CF  Error.  Prob device busy or device not exist.
 SCSI_OPEN_LID			PROC
 						PUSH	DS
 						MOV		AX,CS
@@ -95,6 +97,8 @@ SCSI_EJECT_COMMAND		DB		1BH,0,0,0,2,0	; 2=LoEJ
 ; Input
 ;   CL  SCSI ID
 ;   Wait until unit ready by TEST UNIT READY before calling this.
+; Output
+;   CF  Error.  Prob device busy or device not exist.
 SCSI_CLOSE_LID			PROC
 						PUSH	DS
 						MOV		AX,CS

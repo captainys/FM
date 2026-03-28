@@ -8,6 +8,8 @@ IO_CMOS_FASTMODE				EQU			3C2AH
 IO_CMOS_FASTPOWERONMEMORYTEST	EQU			3C1AH
 IO_CMOS_END						EQU			4000H
 
+IO_WAIT_1MICROSEC				EQU			06CH	; This I/O was added in the 4th generation, but earlier models are slow enough.  OUT 6CH,AL gives a good wait.
+
 IO_MACHINE_ID_LOW				EQU			0030H
 IO_MACHINE_ID_HIGH				EQU			0031H
 
