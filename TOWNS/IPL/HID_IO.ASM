@@ -77,8 +77,8 @@ WAIT_PADA_RELEASE		PROC
 
 						MOV		DX,IO_PADA_IN
 						IN		AL,DX
-						AND		AL,30H
-						CMP		AL,30H
+						AND		AL,3FH
+						CMP		AL,3FH
 						JNE		@b
 
 
