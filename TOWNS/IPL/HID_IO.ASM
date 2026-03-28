@@ -115,11 +115,13 @@ READ_PADA				PROC
 						MOV		DX,IO_PAD_OUT
 						OUT		DX,AL
 
+						OUT		IO_WAIT_1MICROSEC,AL	; Hope this make it better.  TBIOS does wait for 1us after writing PAD OUT.
+
 						MOV		DX,IO_PADA_IN
 						IN		AL,DX
 						AND		AL,3FH
 						CMP		AL,3FH
-						JE		READ_PADA_ANTI_CHATTER
+						JE		READ_PADA_ANTI_CHATTER_DONE
 
 						; If, any button is pressed, wait for 10ms and then read again to prevent chattering.
 						MOV		DX,10000
@@ -129,6 +131,8 @@ READ_PADA_ANTI_CHATTER:	OUT		IO_WAIT_1MICROSEC,AL
 
 						MOV		DX,IO_PADA_IN
 						IN		AL,DX
+
+READ_PADA_ANTI_CHATTER_DONE:
 						OR		AL,0C0H
 						XOR		AH,AH
 
@@ -216,8 +220,8 @@ HID_WAIT_VSYNC_CLEAR_LOOP:	IN		AL,DX
 							AND		AL,1
 							JNE		HID_WAIT_VSYNC_CLEAR_LOOP
 
-							POP		DX
 							POP		AX
+							POP		DX
 							RET
 HID_WAIT_VSYNC_CLEAR		ENDP
 
@@ -234,8 +238,8 @@ HID_WAIT_VSYNC_SET_LOOP:	IN		AL,DX
 							AND		AL,1
 							JE		HID_WAIT_VSYNC_SET_LOOP
 
-							POP		DX
 							POP		AX
+							POP		DX
 							RET
 HID_WAIT_VSYNC_SET			ENDP
 
