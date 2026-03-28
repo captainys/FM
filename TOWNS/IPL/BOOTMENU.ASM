@@ -143,7 +143,7 @@ BOOTMENU_PAD_LOOP:
 						CALL	COLOR
 
 BOOTMENU_PAD_READ:
-						CALL	READ_PADA
+						CALL	READ_PADA_WAIT_RELEASE		; It waits until pad buttons are released, also it captures RUN/SELECT correctly.
 
 						CMP		AH,013H	; Scancode for 'E' Eject
 						JE		BOOTMENU_EJECT_MEDIA
@@ -154,8 +154,6 @@ BOOTMENU_PAD_READ:
 						JE		BOOTMENU_PAD_LOOP
 						; Wait for PAD while count down for AUTOBOOT <<
 
-
-
 BOOTMENU_PAD_IS_IN:
 						MOV		BYTE PTR CS:[AUTOBOOT],0	; Once pad is moved, no more auto boot
 						PUSH	AX
@@ -163,15 +161,15 @@ BOOTMENU_PAD_IS_IN:
 						CALL	ERASE_LINE_TALL
 						POP		AX
 
-						MOV		AH,CS:[BOOTMENU_SELECTION]
-						MOV		CH,CS:[NUM_BOOTMENU_OPTIONS]
-						CALL	MOVE_ARROW_BY_PAD
-						MOV		CS:[BOOTMENU_SELECTION],AH
-
 						TEST	AL,080H	; Select Button
 						JE		BOOTMENU_EJECT_MEDIA
 						TEST	AL,040H ; Run Button
 						JE		BOOTMENU_CLOSE_LID
+
+						MOV		AH,CS:[BOOTMENU_SELECTION]
+						MOV		CH,CS:[NUM_BOOTMENU_OPTIONS]
+						CALL	MOVE_ARROW_BY_PAD
+						MOV		CS:[BOOTMENU_SELECTION],AH
 
 BOOTMENU_NOT_SELECT_BTN:
 						AND		AL,30H
