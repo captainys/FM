@@ -39,8 +39,10 @@ proc=subprocess.Popen([
 		"-conscmd","D:\AUTOEXEC.BAT",
 		"-conscmd","E:",
 		"-conscmd","CD IPL",
-		"-conscmd","TASK.BAT"
-	])
+		"-conscmd","MAKE",
+		"-conscmd","IF ERRORLEVEL 1 FAIL",
+		"-conscmd","SUCCESS",
+	]+sys.argv[1:])
 proc.communicate()
 if 0!=proc.returncode:
 	print("**** ERROR ***")
