@@ -215,7 +215,9 @@ TRIPLE_CONFIRM_LOOP:
 						POP		SI
 
 @@:
+						XCHG	DH,AH		; Save AH
 						CALL	READ_PADA
+						XCHG	DH,AH		; Restore AH
 						CMP		AL,0FFH
 						JE		@b
 

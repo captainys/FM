@@ -106,7 +106,7 @@ WAIT_PADA_RELEASE		ENDP
 ; Return:
 ;   AL  Pad state (b7 Select, b6 Run)
 ;   AH  Key Scan Code
-; Guarantee to preserve DX.  BOOTMENU assumes so.
+; Guarantee to preserve DX.  BOOTMENU and MENU_TRIPLE_CONFIRM assume so.
 READ_PADA				PROC
 
 						PUSH	DX
