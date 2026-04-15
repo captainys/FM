@@ -69,7 +69,15 @@ REALMAIN:
 
 						MOV		AX,BOOTLOADER_SEGMENT
 						MOV		DS,AX
+						MOV		ES,AX
 
+
+						MOV		DI,0000H; OFFSET 0100H
+						MOV		CX,0100H
+						MOV		AL,0
+						REP		STOSB
+
+						; DI is now 0100H
 
 						MOV		AH,05H	; Read Sector
 
@@ -80,7 +88,6 @@ REALMAIN:
 						XOR		CH,CH	; Just in case
 
 						MOV		BX,48	; 48 sectors.  Looks like 1024 bytes/sec
-						XOR		DI,DI	; OFFSET 0
 
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
 						DB		9AH		; CALLF FFFB:0014
@@ -101,8 +108,8 @@ REALMAIN:
 
 						POP		BX
 
-						DB		9AH		; CALLF 8000:0000
-						DW		0000H
+						DB		9AH		; CALLF 8000:0100
+						DW		0100H
 						DW		BOOTLOADER_SEGMENT
 
 						; Not really happen, but if the loader fails, return to the system ROM.

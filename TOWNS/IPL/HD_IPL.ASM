@@ -82,6 +82,13 @@ REALMAIN:
 
 						MOV		AX,BOOTLOADER_SEGMENT
 						MOV		DS,AX
+						MOV		ES,AX
+
+
+						XOR		DI,DI	; OFFSET 0
+						MOV		AL,0
+						MOV		CX,0100H
+						REP		STOSB
 
 
 						MOV		AH,05H	; Read Sector
@@ -95,7 +102,6 @@ REALMAIN:
 						XOR		CH,CH	; Just in case
 
 						MOV		BX,96	; 96 sectors 48K
-						XOR		DI,DI	; OFFSET 0
 
 						; How can I write CALL 		FAR PTR 0FFFBH:0014H
 						DB		9AH		; CALLF FFFB:0014

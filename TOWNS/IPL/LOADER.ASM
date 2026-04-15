@@ -2,7 +2,7 @@
 
 						PAGE	99,160
 
-VERSION_STRING			EQU		"VERSION 20260404a"
+VERSION_STRING			EQU		"VERSION 20260415"
 
 						.386p
 CODE					SEGMENT	USE16
@@ -10,10 +10,9 @@ CODE					SEGMENT	USE16
 						INCLUDE		IODEF.ASM
 						INCLUDE		DEF.ASM
 
-; If making a .COM executable, the offset needs to be 0100h
-IFDEF	COMEXE
+
+						; To align with .COM executable, it should start from offset 100h.
 						ORG			0100H
-ENDIF
 
 
 MAIN					PROC

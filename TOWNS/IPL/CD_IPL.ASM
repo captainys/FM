@@ -67,7 +67,14 @@ INTERNALCD:
 						PUSH	DS
 						MOV		AX,8000H
 						MOV		DS,AX
+						MOV		ES,AX
+
 						XOR		DI,DI
+						MOV		CX,0100H
+						MOV		AL,0
+						REP		STOSB
+
+						; DI=0100H
 
 						MOV		AX,05C0H	; Read Sector, Device=0C0H
 						XOR		CX,CX
@@ -126,8 +133,8 @@ SECONDARY_LOADER_LOADED:
 
 						POP		BX
 
-						DB		9AH		; CALLF 8000:0000
-						DW		0000H
+						DB		9AH		; CALLF 8000:0100
+						DW		0100H
 						DW		BOOTLOADER_SEGMENT
 
 CD_ERROR:
