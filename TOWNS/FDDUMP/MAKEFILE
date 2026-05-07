@@ -10,23 +10,29 @@ ALL : EXE\FDDUMP.EXE EXE\RDD2D77.EXE EXE\TEST.EXE
 
 
 BUILD\FDDUMP.OBJ : FDDUMP.C MAKEFILE
-	WCC FDDUMP.C -3 -foBUILD\FDDUMP.OBJ
+	WCC FDDUMP.C -3 -ms -os -s -bt=DOS -foBUILD\FDDUMP.OBJ
+
+# -ms     Small memory model (supposed to be, but no effect)
+# -3      386.  For eliminating absurd 8-bit limit for conditional jumps.  6809 did better than 8086.
+# -os     Optimize for size.  Open Watcom C creates slightly bigger binary if I use this option though.  WTF!
+# -s      Eliminate stack-overflow check.  This eliminates reference to mysterious __STK label.
+# -bt=DOS DOS binary.
+
 
 EXE\FDDUMP.EXE : BUILD\FDDUMP.OBJ MAKEFILE
-	@WLINK FILE BUILD\FDDUMP.OBJ NAME EXE\FDDUMP.EXE
-
+	@WLINK system dos FILE BUILD\FDDUMP.OBJ NAME EXE\FDDUMP.EXE
 
 
 BUILD\RDD2D77.OBJ : RDD2D77.C MAKEFILE
-	WCC RDD2D77.C -3 -foBUILD\RDD2D77.OBJ
+	WCC RDD2D77.C -3 -ms -os -s -bt=DOS  -foBUILD\RDD2D77.OBJ
 
 EXE\RDD2D77.EXE : BUILD\RDD2D77.OBJ MAKEFILE
-	@WLINK FILE BUILD\RDD2D77.OBJ NAME EXE\RDD2D77.EXE
+	@WLINK system dos FILE BUILD\RDD2D77.OBJ NAME EXE\RDD2D77.EXE
 
 
 
 BUILD\TEST.OBJ : TEST.C MAKEFILE
-	WCC TEST.C -3 -foBUILD\TEST.OBJ
+	WCC TEST.C -3 -ms -os -s -bt=DOS  -foBUILD\TEST.OBJ
 
 EXE\TEST.EXE : BUILD\TEST.OBJ MAKEFILE
-	@WLINK FILE BUILD\TEST.OBJ NAME EXE\TEST.EXE
+	@WLINK system dos FILE BUILD\TEST.OBJ NAME EXE\TEST.EXE

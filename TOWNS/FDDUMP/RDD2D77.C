@@ -22,6 +22,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #define TSUGARU_DEBUGBREAK				outp(0x2386,2);
 
+// size_t is 16-bit in WATCOM for DOS.  size_t is too unusable.
+typedef uint32_t SIZE_T;
 
 struct D77Header
 {
@@ -108,8 +110,8 @@ unsigned int ConvertTrack(uint32_t trackTable[],FILE *ofp,FILE *extFp,FILE *ifp,
 	int nSec=0;
 	static uint8_t data[1024];
 	static struct D77SectorHeader hdr;
-	size_t d77Ptr=ftell(ofp);
-	size_t rddPtr=ftell(ifp);
+	SIZE_T d77Ptr=ftell(ofp);
+	SIZE_T rddPtr=ftell(ifp);
 
 	// D77 format is weird because each sector needs to remember number of sectors per track.
 	while(16==fread(id,1,16,ifp))
@@ -151,7 +153,7 @@ unsigned int ConvertTrack(uint32_t trackTable[],FILE *ofp,FILE *extFp,FILE *ifp,
 		}
 	}
 
-	printf("%d\n",nSec);
+	printf("%d sectors per track\n",nSec);
 
 	while(16==fread(id,1,16,ifp))
 	{
