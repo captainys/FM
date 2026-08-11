@@ -3,6 +3,7 @@
 ; CX					Pattern Length
 ; ES:DI					Source Pattern
 ; ES:BX					Write Pattern
+; CF is carried over from FIND_SOURCE_PATTERN (CF=0 Pattern found  CF=1 Pattern not found)
 APPLY_PATCH				PROC
 
 						CALL	FIND_SOURCE_PATTERN
@@ -77,20 +78,44 @@ FIND_SOURCE_PATTERN		ENDP
 ; CX					Pattern Length
 ; CS:DI					Source Pattern
 ; CS:BX					Write Pattern
+; CF will be carried over from APPLY_PATCH (CF=0 Pattern found  CF=1 Pattern not found)
 PATCH_IOSYS				PROC
 						; DS:0000h				Target Location
 						; DX					Target Length in number of 16-byte pages
 						; CX					Pattern Length
 						; ES:DI					Source Pattern
 						; ES:BX					Write Pattern
-						MOV		AX,0040H
-						MOV		DS,AX			; Target 0040:0000
+						MOV		DX,0040H
+						MOV		DS,DX			; Target 0040:0000
 						MOV		DX,2000H		; 16 times 2000h = 128KB target size
 						PUSH	CS
 						POP		ES
 						CALL	APPLY_PATCH
 						RET
 PATCH_IOSYS				ENDP
+
+
+
+; CX					Pattern Length
+; CS:DI					Source Pattern
+; Output:
+; CF will be carried over from FIND_SOURCE_PATTERN (CF=0 Pattern found  CF=1 Pattern not found)
+;   CF=0  DS:SI Pattern location
+;   CF=1  Pattern not found
+FIND_IN_IOSYS			PROC
+						; DS:0000h				Target Location
+						; DX					Target Length in number of 16-byte pages
+						; CX					Pattern Length
+						; ES:DI					Source Pattern
+						MOV		DX,0040H
+						MOV		DS,DX			; Target 0040:0000
+						MOV		DX,2000H		; 16 times 2000h = 128KB target size
+						PUSH	CS
+						POP		ES
+						CALL	FIND_SOURCE_PATTERN
+						RET
+FIND_IN_IOSYS			ENDP
+
 
 
 
@@ -164,6 +189,119 @@ UNPATCH_V21L20			PROC
 						POP		DS
 						RET
 UNPATCH_V21L20			ENDP
+
+
+
+
+; IO.SYS of Towns OS V1.1L20 checks CMOS 321CH, and it fails to boot unless it is zero.
+; This CMOS address is used by the newer version of Towns OS, the purpose is still unknown.
+; As a result, it fails to boot once some settings are changed in the newer version Towns OS.
+; The following patches correct the issue and make Towns OS V1.1L20 bootable regardless.
+
+; Towns OS V1.1L20 MENU_DRV Bug.
+; FROM:
+; 0A58:00000217 E873FE                    CALL    0000008D
+; 0A58:0000021A C606EB0000                MOV     BYTE PTR [00EBH],00H
+; 0A58:0000021F 833E4C0000                CMP     WORD PTR [004CH],00H
+; 0A58:00000224 7532                      JNE     00000258                   -> NOP NOP 90 90
+; 0A58:00000226 803E400008                CMP     BYTE PTR [0040H],08H
+; 0A58:0000022B 752B                      JNE     00000258
+; 0A58:0000022D C606EB00FF                MOV     BYTE PTR [00EBH],FFH
+; TO:
+; 0A58:00000224 90                        NOP
+; 0A58:00000225 90                        NOP
+V11L20_MENU_DRV_BUG1_FROM	DB	0E8h,073h,0FEh,0C6h,006h,0EBh,000h,000h,083h,03Eh,04Ch,000h,000h,075h,032h,080h,03Eh,040h,000h,008h,075h,02Bh,0C6h,006h,0EBh,000h,0FFh
+V11L20_MENU_DRV_BUG1_FROM_END:
+V11L20_MENU_DRV_BUG1_TO		DB	0E8h,073h,0FEh,0C6h,006h,0EBh,000h,000h,083h,03Eh,04Ch,000h,000h,090h,090h,080h,03Eh,040h,000h,008h,075h,02Bh,0C6h,006h,0EBh,000h,0FFh
+V11L20_MENU_DRV_BUG1_TO_END:
+
+
+; FROM:
+; 0A58:000046CE FA                        CLI
+; 0A58:000046CF 8C165640                  MOV     [4056H],SS
+; 0A58:000046D3 89265840                  MOV     [4058H],SP
+; 0A58:000046D7 BC580A                    MOV     SP,0A58H     <- ‚±‚ÌA58H‚Íˆá‚¤êŠ‚É‚È‚é‰Â”\«‚ ‚è
+; 0A58:000046DA 8ED4                      MOV     SS,SP
+; 0A58:000046DC BC5A42                    MOV     SP,425AH
+; 0A58:000046DF FB                        STI
+; TO:
+;                 FA                                  CLI
+;      3 00000000 2E89265640              			MOV     CS:[4056H],SP
+;      4 00000005 2E8C165840              			MOV     CS:[4058H],SS
+;      5 0000000A 0E                      			PUSH	CS
+;      6 0000000B 17                      			POP		SS
+;      7 0000000C BC5A42                  			MOV		SP,425AH
+;      8 0000000F 90                      			NOP
+;                 FB                                  STI
+V11L20_MENU_DRV_BUG2_FROM	DB	0FAh,08Ch,016h,056h,040h,089h,026h,058h,040h,0BCh
+V11L20_MENU_DRV_BUG2_FROM_END:
+V11L20_MENU_DRV_BUG2_TO		DB	0FAh,02Eh,089h,026h,056h,040h,02Eh,08Ch,016h,058h,040h,00Eh,017h,0BCh,05Ah,042h,090h
+V11L20_MENU_DRV_BUG2_TO_END:
+
+
+; FROM:
+; 0A58:00004848 FA                        CLI
+; 0A58:00004849 8B265840                  MOV     SP,[4058H]
+; 0A58:0000484D 8E165640                  MOV     SS,[4056H]
+; 0A58:00004851 FB                        STI
+; TO:
+;                 FA                        CLI
+;     11 00000010 2E0FB2265640            			LSS	SP,CS:[4056H]
+;     12 00000016 90                      			NOP
+;     13 00000017 90                      			NOP
+;                 FB                        STI
+V11L20_MENU_DRV_BUG3_FROM	DB	0FAh,08Bh,026h,058h,040h,08Eh,016h,056h,040h,0FBh
+V11L20_MENU_DRV_BUG3_FROM_END:
+V11L20_MENU_DRV_BUG3_TO		DB	0FAh,02Eh,00Fh,0B2h,026h,056h,040h,090h,090h,0FBh
+V11L20_MENU_DRV_BUG3_TO_END:
+
+PATCH_V11L20			PROC
+						PUSH	DS
+						PUSH	ES
+						PUSHA
+
+						MOV		CX,OFFSET V11L20_MENU_DRV_BUG1_FROM_END-OFFSET V11L20_MENU_DRV_BUG1_FROM
+						MOV		DI,OFFSET V11L20_MENU_DRV_BUG1_FROM
+						MOV		BX,OFFSET V11L20_MENU_DRV_BUG1_TO
+						CALL	PATCH_IOSYS	; (CF=0 Pattern found  CF=1 Pattern not found)
+						JC		NOT_V11L20
+
+						; Don't apply the rest two patches unless all three patterns are found.
+
+						MOV		CX,OFFSET V11L20_MENU_DRV_BUG3_FROM_END-V11L20_MENU_DRV_BUG3_FROM
+						MOV		DI,OFFSET V11L20_MENU_DRV_BUG3_FROM
+						CALL	FIND_IN_IOSYS
+						JC		NOT_V11L20
+
+						MOV		CX,OFFSET V11L20_MENU_DRV_BUG2_FROM_END-V11L20_MENU_DRV_BUG2_FROM
+						MOV		DI,OFFSET V11L20_MENU_DRV_BUG2_FROM
+						CALL	FIND_IN_IOSYS
+						JC		NOT_V11L20
+
+						; Two patterns found.  Go ahead and apply patches.
+						; FIND_IN_IOSYS -> DS:SI is where patch 2 needs to be applied.
+						PUSH	DS
+						POP		ES
+						MOV		DI,SI
+
+						PUSH	CS
+						POP		DS
+						MOV		SI,OFFSET V11L20_MENU_DRV_BUG2_TO
+						MOV		CX,OFFSET V11L20_MENU_DRV_BUG2_TO_END-V11L20_MENU_DRV_BUG2_TO
+						REP		MOVSB
+
+						MOV		CX,OFFSET V11L20_MENU_DRV_BUG3_FROM_END-V11L20_MENU_DRV_BUG3_FROM
+						MOV		DI,OFFSET V11L20_MENU_DRV_BUG3_FROM
+						MOV		BX,OFFSET V11L20_MENU_DRV_BUG3_TO
+						CALL	PATCH_IOSYS
+
+NOT_V11L20:
+						POPA
+						POP		ES
+						POP		DS
+						RET
+PATCH_V11L20			ENDP
+
 
 
 
